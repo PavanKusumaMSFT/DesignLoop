@@ -1,0 +1,62 @@
+import React from 'react';
+import styles from './{ComponentName}.module.css';
+
+// =============================================================================
+// Types
+// =============================================================================
+
+export interface {ComponentName}Props {
+  /** Visual style variant */
+  variant?: 'primary' | 'secondary' | 'ghost';
+  /** Component size */
+  size?: 'sm' | 'md' | 'lg';
+  /** Disabled state */
+  disabled?: boolean;
+  /** Content to render */
+  children: React.ReactNode;
+  /** Click handler */
+  onClick?: () => void;
+  /** Additional CSS classes */
+  className?: string;
+}
+
+// =============================================================================
+// Component
+// =============================================================================
+
+export const {ComponentName}: React.FC<{ComponentName}Props> = ({
+  variant = 'primary',
+  size = 'md',
+  disabled = false,
+  children,
+  onClick,
+  className,
+}) => {
+  const classNames = [
+    styles.root,
+    styles[variant],
+    styles[size],
+    disabled && styles.disabled,
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <div
+      className={classNames}
+      onClick={!disabled ? onClick : undefined}
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled}
+      onKeyDown={(e) => {
+        if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+    >
+      {children}
+    </div>
+  );
+};

@@ -1,0 +1,116 @@
+.container {
+  display: inline-flex;
+  align-items: stretch;
+  background: var(--color-neutral-100);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--elevation-1);
+  padding: 2px;
+  gap: 2px;
+}
+
+.segment {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  min-width: 80px;
+  min-height: 44px;
+  border: none;
+  border-radius: var(--border-radius-md);
+  background: transparent;
+  color: var(--color-neutral-700);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--motion-duration-fast), color var(--motion-duration-fast), transform var(--motion-duration-fast);
+  position: relative;
+  user-select: none;
+}
+
+.segment:hover:not(.active):not(:disabled) {
+  background: var(--color-neutral-200);
+}
+
+.segment:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+.segment:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.active {
+  background: var(--color-primary-500);
+  color: var(--color-neutral-50);
+  font-weight: var(--font-weight-medium);
+  transform: scale(1.02);
+}
+
+.active:hover {
+  background: var(--color-primary-500);
+}
+
+.icon {
+  font-size: var(--font-size-md);
+  line-height: 1;
+}
+
+.label {
+  line-height: 1;
+}
+
+.subLabel {
+  font-size: var(--font-size-xs);
+  opacity: 0.85;
+  line-height: 1;
+}
+
+.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+@media (max-width: 480px) {
+  .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .subLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .segment {
+    min-width: 44px;
+    padding: var(--spacing-xs);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segment {
+    transition: none;
+  }
+
+  .active {
+    transform: none;
+  }
+}

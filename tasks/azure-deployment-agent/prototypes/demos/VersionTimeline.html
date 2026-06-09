@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VersionTimeline Demo</title>
+<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --color-primary-300: #93C5FD; --color-primary-500: #3B82F6;
+  --color-neutral-50: #F9FAFB; --color-neutral-100: #F3F4F6;
+  --color-neutral-200: #E5E7EB; --color-neutral-300: #D1D5DB;
+  --color-neutral-700: #374151;
+  --border-radius-md: 8px; --border-radius-sm: 6px;
+  --spacing-xs: 4px; --spacing-sm: 8px; --spacing-md: 16px; --spacing-lg: 24px;
+  --font-size-xs: 0.75rem; --font-size-sm: 0.875rem;
+  --font-weight-medium: 500;
+  --motion-duration-fast: 150ms;
+  --elevation-1: 0 1px 3px rgba(0,0,0,0.08);
+  --elevation-3: 0 8px 24px rgba(0,0,0,0.12);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', -apple-system, sans-serif; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 32px; }
+.demo-wrapper { width: 100%; max-width: 700px; }
+.demo-label { font-size: 0.75rem; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; margin-bottom: 16px; }
+.demo-info { font-size: 0.8rem; color: #6B7280; margin-top: 16px; }
+.demo-info strong { color: #374151; }
+
+/* VersionTimeline styles */
+.vt-container { display: flex; flex-direction: column; gap: var(--spacing-md); padding: var(--spacing-md); }
+.vt-searchBar { display: flex; }
+.vt-searchInput {
+  width: 100%; max-width: 320px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-neutral-200); border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm); color: var(--color-neutral-700); background: var(--color-neutral-50);
+  outline: none; font-family: inherit; transition: border-color 150ms;
+}
+.vt-searchInput:focus { border-color: var(--color-primary-500); box-shadow: 0 0 0 1px var(--color-primary-500); }
+.vt-timeline { position: relative; height: 48px; margin: var(--spacing-lg) 24px; }
+.vt-track {
+  position: absolute; top: 50%; left: 0; right: 0; height: 3px;
+  background: var(--color-neutral-200); transform: translateY(-50%); border-radius: 2px;
+}
+.vt-connector {
+  position: absolute; top: 50%; height: 3px;
+  background: var(--color-primary-300); transform: translateY(-50%);
+  border-radius: 2px; z-index: 1; transition: left 150ms, width 150ms;
+}
+.vt-dotWrapper { position: absolute; top: 50%; transform: translate(-50%, -50%); z-index: 2; }
+.vt-dot {
+  width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer; padding: 0;
+  background: transparent; display: flex; align-items: center; justify-content: center;
+  transition: transform 150ms;
+}
+.vt-dot::before {
+  content: ''; width: 18px; height: 18px; border-radius: 50%; display: block;
+  transition: background 150ms, box-shadow 150ms, transform 150ms;
+}
+.vt-dotSelected::before { background: var(--color-primary-500); box-shadow: var(--elevation-1); }
+.vt-dotInactive::before { background: var(--color-neutral-300); }
+.vt-dot:hover::before { transform: scale(1.3); }
+.vt-dot:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 4px; }
+.vt-tooltip {
+  position: absolute; bottom: calc(100% + 14px); left: 50%; transform: translateX(-50%);
+  background: var(--color-neutral-50); border-radius: var(--border-radius-md);
+  box-shadow: var(--elevation-3); padding: var(--spacing-sm); white-space: nowrap;
+  z-index: 10; animation: fadeIn 100ms ease-out; pointer-events: none;
+}
+.vt-tooltipLabel { display: block; font-size: var(--font-size-sm); font-weight: 500; color: var(--color-neutral-700); }
+.vt-tooltipDate { display: block; font-size: var(--font-size-xs); color: var(--color-neutral-700); opacity: 0.7; }
+.vt-tooltipMeta { display: block; font-size: var(--font-size-xs); color: var(--color-neutral-700); opacity: 0.6; margin-top: 2px; }
+.vt-labels { position: relative; height: 20px; margin: 0 24px; }
+.vt-dotLabel {
+  position: absolute; transform: translateX(-50%); font-size: var(--font-size-xs);
+  color: var(--color-neutral-700); white-space: nowrap; text-align: center;
+}
+.vt-dotLabelSelected { font-weight: 600; color: var(--color-primary-500); }
+.vt-emptyMessage { text-align: center; color: var(--color-neutral-700); font-size: var(--font-size-sm); padding: var(--spacing-md); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(4px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useCallback, useRef } = React;
+
+const VERSIONS = [
+  { id: 'v1.0', label: 'v1.0.0', date: '2026-03-15', changeCount: 42, author: 'Alex Chen' },
+  { id: 'v1.1', label: 'v1.1.0', date: '2026-04-02', changeCount: 18, author: 'Priya Sharma' },
+  { id: 'v1.2', label: 'v1.2.0', date: '2026-04-20', changeCount: 31, author: 'Marcus Williams' },
+  { id: 'v1.3', label: 'v1.3.0', date: '2026-05-01', changeCount: 7, author: 'Alex Chen' },
+  { id: 'v2.0', label: 'v2.0.0-rc', date: '2026-05-10', changeCount: 56, author: 'Priya Sharma' },
+];
+
+function VersionTimeline({ versions, selectedVersions, onVersionSelect, searchQuery = '', onSearch }) {
+  const [hoveredId, setHoveredId] = useState(null);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const dotRefs = useRef([]);
+
+  const filtered = versions.filter(v => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return v.label.toLowerCase().includes(q) || v.author.toLowerCase().includes(q);
+  });
+
+  const isSelected = (id) => selectedVersions.includes(id);
+
+  const getConnectorRange = () => {
+    const idx0 = filtered.findIndex(v => v.id === selectedVersions[0]);
+    const idx1 = filtered.findIndex(v => v.id === selectedVersions[1]);
+    if (idx0 === -1 || idx1 === -1) return null;
+    return { start: Math.min(idx0, idx1), end: Math.max(idx0, idx1) };
+  };
+
+  const handleKeyDown = (e, index) => {
+    let nextIndex = null;
+    switch (e.key) {
+      case 'ArrowRight': nextIndex = Math.min(index + 1, filtered.length - 1); break;
+      case 'ArrowLeft': nextIndex = Math.max(index - 1, 0); break;
+      case 'Enter': case ' ': e.preventDefault(); onVersionSelect(filtered[index].id); return;
+      default: return;
+    }
+    if (nextIndex !== null) { e.preventDefault(); setFocusedIndex(nextIndex); dotRefs.current[nextIndex]?.focus(); }
+  };
+
+  const connectorRange = getConnectorRange();
+
+  if (filtered.length === 0) {
+    return (
+      <div className="vt-container">
+        {onSearch && (
+          <div className="vt-searchBar">
+            <input className="vt-searchInput" type="search" value={searchQuery}
+              onChange={e => onSearch(e.target.value)} placeholder="Search versions..." />
+          </div>
+        )}
+        <p className="vt-emptyMessage">No versions found</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="vt-container">
+      {onSearch && (
+        <div className="vt-searchBar">
+          <input className="vt-searchInput" type="search" value={searchQuery}
+            onChange={e => onSearch(e.target.value)} placeholder="Search versions..." aria-label="Search versions" />
+        </div>
+      )}
+
+      <div className="vt-timeline" role="listbox" aria-label="Version timeline">
+        <div className="vt-track" />
+        {connectorRange && (
+          <div className="vt-connector" style={{
+            left: `${(connectorRange.start / (filtered.length - 1)) * 100}%`,
+            width: `${((connectorRange.end - connectorRange.start) / (filtered.length - 1)) * 100}%`,
+          }} />
+        )}
+        {filtered.map((version, index) => {
+          const selected = isSelected(version.id);
+          const hovered = hoveredId === version.id;
+          const focused = focusedIndex === index;
+          return (
+            <div key={version.id} className="vt-dotWrapper" style={{
+              left: filtered.length > 1 ? `${(index / (filtered.length - 1)) * 100}%` : '50%',
+            }}>
+              <button
+                ref={el => dotRefs.current[index] = el}
+                className={`vt-dot ${selected ? 'vt-dotSelected' : 'vt-dotInactive'}`}
+                role="option" aria-selected={selected}
+                aria-label={`${version.label}, ${version.date}, ${version.changeCount} changes by ${version.author}`}
+                tabIndex={focused || (focusedIndex === -1 && index === 0) ? 0 : -1}
+                onClick={() => onVersionSelect(version.id)}
+                onKeyDown={e => handleKeyDown(e, index)}
+                onMouseEnter={() => setHoveredId(version.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                onFocus={() => setFocusedIndex(index)}
+              />
+              {(hovered || focused) && (
+                <div className="vt-tooltip" role="tooltip">
+                  <strong className="vt-tooltipLabel">{version.label}</strong>
+                  <span className="vt-tooltipDate">{version.date}</span>
+                  <span className="vt-tooltipMeta">{version.changeCount} changes · {version.author}</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="vt-labels">
+        {filtered.map((version, index) => (
+          <span key={version.id}
+            className={`vt-dotLabel ${isSelected(version.id) ? 'vt-dotLabelSelected' : ''}`}
+            style={{ left: filtered.length > 1 ? `${(index / (filtered.length - 1)) * 100}%` : '50%' }}>
+            {version.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [selected, setSelected] = useState(['v1.1', 'v1.3']);
+  const [search, setSearch] = useState('');
+
+  const handleSelect = (id) => {
+    setSelected(prev => {
+      if (prev.includes(id)) return prev;
+      return [prev[1], id];
+    });
+  };
+
+  return (
+    <div className="demo-wrapper">
+      <div className="demo-label">Click dots to select version range · Hover for details</div>
+      <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 10, padding: 8 }}>
+        <VersionTimeline
+          versions={VERSIONS}
+          selectedVersions={selected}
+          onVersionSelect={handleSelect}
+          searchQuery={search}
+          onSearch={setSearch}
+        />
+      </div>
+      <div className="demo-info">
+        Comparing: <strong>{selected[0]}</strong> → <strong>{selected[1]}</strong>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

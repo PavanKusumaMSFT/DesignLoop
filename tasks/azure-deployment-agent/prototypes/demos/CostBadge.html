@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CostBadge Demo</title>
+<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --color-primary-500: #3B82F6;
+  --color-neutral-50: #F9FAFB;
+  --color-neutral-100: #F3F4F6;
+  --color-neutral-200: #E5E7EB;
+  --color-neutral-700: #374151;
+  --color-warning-100: #FEF3C7;
+  --color-warning-500: #F59E0B;
+  --color-error-100: #FEE2E2;
+  --color-error-500: #EF4444;
+  --color-success-500: #22C55E;
+  --border-radius-full: 999px;
+  --border-radius-md: 8px;
+  --border-radius-sm: 6px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-weight-medium: 500;
+  --motion-duration-fast: 150ms;
+  --elevation-2: 0 4px 12px rgba(0,0,0,0.1);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+.demo-wrapper { display: flex; flex-direction: column; align-items: flex-start; gap: 40px; }
+.demo-section { display: flex; flex-direction: column; gap: 8px; }
+.demo-label { font-size: 0.75rem; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; }
+
+/* CostBadge styles */
+.cb-wrapper { display: inline-flex; flex-direction: column; position: relative; }
+.cb-badge {
+  display: inline-flex; align-items: center; gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-neutral-100); color: var(--color-neutral-700);
+  border: 1px solid transparent; border-radius: var(--border-radius-full);
+  font-size: var(--font-size-sm); font-weight: var(--font-weight-medium);
+  cursor: pointer; transition: background 150ms, transform 150ms;
+  min-height: 32px; font-family: inherit;
+}
+.cb-badge:hover { transform: scale(1.03); opacity: 0.9; }
+.cb-badge:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
+.cb-warning { background: var(--color-warning-100); border-color: var(--color-warning-500); }
+.cb-critical { background: var(--color-error-100); border-color: var(--color-error-500); }
+.cb-critical .cb-warningIcon { animation: pulse 1.5s ease-in-out infinite; }
+.cb-loading { pointer-events: none; }
+.cb-skeleton {
+  display: inline-block; width: 72px; height: 14px;
+  background: linear-gradient(90deg, #F3F4F6 25%, #E5E7EB 50%, #F3F4F6 75%);
+  background-size: 200% 100%; border-radius: 4px;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+.cb-panel {
+  margin-top: var(--spacing-xs); padding: var(--spacing-md);
+  background: var(--color-neutral-50); border-radius: var(--border-radius-md);
+  box-shadow: var(--elevation-2); animation: slideDown 150ms ease-out;
+  min-width: 360px;
+}
+.cb-table { width: 100%; border-collapse: collapse; font-size: var(--font-size-xs); }
+.cb-table th { text-align: left; padding: var(--spacing-xs); font-weight: 500; color: #374151; border-bottom: 1px solid #E5E7EB; }
+.cb-table td { padding: var(--spacing-xs); color: #374151; border-bottom: 1px solid #E5E7EB; }
+.cb-table tr:hover { background: #F9FAFB; }
+.cb-recommended { background: rgba(59,130,246,0.06); }
+.cb-recBadge { font-size: 0.65rem; background: rgba(59,130,246,0.1); color: #1D4ED8; padding: 1px 6px; border-radius: 999px; margin-left: 4px; }
+.cb-perfBar { display: inline-block; height: 6px; border-radius: 3px; background: var(--color-primary-500); vertical-align: middle; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@keyframes slideDown { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useCallback } = React;
+
+const ALTERNATIVES = [
+  { sku: 'Standard_D2s_v3', vCPUs: 2, ram: '8 GB', cost: 96, perfScore: 70 },
+  { sku: 'Standard_D4s_v3', vCPUs: 4, ram: '16 GB', cost: 192, perfScore: 85, recommended: true },
+  { sku: 'Standard_D8s_v3', vCPUs: 8, ram: '32 GB', cost: 384, perfScore: 95 },
+  { sku: 'Standard_E4s_v3', vCPUs: 4, ram: '32 GB', cost: 252, perfScore: 80 },
+];
+
+function CostBadge({ cost, currency = '$', timeHorizon = 'monthly', resourceName, alternatives = [], onAlternativeSelect, status = 'normal', loading = false }) {
+  const [expanded, setExpanded] = useState(false);
+  const TIME_LABELS = { hourly: '/hr', monthly: '/mo', annual: '/yr' };
+  const costText = `~${currency}${cost.toLocaleString()}${TIME_LABELS[timeHorizon]}`;
+  const statusClass = status === 'warning' ? 'cb-warning' : status === 'critical' ? 'cb-critical' : '';
+
+  return (
+    <div className="cb-wrapper">
+      <button
+        className={`cb-badge ${statusClass} ${loading ? 'cb-loading' : ''}`}
+        aria-label={`${resourceName} estimated cost: ${costText}`}
+        aria-expanded={alternatives.length > 0 ? expanded : undefined}
+        onClick={() => !loading && setExpanded(!expanded)}
+      >
+        {loading ? (
+          <span className="cb-skeleton" aria-hidden="true" />
+        ) : (
+          <>
+            <span>{costText}</span>
+            {status !== 'normal' && <span className="cb-warningIcon" aria-hidden="true">⚠</span>}
+          </>
+        )}
+      </button>
+      {expanded && alternatives.length > 0 && (
+        <div className="cb-panel" role="region" aria-label={`SKU alternatives for ${resourceName}`}>
+          <table className="cb-table">
+            <thead>
+              <tr><th>SKU</th><th>vCPUs</th><th>RAM</th><th>Cost/mo</th><th>Perf</th></tr>
+            </thead>
+            <tbody>
+              {alternatives.map(alt => (
+                <tr key={alt.sku}
+                    className={alt.recommended ? 'cb-recommended' : ''}
+                    style={{ cursor: onAlternativeSelect ? 'pointer' : 'default' }}
+                    onClick={() => onAlternativeSelect?.(alt.sku)}>
+                  <td>{alt.sku}{alt.recommended && <span className="cb-recBadge">Rec</span>}</td>
+                  <td>{alt.vCPUs}</td>
+                  <td>{alt.ram}</td>
+                  <td>${alt.cost}</td>
+                  <td><span className="cb-perfBar" style={{ width: alt.perfScore * 0.6 }} /> {alt.perfScore}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [selected, setSelected] = useState(null);
+
+  return (
+    <div className="demo-wrapper">
+      <div className="demo-section">
+        <div className="demo-label">Normal — Click to expand</div>
+        <CostBadge cost={192} resourceName="VM Instance" alternatives={ALTERNATIVES} onAlternativeSelect={setSelected} />
+        {selected && <div style={{fontSize:'0.8rem',color:'#6B7280',marginTop:4}}>Selected: <strong>{selected}</strong></div>}
+      </div>
+      <div className="demo-section">
+        <div className="demo-label">Warning</div>
+        <CostBadge cost={850} resourceName="AKS Cluster" status="warning" alternatives={[]} />
+      </div>
+      <div className="demo-section">
+        <div className="demo-label">Critical</div>
+        <CostBadge cost={2400} resourceName="SQL Database" status="critical" alternatives={[]} />
+      </div>
+      <div className="demo-section">
+        <div className="demo-label">Loading</div>
+        <CostBadge cost={0} resourceName="Computing..." loading />
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

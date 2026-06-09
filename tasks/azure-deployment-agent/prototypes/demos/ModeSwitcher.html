@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ModeSwitcher Demo</title>
+<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --color-primary-500: #3B82F6;
+  --color-neutral-50: #F9FAFB;
+  --color-neutral-100: #F3F4F6;
+  --color-neutral-200: #E5E7EB;
+  --color-neutral-700: #374151;
+  --border-radius-md: 8px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-weight-medium: 500;
+  --motion-duration-fast: 150ms;
+  --elevation-1: 0 1px 3px rgba(0,0,0,0.08);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+.demo-wrapper { display: flex; flex-direction: column; align-items: center; gap: 32px; }
+.demo-label { font-size: 0.75rem; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; }
+
+/* ModeSwitcher styles */
+.ms-container {
+  display: inline-flex;
+  align-items: stretch;
+  background: var(--color-neutral-100);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--elevation-1);
+  padding: 2px;
+  gap: 2px;
+}
+.ms-segment {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  min-width: 80px;
+  min-height: 44px;
+  border: none;
+  border-radius: var(--border-radius-md);
+  background: transparent;
+  color: var(--color-neutral-700);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--motion-duration-fast), color var(--motion-duration-fast), transform var(--motion-duration-fast);
+  user-select: none;
+  font-family: inherit;
+}
+.ms-segment:hover:not(.ms-active):not(:disabled) { background: var(--color-neutral-200); }
+.ms-segment:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
+.ms-segment:disabled { opacity: 0.4; cursor: not-allowed; }
+.ms-active {
+  background: var(--color-primary-500);
+  color: #fff;
+  font-weight: var(--font-weight-medium);
+  transform: scale(1.02);
+}
+.ms-icon { font-size: var(--font-size-md); line-height: 1; }
+.ms-label { line-height: 1; }
+.ms-sublabel { font-size: 0.7rem; opacity: 0.85; line-height: 1; }
+.ms-disabled { opacity: 0.4; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useCallback } = React;
+
+const MODES = [
+  { key: 'ask', label: 'Ask', icon: '💬' },
+  { key: 'plan', label: 'Plan', icon: '📋' },
+  { key: 'agent', label: 'Agent', icon: '🤖' },
+];
+
+function ModeSwitcher({ mode, activeAgent, onModeChange, disabled = false }) {
+  const tabRefs = useRef([]);
+
+  const handleKeyDown = useCallback((e, index) => {
+    if (disabled) return;
+    let nextIndex = null;
+    switch (e.key) {
+      case 'ArrowRight': nextIndex = (index + 1) % MODES.length; break;
+      case 'ArrowLeft': nextIndex = (index - 1 + MODES.length) % MODES.length; break;
+      case 'Home': nextIndex = 0; break;
+      case 'End': nextIndex = MODES.length - 1; break;
+      case 'Enter': case ' ':
+        e.preventDefault();
+        onModeChange(MODES[index].key);
+        return;
+      default: return;
+    }
+    if (nextIndex !== null) {
+      e.preventDefault();
+      tabRefs.current[nextIndex]?.focus();
+    }
+  }, [disabled, onModeChange]);
+
+  return (
+    <div className={`ms-container ${disabled ? 'ms-disabled' : ''}`} role="tablist" aria-label="Interaction mode">
+      {MODES.map((m, index) => {
+        const isActive = mode === m.key;
+        const showSubLabel = m.key === 'agent' && isActive && activeAgent;
+        return (
+          <button
+            key={m.key}
+            ref={el => tabRefs.current[index] = el}
+            role="tab"
+            aria-selected={isActive}
+            tabIndex={isActive ? 0 : -1}
+            className={`ms-segment ${isActive ? 'ms-active' : ''}`}
+            onClick={() => !disabled && onModeChange(m.key)}
+            onKeyDown={e => handleKeyDown(e, index)}
+            disabled={disabled}
+          >
+            <span className="ms-icon" aria-hidden="true">{m.icon}</span>
+            <span className="ms-label">{m.label}</span>
+            {showSubLabel && <span className="ms-sublabel">@{activeAgent}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function App() {
+  const [mode1, setMode1] = useState('ask');
+  const [mode2, setMode2] = useState('agent');
+
+  return (
+    <div className="demo-wrapper">
+      <div style={{ textAlign: 'center' }}>
+        <div className="demo-label">Default</div>
+        <div style={{ marginTop: 8 }}>
+          <ModeSwitcher mode={mode1} onModeChange={setMode1} />
+        </div>
+        <div style={{ marginTop: 8, fontSize: '0.8rem', color: '#6B7280' }}>
+          Current: <strong>{mode1}</strong>
+        </div>
+      </div>
+      <div style={{ textAlign: 'center' }}>
+        <div className="demo-label">With Active Agent</div>
+        <div style={{ marginTop: 8 }}>
+          <ModeSwitcher mode={mode2} activeAgent="deploy" onModeChange={setMode2} />
+        </div>
+      </div>
+      <div style={{ textAlign: 'center' }}>
+        <div className="demo-label">Disabled</div>
+        <div style={{ marginTop: 8 }}>
+          <ModeSwitcher mode="plan" onModeChange={() => {}} disabled />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

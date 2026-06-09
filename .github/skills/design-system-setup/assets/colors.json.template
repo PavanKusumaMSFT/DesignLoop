@@ -1,0 +1,32 @@
+{
+  "color": {
+    "primary": {
+      "50": { "value": "#EFF6FF", "description": "Lightest primary" },
+      "100": { "value": "#DBEAFE", "description": "Very light primary" },
+      "200": { "value": "#BFDBFE", "description": "Light primary" },
+      "300": { "value": "#93C5FD", "description": "Medium light primary" },
+      "400": { "value": "#60A5FA", "description": "Medium primary" },
+      "500": { "value": "#3B82F6", "description": "Base primary" },
+      "600": { "value": "#2563EB", "description": "Medium dark primary" },
+      "700": { "value": "#1D4ED8", "description": "Dark primary" },
+      "800": { "value": "#1E40AF", "description": "Very dark primary" },
+      "900": { "value": "#1E3A8A", "description": "Darkest primary" }
+    },
+    "neutral": {
+      "50": { "value": "#F9FAFB" },
+      "100": { "value": "#F3F4F6" },
+      "200": { "value": "#E5E7EB" },
+      "300": { "value": "#D1D5DB" },
+      "400": { "value": "#9CA3AF" },
+      "500": { "value": "#6B7280" },
+      "600": { "value": "#4B5563" },
+      "700": { "value": "#374151" },
+      "800": { "value": "#1F2937" },
+      "900": { "value": "#111827" }
+    },
+    "success": { "500": { "value": "#22C55E" } },
+    "warning": { "500": { "value": "#F59E0B" } },
+    "error": { "500": { "value": "#EF4444" } },
+    "info": { "500": { "value": "#3B82F6" } }
+  }
+}

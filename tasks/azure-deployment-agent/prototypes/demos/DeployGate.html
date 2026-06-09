@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeployGate Demo</title>
+<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --color-primary-100: #DBEAFE; --color-primary-500: #3B82F6; --color-primary-600: #2563EB;
+  --color-neutral-50: #F9FAFB; --color-neutral-100: #F3F4F6; --color-neutral-200: #E5E7EB;
+  --color-neutral-700: #374151; --color-neutral-800: #1F2937;
+  --color-success-500: #22C55E; --color-warning-500: #F59E0B;
+  --color-error-500: #EF4444;
+  --border-radius-md: 8px; --border-radius-sm: 6px;
+  --spacing-xs: 4px; --spacing-sm: 8px; --spacing-md: 16px; --spacing-lg: 24px;
+  --font-size-xs: 0.75rem; --font-size-sm: 0.875rem; --font-size-md: 1rem; --font-size-lg: 1.125rem;
+  --font-weight-medium: 500; --font-weight-semibold: 600;
+  --motion-duration-fast: 150ms; --motion-duration-normal: 250ms;
+  --elevation-2: 0 4px 12px rgba(0,0,0,0.1);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', -apple-system, sans-serif; background: #F3F4F6; display: flex; justify-content: center; padding: 32px 16px; min-height: 100vh; }
+#root { width: 100%; max-width: 720px; }
+
+.dg-panel { background: #fff; border-radius: var(--border-radius-md); box-shadow: var(--elevation-2); padding: var(--spacing-lg); animation: fadeIn var(--motion-duration-normal) ease-out; }
+.dg-header { display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-lg); }
+.dg-title { font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: var(--color-neutral-700); }
+.dg-fastTrack { font-size: var(--font-size-xs); padding: 3px 10px; background: var(--color-primary-100); color: var(--color-primary-500); border-radius: var(--border-radius-sm); font-weight: 500; }
+.dg-section { border: 1px solid var(--color-neutral-200); border-radius: var(--border-radius-md); margin-bottom: var(--spacing-md); overflow: hidden; }
+.dg-sectionHeader { display: flex; align-items: center; gap: var(--spacing-sm); width: 100%; padding: var(--spacing-md); background: var(--color-neutral-100); border: none; font-size: var(--font-size-md); font-weight: 600; color: var(--color-neutral-700); cursor: pointer; text-align: left; font-family: inherit; transition: background 150ms; }
+.dg-sectionHeader:hover { background: var(--color-neutral-200); }
+.dg-sectionContent { padding: var(--spacing-md); }
+.dg-chevron { font-size: var(--font-size-xs); width: 16px; text-align: center; }
+.dg-changeSummary { display: flex; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm); flex-wrap: wrap; }
+.dg-addedBadge, .dg-modifiedBadge, .dg-removedBadge { font-size: var(--font-size-sm); padding: 3px 10px; border-radius: var(--border-radius-sm); font-weight: 500; }
+.dg-addedBadge { background: rgba(34,197,94,0.12); color: var(--color-success-500); }
+.dg-modifiedBadge { background: rgba(245,158,11,0.12); color: var(--color-warning-500); }
+.dg-removedBadge { background: rgba(239,68,68,0.12); color: var(--color-error-500); }
+.dg-table { width: 100%; border-collapse: collapse; font-size: var(--font-size-sm); }
+.dg-table th { text-align: left; padding: var(--spacing-sm); font-weight: 500; color: var(--color-neutral-700); border-bottom: 1px solid var(--color-neutral-200); }
+.dg-table td { padding: var(--spacing-sm); color: var(--color-neutral-700); border-bottom: 1px solid var(--color-neutral-200); }
+.dg-added { color: var(--color-success-500); } .dg-modified { color: var(--color-warning-500); } .dg-removed { color: var(--color-error-500); }
+.dg-costIncrease { color: var(--color-error-500); } .dg-costDecrease { color: var(--color-success-500); }
+.dg-totalRow td { font-weight: 600; border-top: 2px solid var(--color-neutral-200); }
+.dg-validationList { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+.dg-validationItem { display: flex; align-items: center; gap: var(--spacing-sm); padding: var(--spacing-sm); border-radius: var(--border-radius-sm); }
+.dg-val-pass { background: rgba(34,197,94,0.06); } .dg-val-fail { background: rgba(239,68,68,0.06); } .dg-val-warning { background: rgba(245,158,11,0.06); }
+.dg-acknowledgment { margin: var(--spacing-md) 0; padding: var(--spacing-md); background: rgba(239,68,68,0.04); border-radius: var(--border-radius-sm); }
+.dg-checkboxLabel { display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-sm); color: var(--color-neutral-700); cursor: pointer; }
+.dg-checkboxLabel input { accent-color: var(--color-primary-500); width: 16px; height: 16px; }
+.dg-actions { display: flex; gap: var(--spacing-sm); justify-content: flex-end; margin-top: var(--spacing-lg); flex-wrap: wrap; }
+.dg-cancelButton, .dg-secondaryButton, .dg-deployButton { padding: 10px 20px; border-radius: var(--border-radius-sm); font-size: var(--font-size-sm); font-weight: 500; cursor: pointer; border: 1px solid var(--color-neutral-200); font-family: inherit; transition: background 150ms; }
+.dg-cancelButton { background: #fff; color: var(--color-neutral-700); }
+.dg-cancelButton:hover { background: var(--color-neutral-50); }
+.dg-secondaryButton { background: #fff; color: var(--color-primary-500); border-color: var(--color-primary-500); }
+.dg-secondaryButton:hover { background: rgba(59,130,246,0.04); }
+.dg-deployButton { background: var(--color-primary-600); color: #fff; border: none; }
+.dg-deployButton:hover:not(:disabled) { background: var(--color-primary-500); }
+.dg-deployButton:disabled { opacity: 0.5; cursor: not-allowed; }
+.dg-targetInfo { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; font-size: var(--font-size-sm); }
+.dg-targetInfo dt { font-weight: 500; color: var(--color-neutral-700); }
+.dg-targetInfo dd { color: var(--color-neutral-700); }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+
+const RESOURCES = [
+  { name: 'web-app-prod', type: 'Microsoft.Web/sites', status: 'modified' },
+  { name: 'app-insights-prod', type: 'Microsoft.Insights/components', status: 'added' },
+  { name: 'cdn-endpoint-legacy', type: 'Microsoft.Cdn/endpoints', status: 'removed' },
+  { name: 'storage-account', type: 'Microsoft.Storage/storageAccounts', status: 'modified' },
+];
+
+const VALIDATIONS = [
+  { name: 'Resource quotas', status: 'pass' },
+  { name: 'RBAC permissions', status: 'pass' },
+  { name: 'Network security groups', status: 'warning', message: 'Port 443 open to 0.0.0.0/0' },
+  { name: 'Budget threshold', status: 'fail', message: 'Monthly cost exceeds team budget of $5,000' },
+];
+
+const COST_SUMMARY = {
+  total: 5200,
+  delta: 840,
+  drivers: [
+    { serviceName: 'App Service', previousCost: 320, currentCost: 420, delta: 100 },
+    { serviceName: 'Application Insights', previousCost: 0, currentCost: 180, delta: 180 },
+    { serviceName: 'CDN', previousCost: 560, currentCost: 0, delta: -560 },
+    { serviceName: 'Storage', previousCost: 120, currentCost: 240, delta: 120 },
+  ]
+};
+
+const STATUS_ICONS = { added: '+', modified: '✎', removed: '✕', pass: '✅', fail: '❌', warning: '⚠️' };
+
+function Section({ title, index, defaultExpanded, children }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  return (
+    <div className="dg-section">
+      <button className="dg-sectionHeader" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+        <span className="dg-chevron">{expanded ? '▼' : '▶'}</span>
+        <span>{index}. {title}</span>
+      </button>
+      {expanded && <div className="dg-sectionContent">{children}</div>}
+    </div>
+  );
+}
+
+function DeployGate() {
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [deployed, setDeployed] = useState(false);
+
+  const hasFailures = VALIDATIONS.some(v => v.status === 'fail');
+  const hasDestructive = RESOURCES.some(r => r.status === 'removed');
+  const deployDisabled = hasFailures || (hasDestructive && !acknowledged);
+
+  const addedCount = RESOURCES.filter(r => r.status === 'added').length;
+  const modifiedCount = RESOURCES.filter(r => r.status === 'modified').length;
+  const removedCount = RESOURCES.filter(r => r.status === 'removed').length;
+
+  if (deployed) {
+    return (
+      <div className="dg-panel" style={{ textAlign: 'center', padding: 48 }}>
+        <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>🚀</div>
+        <h2 style={{ color: '#374151', marginBottom: 8 }}>Deployment Initiated</h2>
+        <p style={{ color: '#6B7280' }}>Your resources are being deployed to production.</p>
+        <button className="dg-secondaryButton" style={{ marginTop: 20 }} onClick={() => setDeployed(false)}>Reset Demo</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="dg-panel">
+      <div className="dg-header">
+        <h2 className="dg-title">Deploy Gate</h2>
+      </div>
+
+      <Section title="Resource Changes Summary" index={1} defaultExpanded={true}>
+        <div className="dg-changeSummary">
+          {addedCount > 0 && <span className="dg-addedBadge">+ {addedCount} added</span>}
+          {modifiedCount > 0 && <span className="dg-modifiedBadge">✎ {modifiedCount} modified</span>}
+          {removedCount > 0 && <span className="dg-removedBadge">✕ {removedCount} deleted</span>}
+        </div>
+        <table className="dg-table">
+          <thead><tr><th>Resource</th><th>Type</th><th>Change</th></tr></thead>
+          <tbody>
+            {RESOURCES.map(r => (
+              <tr key={r.name}>
+                <td>{r.name}</td>
+                <td style={{fontSize:'0.8rem'}}>{r.type}</td>
+                <td><span className={`dg-${r.status}`}>{STATUS_ICONS[r.status]} {r.status.charAt(0).toUpperCase() + r.status.slice(1)}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Section>
+
+      <Section title="Validation Checks" index={2} defaultExpanded={true}>
+        <div className="dg-validationList">
+          {VALIDATIONS.map(v => (
+            <div key={v.name} className={`dg-validationItem dg-val-${v.status}`}>
+              <span>{STATUS_ICONS[v.status]}</span>
+              <div>
+                <strong style={{fontSize:'0.875rem'}}>{v.name}</strong>
+                {v.message && <p style={{fontSize:'0.8rem',color:'#6B7280',margin:'2px 0 0'}}>{v.message}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Cost Impact" index={3} defaultExpanded={true}>
+        <table className="dg-table">
+          <thead><tr><th>Service</th><th>Previous</th><th>Current</th><th>Delta</th></tr></thead>
+          <tbody>
+            {COST_SUMMARY.drivers.map(d => (
+              <tr key={d.serviceName}>
+                <td>{d.serviceName}</td>
+                <td>{d.previousCost > 0 ? `$${d.previousCost}/mo` : '—'}</td>
+                <td>{d.currentCost > 0 ? `$${d.currentCost}/mo` : '—'}</td>
+                <td className={d.delta > 0 ? 'dg-costIncrease' : d.delta < 0 ? 'dg-costDecrease' : ''}>
+                  {d.delta > 0 ? `+$${d.delta}` : d.delta < 0 ? `-$${Math.abs(d.delta)}` : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="dg-totalRow">
+              <td>Total</td>
+              <td>${COST_SUMMARY.total - COST_SUMMARY.delta}/mo</td>
+              <td>${COST_SUMMARY.total}/mo</td>
+              <td className="dg-costIncrease">+${COST_SUMMARY.delta}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </Section>
+
+      <Section title="Deployment Target" index={4} defaultExpanded={true}>
+        <dl className="dg-targetInfo">
+          <dt>Environment</dt><dd>production</dd>
+          <dt>Subscription</dt><dd>Azure-Prod-001</dd>
+          <dt>Resource Group</dt><dd>rg-app-prod-westus2</dd>
+        </dl>
+      </Section>
+
+      {hasDestructive && (
+        <div className="dg-acknowledgment">
+          <label className="dg-checkboxLabel">
+            <input type="checkbox" checked={acknowledged} onChange={e => setAcknowledged(e.target.checked)} />
+            I acknowledge all destructive changes listed above
+          </label>
+        </div>
+      )}
+
+      <div className="dg-actions">
+        <button className="dg-cancelButton">Cancel</button>
+        <button className="dg-secondaryButton">Save as PR</button>
+        {hasFailures && <button className="dg-secondaryButton">Fix Issues</button>}
+        <button className="dg-deployButton" disabled={deployDisabled} onClick={() => setDeployed(true)}>
+          {deployDisabled ? 'Deploy blocked' : 'Deploy to Production'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<DeployGate />);
+</script>
+</body>
+</html>

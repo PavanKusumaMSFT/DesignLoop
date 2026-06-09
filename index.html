@@ -1,0 +1,1709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DesignLoop — Design Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/typescript.min.js"></script>
+<style>
+/* ================================================================
+   DESIGN TOKENS
+   ================================================================ */
+:root {
+  --color-primary-50: #EFF6FF;
+  --color-primary-100: #DBEAFE;
+  --color-primary-200: #BFDBFE;
+  --color-primary-300: #93C5FD;
+  --color-primary-400: #60A5FA;
+  --color-primary-500: #3B82F6;
+  --color-primary-600: #2563EB;
+  --color-primary-700: #1D4ED8;
+  --color-primary-800: #1E40AF;
+  --color-primary-900: #1E3A8A;
+  --color-neutral-0: #FFFFFF;
+  --color-neutral-50: #F9FAFB;
+  --color-neutral-100: #F3F4F6;
+  --color-neutral-200: #E5E7EB;
+  --color-neutral-300: #D1D5DB;
+  --color-neutral-400: #9CA3AF;
+  --color-neutral-500: #6B7280;
+  --color-neutral-600: #4B5563;
+  --color-neutral-700: #374151;
+  --color-neutral-800: #1F2937;
+  --color-neutral-900: #111827;
+  --color-success-50: #F0FDF4;
+  --color-success-500: #22C55E;
+  --color-warning-50: #FFFBEB;
+  --color-warning-500: #F59E0B;
+  --color-error-50: #FEF2F2;
+  --color-error-500: #EF4444;
+  --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --sidebar-width: 320px;
+  --header-height: 64px;
+}
+
+/* ================================================================
+   RESET & BASE
+   ================================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; scroll-behavior: smooth; }
+body {
+  font-family: var(--font-family-sans);
+  color: var(--color-neutral-800);
+  background: var(--color-neutral-50);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ================================================================
+   LAYOUT
+   ================================================================ */
+.app { display: flex; min-height: 100vh; }
+
+/* ================================================================
+   SIDEBAR
+   ================================================================ */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--color-neutral-900);
+  color: var(--color-neutral-300);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 100;
+  transition: transform 0.3s ease;
+}
+.sidebar-header {
+  padding: 24px 20px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.sidebar-logo {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-neutral-0);
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sidebar-logo .logo-icon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700));
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  color: white;
+}
+.sidebar-subtitle {
+  font-size: 0.75rem;
+  color: var(--color-neutral-500);
+  margin-top: 4px;
+}
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 0;
+}
+.sidebar-nav::-webkit-scrollbar { width: 4px; }
+.sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+/* Task group */
+.task-group { margin-bottom: 4px; }
+.task-header {
+  padding: 10px 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-neutral-500);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: color 0.15s;
+  user-select: none;
+}
+.task-header:hover { color: var(--color-neutral-300); }
+.task-header .chevron {
+  transition: transform 0.2s;
+  font-size: 0.6rem;
+}
+.task-header.collapsed .chevron { transform: rotate(-90deg); }
+
+/* Phase group */
+.phase-group { margin-bottom: 2px; }
+.phase-label {
+  padding: 6px 20px 6px 24px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-neutral-500);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.phase-label:hover { color: var(--color-neutral-400); }
+.phase-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.phase-dot.discover { background: #818CF8; }
+.phase-dot.define { background: #F472B6; }
+.phase-dot.ideate { background: #FBBF24; }
+.phase-dot.design { background: #34D399; }
+.phase-dot.prototype { background: #60A5FA; }
+.phase-dot.test { background: #FB923C; }
+.phase-dot.deliver { background: #A78BFA; }
+
+/* File item */
+.file-item {
+  padding: 6px 20px 6px 40px;
+  font-size: 0.8rem;
+  color: var(--color-neutral-400);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-left: 2px solid transparent;
+}
+.file-item:hover {
+  color: var(--color-neutral-100);
+  background: rgba(255,255,255,0.04);
+}
+.file-item.active {
+  color: var(--color-primary-400);
+  background: rgba(59, 130, 246, 0.08);
+  border-left-color: var(--color-primary-500);
+}
+.file-item .file-icon {
+  margin-right: 6px;
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+.phase-files { overflow: hidden; transition: max-height 0.3s ease; }
+
+/* ================================================================
+   MAIN CONTENT
+   ================================================================ */
+.main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.topbar {
+  height: var(--header-height);
+  background: var(--color-neutral-0);
+  border-bottom: 1px solid var(--color-neutral-200);
+  display: flex;
+  align-items: center;
+  padding: 0 32px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  gap: 16px;
+}
+.breadcrumb {
+  font-size: 0.85rem;
+  color: var(--color-neutral-500);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.breadcrumb span { color: var(--color-neutral-300); }
+.breadcrumb .crumb-active { color: var(--color-neutral-800); font-weight: 500; }
+.badge-phase {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.badge-phase.discover { background: #EEF2FF; color: #4338CA; }
+.badge-phase.define { background: #FDF2F8; color: #BE185D; }
+.badge-phase.ideate { background: #FFFBEB; color: #B45309; }
+.badge-phase.design { background: #ECFDF5; color: #047857; }
+.badge-phase.prototype { background: #EFF6FF; color: #1D4ED8; }
+.badge-phase.test { background: #FFF7ED; color: #C2410C; }
+.badge-phase.deliver { background: #F5F3FF; color: #6D28D9; }
+
+.hamburger {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: var(--color-neutral-600);
+  padding: 4px;
+}
+
+/* Content area */
+.content-area {
+  flex: 1;
+  padding: 40px;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ================================================================
+   WELCOME SCREEN
+   ================================================================ */
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  animation: fadeIn 0.5s ease;
+}
+.welcome-icon {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, var(--color-primary-100), var(--color-primary-200));
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  margin-bottom: 24px;
+}
+.welcome h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+  margin-bottom: 8px;
+}
+.welcome p {
+  font-size: 1rem;
+  color: var(--color-neutral-500);
+  max-width: 480px;
+  line-height: 1.7;
+}
+.task-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 32px;
+  width: 100%;
+  max-width: 640px;
+}
+.task-card {
+  background: var(--color-neutral-0);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 12px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+.task-card:hover {
+  border-color: var(--color-primary-300);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+  transform: translateY(-2px);
+}
+.task-card h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-neutral-900);
+  margin-bottom: 4px;
+}
+.task-card p {
+  font-size: 0.8rem;
+  color: var(--color-neutral-500);
+}
+.task-card .task-card-meta {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.task-card .meta-chip {
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-600);
+  font-weight: 500;
+}
+
+/* New Task card (dashed "create" affordance) */
+.task-card.new-task {
+  border-style: dashed;
+  border-color: var(--color-primary-300);
+  background: var(--color-primary-50);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  color: var(--color-primary-600);
+}
+.task-card.new-task:hover {
+  background: var(--color-primary-100);
+  border-color: var(--color-primary-500);
+}
+.task-card.new-task .new-task-plus {
+  font-size: 1.6rem;
+  line-height: 1;
+  font-weight: 600;
+}
+.task-card.new-task h3 { color: var(--color-primary-700); }
+.task-card.new-task p { color: var(--color-primary-600); }
+
+/* ================================================================
+   TASK OVERVIEW (browse a single task's lifecycle)
+   ================================================================ */
+.task-overview { animation: fadeIn 0.4s ease; max-width: 900px; }
+.task-overview-header { margin-bottom: 28px; }
+.task-overview-header h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+  margin-bottom: 6px;
+}
+.task-overview-header p {
+  font-size: 0.95rem;
+  color: var(--color-neutral-500);
+  line-height: 1.6;
+}
+.task-overview-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 0.8rem;
+  color: var(--color-primary-600);
+  text-decoration: none;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+.task-overview-source:hover { background: var(--color-neutral-100); }
+.phase-section {
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 14px;
+  background: var(--color-neutral-0);
+}
+.phase-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.phase-section-head h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-neutral-900);
+}
+.phase-section-head .phase-count {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--color-neutral-500);
+}
+.phase-file-list { display: flex; flex-direction: column; gap: 4px; }
+.phase-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--color-neutral-700);
+  transition: background 0.15s;
+}
+.phase-file-row:hover { background: var(--color-neutral-100); }
+.phase-file-row .file-icon { font-size: 0.9rem; }
+
+/* ================================================================
+   NEW TASK MODAL
+   ================================================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 24px;
+}
+.modal-overlay.open { display: flex; animation: fadeIn 0.2s ease; }
+.modal {
+  background: var(--color-neutral-0);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 520px;
+  padding: 28px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+.modal h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+  margin-bottom: 4px;
+}
+.modal .modal-sub {
+  font-size: 0.85rem;
+  color: var(--color-neutral-500);
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+.modal label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-neutral-700);
+  margin-bottom: 6px;
+}
+.modal input[type="text"],
+.modal input[type="url"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: var(--color-neutral-900);
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+.modal input:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+.btn {
+  font-family: inherit;
+  font-size: 0.83rem;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+.btn-secondary {
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-700);
+  border-color: var(--color-neutral-200);
+}
+.btn-secondary:hover { background: var(--color-neutral-200); }
+.btn-primary {
+  background: var(--color-primary-600);
+  color: #fff;
+}
+.btn-primary:hover { background: var(--color-primary-700); }
+.prompt-output {
+  margin-top: 18px;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.prompt-output-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--color-neutral-100);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-neutral-600);
+}
+.prompt-output pre {
+  margin: 0;
+  padding: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.76rem;
+  line-height: 1.6;
+  color: var(--color-neutral-800);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.copy-btn {
+  background: none;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 0.7rem;
+  font-family: inherit;
+  cursor: pointer;
+  color: var(--color-neutral-700);
+}
+.copy-btn:hover { background: var(--color-neutral-0); }
+
+/* New Task — multi-source artifact rows */
+.sources-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.source-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.source-row select {
+  flex: 0 0 120px;
+  padding: 9px 8px;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-family: inherit;
+  color: var(--color-neutral-800);
+  background: var(--color-neutral-0);
+  cursor: pointer;
+}
+.source-row .source-value {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  color: var(--color-neutral-900);
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 38px;
+}
+.source-row select:focus,
+.source-row .source-value:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+.source-remove {
+  flex: 0 0 auto;
+  background: none;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 8px;
+  width: 38px;
+  height: 38px;
+  cursor: pointer;
+  color: var(--color-neutral-500);
+  font-size: 1rem;
+  line-height: 1;
+}
+.source-remove:hover { background: var(--color-neutral-100); color: var(--color-error-500, #dc2626); }
+.add-source-btn {
+  align-self: flex-start;
+  background: none;
+  border: 1px dashed var(--color-primary-300);
+  color: var(--color-primary-600);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+.add-source-btn:hover { background: var(--color-primary-50); }
+
+/* ================================================================
+   MARKDOWN RENDERED CONTENT
+   ================================================================ */
+.doc-content { animation: fadeIn 0.3s ease; }
+
+.doc-content h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+  margin-bottom: 8px;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+.doc-content h2 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--color-neutral-900);
+  margin-top: 40px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+.doc-content h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-neutral-800);
+  margin-top: 28px;
+  margin-bottom: 8px;
+}
+.doc-content h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-neutral-700);
+  margin-top: 20px;
+  margin-bottom: 6px;
+}
+.doc-content p {
+  margin-bottom: 16px;
+  color: var(--color-neutral-700);
+  line-height: 1.75;
+}
+.doc-content ul, .doc-content ol {
+  margin-bottom: 16px;
+  padding-left: 24px;
+}
+.doc-content li {
+  margin-bottom: 6px;
+  color: var(--color-neutral-700);
+  line-height: 1.7;
+}
+.doc-content strong { color: var(--color-neutral-900); font-weight: 600; }
+.doc-content blockquote {
+  border-left: 3px solid var(--color-primary-400);
+  padding: 12px 20px;
+  margin: 16px 0;
+  background: var(--color-primary-50);
+  border-radius: 0 8px 8px 0;
+  color: var(--color-neutral-700);
+}
+.doc-content blockquote p { margin-bottom: 0; }
+
+/* Tables */
+.doc-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0 24px;
+  font-size: 0.875rem;
+}
+.doc-content thead th {
+  background: var(--color-neutral-100);
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-neutral-700);
+  border-bottom: 2px solid var(--color-neutral-200);
+  white-space: nowrap;
+}
+.doc-content tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-neutral-100);
+  color: var(--color-neutral-700);
+  vertical-align: top;
+}
+.doc-content tbody tr:hover { background: var(--color-neutral-50); }
+
+/* Code */
+.doc-content code {
+  font-family: var(--font-family-mono);
+  font-size: 0.85em;
+  background: var(--color-neutral-100);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--color-primary-700);
+}
+.doc-content pre {
+  background: var(--color-neutral-900);
+  border-radius: 10px;
+  padding: 20px;
+  margin: 16px 0 24px;
+  overflow-x: auto;
+  position: relative;
+}
+.doc-content pre code {
+  background: none;
+  padding: 0;
+  color: var(--color-neutral-200);
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
+/* Checkboxes */
+.doc-content input[type="checkbox"] {
+  margin-right: 8px;
+  accent-color: var(--color-primary-500);
+}
+
+/* Horizontal rule */
+.doc-content hr {
+  border: none;
+  height: 1px;
+  background: var(--color-neutral-200);
+  margin: 32px 0;
+}
+
+/* ================================================================
+   FRONTMATTER DISPLAY
+   ================================================================ */
+.frontmatter {
+  background: var(--color-neutral-0);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.8rem;
+}
+.fm-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fm-label {
+  color: var(--color-neutral-500);
+  font-weight: 500;
+}
+.fm-value {
+  color: var(--color-neutral-800);
+  font-weight: 500;
+}
+
+/* ================================================================
+   CODE FILE VIEWER
+   ================================================================ */
+.code-viewer {
+  background: var(--color-neutral-900);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 24px;
+  animation: fadeIn 0.3s ease;
+}
+.code-viewer-header {
+  background: rgba(255,255,255,0.06);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.code-viewer-header .file-name {
+  font-family: var(--font-family-mono);
+  font-size: 0.8rem;
+  color: var(--color-neutral-400);
+}
+.code-viewer-header .lang-badge {
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.1);
+  color: var(--color-neutral-400);
+  font-weight: 500;
+}
+.code-viewer pre {
+  margin: 0;
+  padding: 20px;
+  overflow-x: auto;
+  border-radius: 0;
+}
+.code-viewer pre code {
+  font-family: var(--font-family-mono);
+  font-size: 0.8rem;
+  line-height: 1.7;
+  color: var(--color-neutral-200);
+}
+
+/* ================================================================
+   LOADING & EMPTY STATES
+   ================================================================ */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: var(--color-neutral-400);
+  gap: 12px;
+}
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-neutral-200);
+  border-top-color: var(--color-primary-500);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+.error-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--color-neutral-500);
+}
+.error-state .error-icon { font-size: 2rem; margin-bottom: 12px; }
+
+/* ================================================================
+   COMPONENT PREVIEW (Prototype phase)
+   ================================================================ */
+.component-preview { animation: fadeIn 0.3s ease; }
+.component-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.component-preview-header h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+  margin: 0;
+}
+.component-preview-header .proto-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #EFF6FF;
+  color: #1D4ED8;
+}
+.preview-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--color-neutral-100);
+  border-radius: 8px;
+  padding: 3px;
+  margin-bottom: 16px;
+  width: fit-content;
+}
+.preview-tab {
+  padding: 7px 16px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-neutral-500);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-family-sans);
+}
+.preview-tab:hover { color: var(--color-neutral-700); }
+.preview-tab.active {
+  background: var(--color-neutral-0);
+  color: var(--color-neutral-900);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.preview-iframe-wrapper {
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--color-neutral-0);
+}
+.preview-iframe {
+  width: 100%;
+  border: none;
+  min-height: 400px;
+  display: block;
+}
+.preview-source-pane { display: none; }
+.preview-source-pane.active { display: block; }
+
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
+@media (max-width: 768px) {
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); box-shadow: 4px 0 24px rgba(0,0,0,0.3); }
+  .main { margin-left: 0; }
+  .hamburger { display: block; }
+  .content-area { padding: 24px 16px; }
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 99;
+    display: none;
+  }
+  .sidebar-overlay.open { display: block; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <div class="logo-icon">DL</div>
+        DesignLoop
+      </div>
+      <div class="sidebar-subtitle">Design Portfolio</div>
+    </div>
+    <nav class="sidebar-nav" id="sidebarNav"></nav>
+  </aside>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- NEW TASK MODAL -->
+  <div class="modal-overlay" id="newTaskModal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="newTaskTitle">
+      <h2 id="newTaskTitle">Start a New Task</h2>
+      <p class="modal-sub">
+        Feed the agents one or more source artifacts — a link, document, image, transcript,
+        or note. DesignLoop's agent ecosystem will run the full design lifecycle and create a
+        new task folder you can browse here.
+      </p>
+      <label for="newTaskName">Task name</label>
+      <input type="text" id="newTaskName" placeholder="e.g. Azure Cost Explorer Redesign" />
+      <label>Source artifacts</label>
+      <div class="sources-list" id="sourcesList"></div>
+      <button type="button" class="add-source-btn" onclick="addSourceRow()">＋ Add another source</button>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeNewTaskModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="generateTaskPrompt()">Generate Agent Prompt</button>
+      </div>
+      <div id="promptOutput"></div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <main class="main">
+    <header class="topbar" id="topbar">
+      <button class="hamburger" id="hamburgerBtn" aria-label="Toggle sidebar">&#9776;</button>
+      <div class="breadcrumb" id="breadcrumb">
+        <span class="crumb-active">Home</span>
+      </div>
+    </header>
+    <div class="content-area" id="contentArea"></div>
+  </main>
+</div>
+
+<script>
+/* =================================================================
+   TASK REGISTRY
+   To add a new task, add an entry to this array.
+   ================================================================= */
+const TASKS = [
+  {
+    id: 'azure-deployment-agent',
+    dir: 'tasks/azure-deployment-agent',
+    title: 'Azure Deployment Agent UX Enhancements',
+    description: 'Full design lifecycle for Deployment Agent improvements — from research through handoff.',
+    source: 'research/azure-deployment-agent-ux-enhancements.md',
+    phases: [
+      {
+        id: 'discover',
+        label: 'Discover',
+        files: [
+          { path: 'research/azure-deployment-agent-ux-enhancements.md', label: 'Research Brief' },
+          { path: 'research/findings/agent-discovery.md', label: 'Agent Discovery (Critical)' },
+          { path: 'research/findings/cost-transparency.md', label: 'Cost Transparency (High)' },
+          { path: 'research/findings/bicep-deployments.md', label: 'Bicep Deployments (Medium)' },
+          { path: 'research/findings/inline-editing.md', label: 'Inline Editing (Medium)' },
+          { path: 'research/findings/version-diffing.md', label: 'Version Diffing (Low)' },
+        ]
+      },
+      {
+        id: 'define',
+        label: 'Define',
+        files: [
+          { path: 'strategy/problem-statements.md', label: 'Problem Statements (HMWs)' },
+          { path: 'strategy/personas.md', label: 'User Personas' },
+          { path: 'strategy/requirements-prd.md', label: 'Requirements (PRD)' },
+        ]
+      },
+      {
+        id: 'ideate',
+        label: 'Ideate',
+        files: [
+          { path: 'ideation/solution-concepts.md', label: 'Solution Concepts' },
+          { path: 'ideation/concept-evaluation.md', label: 'Concept Evaluation' },
+          { path: 'ideation/decision-log.md', label: 'Decision Log' },
+        ]
+      },
+      {
+        id: 'design',
+        label: 'Design',
+        files: [
+          { path: 'designs/wireframes/deployment-agent-overview.md', label: 'Wireframe Overview' },
+          { path: 'designs/components/mode-switcher.md', label: 'Mode Switcher Spec' },
+          { path: 'designs/components/cost-annotation.md', label: 'Cost Annotation Spec' },
+          { path: 'designs/components/deploy-gate.md', label: 'Deploy Gate Spec' },
+          { path: 'designs/components/click-to-edit.md', label: 'Click-to-Edit Spec' },
+          { path: 'designs/components/version-timeline.md', label: 'Version Timeline Spec' },
+        ]
+      },
+      {
+        id: 'prototype',
+        label: 'Prototype',
+        files: [],
+        components: [
+          {
+            name: 'ModeSwitcher',
+            demo: 'prototypes/demos/ModeSwitcher.html',
+            sources: [
+              { path: 'prototypes/components/ModeSwitcher/ModeSwitcher.tsx', label: 'Component.tsx' },
+              { path: 'prototypes/components/ModeSwitcher/ModeSwitcher.module.css', label: 'Styles.css' },
+              { path: 'prototypes/components/ModeSwitcher/ModeSwitcher.stories.tsx', label: 'Stories.tsx' },
+            ]
+          },
+          {
+            name: 'CostBadge',
+            demo: 'prototypes/demos/CostBadge.html',
+            sources: [
+              { path: 'prototypes/components/CostBadge/CostBadge.tsx', label: 'Component.tsx' },
+              { path: 'prototypes/components/CostBadge/CostBadge.module.css', label: 'Styles.css' },
+              { path: 'prototypes/components/CostBadge/CostBadge.stories.tsx', label: 'Stories.tsx' },
+            ]
+          },
+          {
+            name: 'DeployGate',
+            demo: 'prototypes/demos/DeployGate.html',
+            sources: [
+              { path: 'prototypes/components/DeployGate/DeployGate.tsx', label: 'Component.tsx' },
+              { path: 'prototypes/components/DeployGate/DeployGate.module.css', label: 'Styles.css' },
+              { path: 'prototypes/components/DeployGate/DeployGate.stories.tsx', label: 'Stories.tsx' },
+            ]
+          },
+          {
+            name: 'ClickToEdit',
+            demo: 'prototypes/demos/ClickToEdit.html',
+            sources: [
+              { path: 'prototypes/components/ClickToEdit/ClickToEdit.tsx', label: 'Component.tsx' },
+              { path: 'prototypes/components/ClickToEdit/ClickToEdit.module.css', label: 'Styles.css' },
+              { path: 'prototypes/components/ClickToEdit/ClickToEdit.stories.tsx', label: 'Stories.tsx' },
+            ]
+          },
+          {
+            name: 'VersionTimeline',
+            demo: 'prototypes/demos/VersionTimeline.html',
+            sources: [
+              { path: 'prototypes/components/VersionTimeline/VersionTimeline.tsx', label: 'Component.tsx' },
+              { path: 'prototypes/components/VersionTimeline/VersionTimeline.module.css', label: 'Styles.css' },
+              { path: 'prototypes/components/VersionTimeline/VersionTimeline.stories.tsx', label: 'Stories.tsx' },
+            ]
+          },
+        ]
+      },
+      {
+        id: 'test',
+        label: 'Test',
+        files: [
+          { path: 'tests/usability/deployment-agent-r4-test-plan.md', label: 'Usability Test Plan (R4)' },
+          { path: 'tests/usability/deployment-agent-r4-task-scripts.md', label: 'Task Scripts (R4)' },
+        ]
+      },
+      {
+        id: 'deliver',
+        label: 'Deliver',
+        files: [
+          { path: 'handoff/implementation-guide.md', label: 'Implementation Guide' },
+          { path: 'handoff/components/component-api-reference.md', label: 'Component API Reference' },
+          { path: 'handoff/design-engineering-changelog.md', label: 'Design-Engineering Changelog' },
+        ]
+      },
+    ]
+  },
+  // ────────────────────────────────────────────────────────────────
+  // ADD NEW TASKS HERE:
+  //
+  // {
+  //   id: 'my-new-project',
+  //   dir: 'tasks/my-new-project',
+  //   title: 'My New Project',
+  //   description: 'Short description of the project.',
+  //   source: 'research/my-research-brief.md',
+  //   phases: [
+  //     {
+  //       id: 'discover',
+  //       label: 'Discover',
+  //       files: [
+  //         { path: 'research/my-research-brief.md', label: 'Research Brief' },
+  //       ]
+  //     },
+  //     ...
+  //   ]
+  // },
+  // ────────────────────────────────────────────────────────────────
+];
+
+/* =================================================================
+   STATE
+   ================================================================= */
+let activeFile = null;
+let collapsedPhases = {};
+
+/* =================================================================
+   HELPERS
+   ================================================================= */
+function getTask(taskId) {
+  return TASKS.find(t => t.id === taskId);
+}
+function fullPath(task, p) {
+  return task && task.dir ? task.dir + '/' + p : p;
+}
+
+/* =================================================================
+   SIDEBAR RENDERING
+   ================================================================= */
+function renderSidebar() {
+  const nav = document.getElementById('sidebarNav');
+  nav.innerHTML = TASKS.map(task => `
+    <div class="task-group" data-task="${task.id}">
+      <div class="task-header">
+        <span style="flex:1;cursor:pointer" onclick="loadTask('${task.id}')">${task.title}</span>
+        <span class="chevron" style="cursor:pointer" onclick="toggleTask('${task.id}')">&#9662;</span>
+      </div>
+      <div class="task-phases" id="task-${task.id}">
+        ${task.phases.map(phase => `
+          <div class="phase-group">
+            <div class="phase-label" onclick="togglePhase('${task.id}-${phase.id}')">
+              <span class="phase-dot ${phase.id}"></span>
+              ${phase.label}
+              <span style="margin-left:auto;font-size:0.6rem;color:var(--color-neutral-600)">${phase.files.length + (phase.components || []).length}</span>
+            </div>
+            <div class="phase-files" id="phase-${task.id}-${phase.id}">
+              ${phase.files.map(file => `
+                <div class="file-item ${activeFile === fullPath(task, file.path) ? 'active' : ''}"
+                     onclick="loadFile('${task.id}', '${file.path}', '${phase.id}')"
+                     title="${fullPath(task, file.path)}">
+                  <span class="file-icon">${getFileIcon(file.path)}</span>${file.label}
+                </div>
+              `).join('')}
+              ${(phase.components || []).map(comp => `
+                <div class="file-item ${activeFile === fullPath(task, comp.demo) ? 'active' : ''}"
+                     onclick="loadComponent('${task.id}', '${comp.name}', '${comp.demo}', ${JSON.stringify(comp.sources).replace(/"/g, '&quot;')})"
+                     title="${comp.name} — Live Preview">
+                  <span class="file-icon">⚛</span>${comp.name}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function getFileIcon(path) {
+  if (path.endsWith('.tsx')) return '⚛';
+  if (path.endsWith('.css')) return '🎨';
+  if (path.endsWith('.stories.tsx')) return '📖';
+  if (path.endsWith('.md')) return '📄';
+  return '📄';
+}
+
+function toggleTask(taskId) {
+  const el = document.getElementById(`task-${taskId}`);
+  const header = el.previousElementSibling;
+  if (el.style.display === 'none') {
+    el.style.display = '';
+    header.classList.remove('collapsed');
+  } else {
+    el.style.display = 'none';
+    header.classList.add('collapsed');
+  }
+}
+
+function togglePhase(phaseKey) {
+  const el = document.getElementById(`phase-${phaseKey}`);
+  if (el.style.maxHeight && el.style.maxHeight !== '0px') {
+    el.style.maxHeight = '0px';
+    el.style.overflow = 'hidden';
+  } else {
+    el.style.maxHeight = el.scrollHeight + 'px';
+    el.style.overflow = 'visible';
+  }
+}
+
+/* =================================================================
+   HOME SCREEN (list of tasks)
+   ================================================================= */
+function renderHome() {
+  activeFile = null;
+  renderSidebar();
+  const area = document.getElementById('contentArea');
+  area.innerHTML = `
+    <div class="welcome">
+      <div class="welcome-icon">🔁</div>
+      <h1>DesignLoop</h1>
+      <p>Each task runs the full design lifecycle as an intelligent loop of agents. Pick a task below to browse its agent-generated artifacts, or start a new one from your source materials.</p>
+      <div class="task-cards">
+        ${TASKS.map(task => `
+          <div class="task-card" onclick="loadTask('${task.id}')">
+            <h3>${task.title}</h3>
+            <p>${task.description}</p>
+            <div class="task-card-meta">
+              ${task.phases.map(p => `<span class="meta-chip">${p.label} (${p.files.length + (p.components || []).length})</span>`).join('')}
+            </div>
+          </div>
+        `).join('')}
+        <div class="task-card new-task" onclick="openNewTaskModal()">
+          <span class="new-task-plus">＋</span>
+          <h3>New Task</h3>
+          <p>Add a link, document, image, or transcript to kick off the agent loop.</p>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('breadcrumb').innerHTML = '<span class="crumb-active">Home</span>';
+}
+
+/* =================================================================
+   TASK OVERVIEW (browse one task's full lifecycle)
+   ================================================================= */
+function loadTask(taskId) {
+  const task = getTask(taskId);
+  if (!task) return;
+  activeFile = null;
+  renderSidebar();
+  closeSidebar();
+
+  // Expand this task in the sidebar
+  const phasesEl = document.getElementById(`task-${task.id}`);
+  if (phasesEl) {
+    phasesEl.style.display = '';
+    phasesEl.previousElementSibling.classList.remove('collapsed');
+  }
+
+  const area = document.getElementById('contentArea');
+  area.innerHTML = `
+    <div class="task-overview">
+      <div class="task-overview-header">
+        <h1>${task.title}</h1>
+        <p>${task.description}</p>
+        ${task.source ? `<span class="task-overview-source" onclick="loadFile('${task.id}', '${task.source}', 'discover')" style="cursor:pointer">📄 Source research report</span>` : ''}
+      </div>
+      ${task.phases.map(phase => `
+        <div class="phase-section">
+          <div class="phase-section-head">
+            <span class="phase-dot ${phase.id}"></span>
+            <h3>${phase.label}</h3>
+            <span class="phase-count">${phase.files.length + (phase.components || []).length} item(s)</span>
+          </div>
+          <div class="phase-file-list">
+            ${phase.files.map(file => `
+              <div class="phase-file-row" onclick="loadFile('${task.id}', '${file.path}', '${phase.id}')">
+                <span class="file-icon">${getFileIcon(file.path)}</span>${file.label}
+              </div>
+            `).join('')}
+            ${(phase.components || []).map(comp => `
+              <div class="phase-file-row" onclick="loadComponent('${task.id}', '${comp.name}', '${comp.demo}', ${JSON.stringify(comp.sources).replace(/"/g, '&quot;')})">
+                <span class="file-icon">⚛</span>${comp.name} <span style="color:var(--color-neutral-400);font-size:0.75rem">— live prototype</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  document.getElementById('breadcrumb').innerHTML = `
+    <span style="cursor:pointer" onclick="renderHome()">Home</span>
+    <span>›</span>
+    <span class="crumb-active">${task.title}</span>
+  `;
+}
+
+/* =================================================================
+   NEW TASK MODAL
+   ================================================================= */
+const SOURCE_TYPES = [
+  { value: 'link',       label: 'Link / URL',  placeholder: 'https://example.com/research-report', input: 'text' },
+  { value: 'document',   label: 'Document',    placeholder: 'Path or name, e.g. interview-notes.pdf', input: 'text' },
+  { value: 'image',      label: 'Image',       placeholder: 'Path or URL to image, e.g. whiteboard.png', input: 'text' },
+  { value: 'transcript', label: 'Transcript',  placeholder: 'Paste transcript text…', input: 'textarea' },
+  { value: 'note',       label: 'Note / Text', placeholder: 'Paste any notes or raw text…', input: 'textarea' },
+];
+
+function sourceRowHtml() {
+  const options = SOURCE_TYPES.map(t => `<option value="${t.value}">${t.label}</option>`).join('');
+  return `
+    <div class="source-row">
+      <select onchange="onSourceTypeChange(this)">${options}</select>
+      <input type="text" class="source-value" placeholder="${SOURCE_TYPES[0].placeholder}" />
+      <button type="button" class="source-remove" title="Remove" onclick="removeSourceRow(this)">×</button>
+    </div>`;
+}
+
+function onSourceTypeChange(select) {
+  const type = SOURCE_TYPES.find(t => t.value === select.value) || SOURCE_TYPES[0];
+  const row = select.closest('.source-row');
+  const old = row.querySelector('.source-value');
+  const val = old.value;
+  let replacement;
+  if (type.input === 'textarea') {
+    replacement = document.createElement('textarea');
+    replacement.rows = 3;
+  } else {
+    replacement = document.createElement('input');
+    replacement.type = 'text';
+  }
+  replacement.className = 'source-value';
+  replacement.placeholder = type.placeholder;
+  replacement.value = val;
+  old.replaceWith(replacement);
+}
+
+function addSourceRow() {
+  const list = document.getElementById('sourcesList');
+  list.insertAdjacentHTML('beforeend', sourceRowHtml());
+  updateRemoveButtons();
+}
+
+function removeSourceRow(btn) {
+  btn.closest('.source-row').remove();
+  updateRemoveButtons();
+}
+
+function updateRemoveButtons() {
+  const rows = document.querySelectorAll('#sourcesList .source-row');
+  rows.forEach(r => {
+    r.querySelector('.source-remove').style.visibility = rows.length > 1 ? 'visible' : 'hidden';
+  });
+}
+
+function openNewTaskModal() {
+  document.getElementById('promptOutput').innerHTML = '';
+  document.getElementById('newTaskName').value = '';
+  document.getElementById('sourcesList').innerHTML = sourceRowHtml();
+  updateRemoveButtons();
+  document.getElementById('newTaskModal').classList.add('open');
+}
+function closeNewTaskModal() {
+  document.getElementById('newTaskModal').classList.remove('open');
+}
+function slugify(str) {
+  return str.toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'new-task';
+}
+
+function collectSources() {
+  const rows = document.querySelectorAll('#sourcesList .source-row');
+  const sources = [];
+  rows.forEach(row => {
+    const type = row.querySelector('select').value;
+    const value = row.querySelector('.source-value').value.trim();
+    if (value) {
+      const meta = SOURCE_TYPES.find(t => t.value === type) || SOURCE_TYPES[0];
+      sources.push({ type, label: meta.label, value });
+    }
+  });
+  return sources;
+}
+
+function generateTaskPrompt() {
+  const name = document.getElementById('newTaskName').value.trim();
+  const sources = collectSources();
+  if (!name || sources.length === 0) {
+    document.getElementById('promptOutput').innerHTML =
+      `<p style="color:var(--color-error-500,#dc2626);font-size:0.8rem;margin-top:8px">Please enter a task name and at least one source artifact.</p>`;
+    return;
+  }
+  const slug = slugify(name);
+  const sourcesBlock = sources
+    .map((s, i) => `${i + 1}. [${s.label}] ${s.value}`)
+    .join('\n');
+  const prompt =
+`@Design Lead Run the full design lifecycle for a new task named "${name}".
+
+Source artifacts:
+${sourcesBlock}
+
+Use all of the above artifacts as input. Create all output under tasks/${slug}/ using the standard phase structure (research, strategy, ideation, designs, prototypes, tests, handoff). When complete, register the task in index.html's TASKS array (id: "${slug}", dir: "tasks/${slug}") so it appears on the Home page.`;
+
+  document.getElementById('promptOutput').innerHTML = `
+    <div class="prompt-output">
+      <div class="prompt-output-head">
+        <span>Copy this prompt to your agent</span>
+        <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+      </div>
+      <pre id="generatedPrompt">${prompt.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>
+    </div>
+  `;
+}
+function copyPrompt(btn) {
+  const text = document.getElementById('generatedPrompt').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+  });
+}
+
+/* =================================================================
+   FILE LOADING & RENDERING
+   ================================================================= */
+async function loadFile(taskId, path, phaseId) {
+  const task = getTask(taskId);
+  const resolved = fullPath(task, path);
+  activeFile = resolved;
+  renderSidebar(); // refresh active state
+  closeSidebar();
+
+  const area = document.getElementById('contentArea');
+  area.innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
+
+  // Update breadcrumb
+  const phaseName = phaseId.charAt(0).toUpperCase() + phaseId.slice(1);
+  const fileName = path.split('/').pop();
+  document.getElementById('breadcrumb').innerHTML = `
+    <span style="cursor:pointer" onclick="renderHome()">Home</span>
+    <span>›</span>
+    <span style="cursor:pointer" onclick="loadTask('${task.id}')">${task.title}</span>
+    <span>›</span>
+    <span class="badge-phase ${phaseId}">${phaseName}</span>
+    <span>›</span>
+    <span class="crumb-active">${fileName}</span>
+  `;
+
+  try {
+    const response = await fetch(resolved);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = await response.text();
+
+    if (path.endsWith('.md')) {
+      renderMarkdown(text, resolved, phaseId);
+    } else {
+      renderCode(text, resolved);
+    }
+  } catch (err) {
+    area.innerHTML = `
+      <div class="error-state">
+        <div class="error-icon">⚠️</div>
+        <p>Could not load <strong>${resolved}</strong></p>
+        <p style="font-size:0.85rem;margin-top:8px;color:var(--color-neutral-400)">
+          Make sure you're serving this page via a local server.<br>
+          Run: <code>python3 -m http.server 8080</code> from the project root.
+        </p>
+      </div>
+    `;
+  }
+}
+
+function renderMarkdown(raw, path, phaseId) {
+  const area = document.getElementById('contentArea');
+
+  // Parse frontmatter
+  let body = raw;
+  let frontmatter = null;
+  const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (fmMatch) {
+    frontmatter = parseFrontmatter(fmMatch[1]);
+    body = fmMatch[2];
+  }
+
+  // Configure marked
+  marked.setOptions({
+    gfm: true,
+    breaks: false,
+    highlight: function(code, lang) {
+      if (lang && hljs.getLanguage(lang)) {
+        return hljs.highlight(code, { language: lang }).value;
+      }
+      return hljs.highlightAuto(code).value;
+    }
+  });
+
+  const html = marked.parse(body);
+
+  let fmHtml = '';
+  if (frontmatter) {
+    const items = Object.entries(frontmatter)
+      .filter(([k]) => !['title', 'related'].includes(k))
+      .map(([k, v]) => `<div class="fm-item"><span class="fm-label">${k}:</span><span class="fm-value">${v}</span></div>`)
+      .join('');
+    fmHtml = `<div class="frontmatter">${items}</div>`;
+  }
+
+  area.innerHTML = `<div class="doc-content">${fmHtml}${html}</div>`;
+
+  // Re-highlight any code blocks
+  area.querySelectorAll('pre code').forEach(block => {
+    hljs.highlightElement(block);
+  });
+
+  // Convert checkbox list items
+  area.querySelectorAll('li').forEach(li => {
+    const text = li.innerHTML;
+    if (text.startsWith('[ ] ')) {
+      li.innerHTML = `<input type="checkbox" disabled> ${text.slice(4)}`;
+    } else if (text.startsWith('[x] ') || text.startsWith('[X] ')) {
+      li.innerHTML = `<input type="checkbox" checked disabled> ${text.slice(4)}`;
+    }
+  });
+}
+
+function renderCode(text, path) {
+  const area = document.getElementById('contentArea');
+  const ext = path.split('.').pop();
+  const langMap = { tsx: 'typescript', ts: 'typescript', jsx: 'javascript', js: 'javascript', css: 'css', json: 'json' };
+  const lang = langMap[ext] || ext;
+  const fileName = path.split('/').pop();
+
+  let highlighted;
+  try {
+    highlighted = hljs.highlight(text, { language: lang }).value;
+  } catch {
+    highlighted = hljs.highlightAuto(text).value;
+  }
+
+  area.innerHTML = `
+    <div class="code-viewer">
+      <div class="code-viewer-header">
+        <span class="file-name">${fileName}</span>
+        <span class="lang-badge">${lang.toUpperCase()}</span>
+      </div>
+      <pre><code>${highlighted}</code></pre>
+    </div>
+  `;
+}
+
+/* =================================================================
+   COMPONENT PREVIEW (Prototype phase)
+   ================================================================= */
+async function loadComponent(taskId, name, demoPath, sources) {
+  const task = getTask(taskId);
+  const resolvedDemo = fullPath(task, demoPath);
+  activeFile = resolvedDemo;
+  renderSidebar();
+  closeSidebar();
+
+  const area = document.getElementById('contentArea');
+  area.innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
+
+  // Update breadcrumb
+  document.getElementById('breadcrumb').innerHTML = `
+    <span style="cursor:pointer" onclick="renderHome()">Home</span>
+    <span>›</span>
+    <span style="cursor:pointer" onclick="loadTask('${task.id}')">${task.title}</span>
+    <span>›</span>
+    <span class="badge-phase prototype">Prototype</span>
+    <span>›</span>
+    <span class="crumb-active">${name}</span>
+  `;
+
+  // Build tab buttons
+  const tabButtons = [
+    `<button class="preview-tab active" onclick="switchPreviewTab(this, 'preview-pane-live')">Preview</button>`,
+    ...sources.map((s, i) =>
+      `<button class="preview-tab" onclick="switchPreviewTab(this, 'preview-pane-${i}')">${s.label}</button>`
+    ),
+  ].join('');
+
+  // Build source panes (initially hidden)
+  let sourcePanes = '';
+  for (let i = 0; i < sources.length; i++) {
+    try {
+      const resp = await fetch(fullPath(task, sources[i].path));
+      const code = await resp.text();
+      const ext = sources[i].path.split('.').pop();
+      const langMap = { tsx: 'typescript', ts: 'typescript', css: 'css' };
+      const lang = langMap[ext] || ext;
+      let highlighted;
+      try { highlighted = hljs.highlight(code, { language: lang }).value; }
+      catch { highlighted = hljs.highlightAuto(code).value; }
+      sourcePanes += `
+        <div id="preview-pane-${i}" class="preview-source-pane">
+          <div class="code-viewer">
+            <div class="code-viewer-header">
+              <span class="file-name">${sources[i].path.split('/').pop()}</span>
+              <span class="lang-badge">${lang.toUpperCase()}</span>
+            </div>
+            <pre><code>${highlighted}</code></pre>
+          </div>
+        </div>`;
+    } catch {
+      sourcePanes += `<div id="preview-pane-${i}" class="preview-source-pane"><div class="error-state">Could not load source</div></div>`;
+    }
+  }
+
+  area.innerHTML = `
+    <div class="component-preview">
+      <div class="component-preview-header">
+        <h2>${name}</h2>
+        <span class="proto-badge">Interactive Prototype</span>
+      </div>
+      <div class="preview-tabs">${tabButtons}</div>
+      <div id="preview-pane-live" class="preview-source-pane active">
+        <div class="preview-iframe-wrapper">
+          <iframe class="preview-iframe" src="${resolvedDemo}" title="${name} preview" sandbox="allow-scripts allow-same-origin"></iframe>
+        </div>
+      </div>
+      ${sourcePanes}
+    </div>
+  `;
+
+  // Auto-resize iframe to content
+  const iframe = area.querySelector('.preview-iframe');
+  iframe.addEventListener('load', () => {
+    try {
+      const h = iframe.contentDocument.documentElement.scrollHeight;
+      iframe.style.height = Math.max(h + 32, 300) + 'px';
+    } catch { /* cross-origin, keep default height */ }
+  });
+}
+
+function switchPreviewTab(btn, paneId) {
+  // Deactivate all tabs
+  btn.parentElement.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+
+  // Hide all panes, show selected
+  const container = btn.closest('.component-preview');
+  container.querySelectorAll('.preview-source-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById(paneId).classList.add('active');
+}
+
+function parseFrontmatter(raw) {
+  const result = {};
+  raw.split('\n').forEach(line => {
+    const match = line.match(/^(\w[\w-]*)\s*:\s*(.+)/);
+    if (match) {
+      let val = match[2].trim();
+      if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+      if (val.startsWith("'") && val.endsWith("'")) val = val.slice(1, -1);
+      result[match[1]] = val;
+    }
+  });
+  return result;
+}
+
+/* =================================================================
+   MOBILE SIDEBAR
+   ================================================================= */
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+}
+
+document.getElementById('hamburgerBtn').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('open');
+});
+document.getElementById('sidebarOverlay').addEventListener('click', closeSidebar);
+
+/* =================================================================
+   INIT
+   ================================================================= */
+renderSidebar();
+renderHome();
+</script>
+</body>
+</html>
