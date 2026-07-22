@@ -54,13 +54,44 @@ const MIME = {
 
 /* ───────────────────────────── helpers ───────────────────────────── */
 
+// CORS: the prototype workspace dev server (:3100) is a different origin from
+// this bridge (:8099), so browser calls from it need permissive CORS headers.
+// This bridge is a localhost-only developer tool, so `*` is acceptable.
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
 function sendJson(res, status, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
+    ...CORS_HEADERS,
   });
   res.end(body);
+}
+
+/**
+ * Run a git command from the repo root, resolving with { code, stdout, stderr }.
+ * Never rejects — callers inspect `code` to decide success.
+ */
+function runGit(args) {
+  return new Promise((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    let proc;
+    try {
+      proc = spawn('git', args, { cwd: ROOT, env: process.env });
+    } catch (e) {
+      return resolve({ code: -1, stdout: '', stderr: e.message });
+    }
+    proc.stdout.on('data', (d) => { stdout += d; });
+    proc.stderr.on('data', (d) => { stderr += d; });
+    proc.on('error', (e) => resolve({ code: -1, stdout, stderr: stderr || e.message }));
+    proc.on('close', (code) => resolve({ code, stdout: stdout.trim(), stderr: stderr.trim() }));
+  });
 }
 
 function readBody(req) {
@@ -786,6 +817,101 @@ async function handleApi(req, res, url) {
     });
   }
 
+  // POST /api/prototypes/make-live — promote a locally-created prototype to the
+  // repo baseline: commit its route + component files and a committed registry
+  // entry, then push so everyone sees it as "Live".
+  if (req.method === 'POST' && pathname === '/api/prototypes/make-live') {
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const id = String(body.id || '').trim();
+    if (!/^[a-z][a-z0-9-]*$/.test(id)) {
+      return sendJson(res, 400, { error: 'Invalid prototype id (must be kebab-case).' });
+    }
+
+    const appDir = path.join(PROTO_DIR, 'app', id);
+    const compDir = path.join(PROTO_DIR, 'components', 'projects', id);
+    if (!fs.existsSync(appDir) || !fs.existsSync(compDir)) {
+      return sendJson(res, 404, {
+        error: `Prototype "${id}" not found (missing app/${id} or components/projects/${id}).`,
+      });
+    }
+
+    const localRegistryPath = path.join(PROTO_DIR, 'public', 'local-prototypes.json');
+    const liveRegistryPath = path.join(PROTO_DIR, 'data', 'live-prototypes.json');
+
+    // Read the local entry (title/description/author) so it carries into the live registry.
+    let localEntries = [];
+    try {
+      if (fs.existsSync(localRegistryPath)) {
+        const parsed = JSON.parse(fs.readFileSync(localRegistryPath, 'utf8'));
+        if (Array.isArray(parsed)) localEntries = parsed;
+      }
+    } catch { localEntries = []; }
+    const entry = localEntries.find((e) => e && e.id === id) || { id, title: id };
+
+    // Merge into the committed live registry (upsert by id), dropping the createdBy
+    // email so a personal identifier is never committed to the shared repo.
+    let liveEntries = [];
+    try {
+      if (fs.existsSync(liveRegistryPath)) {
+        const parsed = JSON.parse(fs.readFileSync(liveRegistryPath, 'utf8'));
+        if (Array.isArray(parsed)) liveEntries = parsed;
+      }
+    } catch { liveEntries = []; }
+    const liveEntry = {
+      id,
+      title: entry.title || id,
+      description: entry.description,
+      status: entry.status || 'in-progress',
+      author: entry.author,
+      route: entry.route || `/${id}`,
+      promotedAt: new Date().toISOString(),
+    };
+    liveEntries = liveEntries.filter((e) => e && e.id !== id);
+    liveEntries.push(liveEntry);
+    fs.mkdirSync(path.dirname(liveRegistryPath), { recursive: true });
+    fs.writeFileSync(liveRegistryPath, JSON.stringify(liveEntries, null, 2) + '\n');
+
+    // Remove it from the local (git-ignored) registry — it is now live, not local.
+    const remaining = localEntries.filter((e) => e && e.id !== id);
+    try { fs.writeFileSync(localRegistryPath, JSON.stringify(remaining, null, 2) + '\n'); } catch {}
+
+    // Stage, commit, and push the prototype files + live registry.
+    const relPaths = [
+      `prototype-workspace/app/${id}`,
+      `prototype-workspace/components/projects/${id}`,
+      'prototype-workspace/data/live-prototypes.json',
+    ];
+    const add = await runGit(['add', ...relPaths]);
+    if (add.code !== 0) {
+      return sendJson(res, 500, { error: 'git add failed', detail: add.stderr || add.stdout });
+    }
+    const commitMsg =
+      `Make "${liveEntry.title}" prototype live\n\n` +
+      `Promotes the ${id} prototype to the repo baseline so it is visible to everyone.\n\n` +
+      `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`;
+    const commit = await runGit(['commit', '-m', commitMsg]);
+    if (commit.code !== 0) {
+      return sendJson(res, 500, {
+        error: 'git commit failed',
+        detail: commit.stderr || commit.stdout,
+        hint: 'Nothing to commit, or git identity is not configured.',
+      });
+    }
+    const push = await runGit(['push']);
+    if (push.code !== 0) {
+      return sendJson(res, 200, {
+        ok: true,
+        pushed: false,
+        committed: true,
+        id,
+        warning: 'Committed locally but push failed — push manually.',
+        detail: push.stderr || push.stdout,
+      });
+    }
+    return sendJson(res, 200, { ok: true, pushed: true, committed: true, id });
+  }
+
   // GET /api/tools — dynamic tool registry from .github/skills/*/tool.json
   if (req.method === 'GET' && pathname === '/api/tools') {
     try {
@@ -1275,6 +1401,11 @@ function stopPrototypeServer() {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${HOST}:${PORT}`);
+  // CORS preflight for cross-origin calls from the prototype workspace (:3100).
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, { ...CORS_HEADERS, 'Cache-Control': 'no-store' });
+    return res.end();
+  }
   if (url.pathname.startsWith('/api/')) {
     handleApi(req, res, url).catch((e) => {
       try { sendJson(res, 500, { error: e.message }); } catch {}

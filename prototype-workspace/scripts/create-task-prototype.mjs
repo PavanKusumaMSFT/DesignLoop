@@ -13,6 +13,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { join, resolve } from "node:path";
 
 const args = process.argv.slice(2);
@@ -25,6 +26,14 @@ function getFlag(name) {
 
 function hasFlag(name) {
   return args.includes(`--${name}`);
+}
+
+function gitConfig(key) {
+  try {
+    return execSync(`git config ${key}`, { encoding: "utf8" }).trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 function toPascalCase(kebab) {
@@ -49,9 +58,20 @@ const taskId = args.find((arg) => !arg.startsWith("--"));
 const force = hasFlag("force");
 const title = getFlag("title") || (taskId ? toTitle(taskId) : "");
 const description = getFlag("description") || `${title} prototype workspace starter.`;
+// Author identity for the locally-created prototype (used to show "Created by you").
+const author =
+  getFlag("author") ||
+  process.env.PROTOTYPE_AUTHOR_NAME ||
+  gitConfig("user.name") ||
+  "Local User";
+const createdBy =
+  getFlag("created-by") ||
+  process.env.PROTOTYPE_AUTHOR_EMAIL ||
+  gitConfig("user.email") ||
+  "";
 
 if (!taskId) {
-  console.error('❌ Usage: node scripts/create-task-prototype.mjs <taskId> [--title "..."] [--description "..."] [--force]');
+  console.error('❌ Usage: node scripts/create-task-prototype.mjs <taskId> [--title "..."] [--description "..."] [--author "..."] [--created-by "email"] [--force]');
   process.exit(1);
 }
 
@@ -64,14 +84,21 @@ const ROOT = resolve(import.meta.dirname, "..");
 const appDir = join(ROOT, "app", taskId);
 const projectDir = join(ROOT, "components", "projects", taskId);
 const componentFile = join(projectDir, "index.tsx");
-const projectsFile = join(ROOT, "data", "projects.ts");
+const localRegistryFile = join(ROOT, "public", "local-prototypes.json");
 const componentName = `${toPascalCase(taskId)}Prototype`;
 
 const routeExists = existsSync(appDir);
 const componentExists = existsSync(projectDir);
-const projectsContent = readFileSync(projectsFile, "utf8");
-const entryPattern = new RegExp(`\\n  \\{\\n    id: "${taskId}",[\\s\\S]*?\\n  \\},(?=\\n\\];|\\n  \\{)`, "m");
-const registryExists = projectsContent.includes(`id: "${taskId}"`);
+let localRegistry = [];
+try {
+  if (existsSync(localRegistryFile)) {
+    const parsed = JSON.parse(readFileSync(localRegistryFile, "utf8"));
+    if (Array.isArray(parsed)) localRegistry = parsed;
+  }
+} catch {
+  localRegistry = [];
+}
+const registryExists = localRegistry.some((e) => e && e.id === taskId);
 
 if (!force && (routeExists || componentExists || registryExists)) {
   console.error(`❌ Task prototype "${taskId}" already exists. Re-run with --force to replace generated route/component/registry entry.`);
@@ -227,48 +254,28 @@ export default function ${componentName}({
 );
 console.log(`  ✓ Created components/projects/${taskId}/index.tsx`);
 
-const newEntry = `
-  {
-    id: "${taskId}",
-    title: "${escapeString(title)}",
-    description:
-      "${escapeString(description)}",
-    owner: "DesignLoop",
-    team: "DesignLoop",
-    status: "in-progress",
-    area: "foundations",
-    subArea: "wayfinding",
-    experienceArea: "other",
-    pillars: ["discover", "build"],
-    horizon: "build-2026",
-    timeframe: "short-term",
-    shell: "build-mvp",
-    componentPath: "projects/${taskId}/index.tsx",
-    purpose: "poc",
-    tags: ["task-prototype", "${taskId}"],
-    source: { type: "local", route: "/${taskId}" },
-    connections: [],
-    icon: "Sparkle24Regular",
-    featured: true,
-  },`;
+const localEntry = {
+  id: taskId,
+  title,
+  description,
+  status: "in-progress",
+  author,
+  createdBy,
+  route: `/${taskId}`,
+  tags: ["task-prototype", taskId],
+  createdAt: new Date().toISOString(),
+};
 
-let updatedProjectsContent = projectsContent;
 if (registryExists) {
-  updatedProjectsContent = updatedProjectsContent.replace(entryPattern, newEntry);
+  localRegistry = localRegistry.map((e) => (e && e.id === taskId ? { ...e, ...localEntry } : e));
 } else {
-  const insertionMarker = "\n];";
-  const insertionIndex = updatedProjectsContent.lastIndexOf(insertionMarker);
-  if (insertionIndex === -1) {
-    console.error("❌ Could not find insertion point in data/projects.ts. Please add this entry manually:");
-    console.log(newEntry);
-    process.exit(1);
-  }
-  updatedProjectsContent =
-    updatedProjectsContent.slice(0, insertionIndex) +
-    newEntry +
-    updatedProjectsContent.slice(insertionIndex);
+  localRegistry.push(localEntry);
 }
-writeFileSync(projectsFile, updatedProjectsContent);
-console.log(`  ✓ ${registryExists ? "Updated" : "Added"} project entry in data/projects.ts`);
 
-console.log(`\n✅ Task prototype "${taskId}" is ready at /${taskId}\n`);
+mkdirSync(join(ROOT, "public"), { recursive: true });
+writeFileSync(localRegistryFile, JSON.stringify(localRegistry, null, 2) + "\n");
+console.log(`  ✓ ${registryExists ? "Updated" : "Added"} local prototype entry in public/local-prototypes.json (author: ${author || "unknown"})`);
+
+console.log(`\n✅ Local task prototype "${taskId}" is ready at /${taskId}`);
+console.log(`   It appears in the workspace as a "Local" prototype. Commit it and add`);
+console.log(`   its id to LIVE_PROTOTYPE_IDS in data/projects.ts to make it live.\n`);

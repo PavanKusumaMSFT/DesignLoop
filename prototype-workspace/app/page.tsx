@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   FluentProvider,
@@ -10,38 +10,61 @@ import {
   Text,
   Badge,
   SearchBox,
+  Button,
+  Spinner,
+  Dialog,
+  DialogSurface,
+  DialogBody,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@fluentui/react-components";
 import {
-  Sparkle24Regular,
-  Apps24Regular,
-  Grid24Regular,
-  Navigation24Regular,
-  Home24Regular,
-  Search24Regular,
-  Beaker24Regular,
   ArrowRight20Regular,
+  CloudArrowUp16Regular,
 } from "@fluentui/react-icons";
 import { projects } from "../data/projects";
-import type { Project } from "../data/projects";
+import liveExtras from "../data/live-prototypes.json";
+import { msalInstance } from "../components/auth/auth-providers";
 
 type SafeTokens = { [key: string]: any };
 const tokens: SafeTokens = fluentTokens;
 
+/** Base URL of the local DesignLoop bridge that performs git operations. */
+const BRIDGE_URL =
+  process.env.NEXT_PUBLIC_BRIDGE_URL ?? "http://localhost:8099";
+
 // ---------------------------------------------------------------------------
-// Icon + status maps
+// Card model — a flat shape shared by live (repo) and local prototypes
 // ---------------------------------------------------------------------------
 
-const ICONS: Record<string, React.FC<{ className?: string }>> = {
-  Sparkle24Regular,
-  Apps24Regular,
-  Grid24Regular,
-  Navigation24Regular,
-  Home24Regular,
-  Search24Regular,
-  Beaker24Regular,
+type CardItem = {
+  id: string;
+  title: string;
+  description?: string;
+  status: string;
+  author?: string;
+  createdBy?: string;
+  origin: "live" | "local";
+  route?: string;
+  deployUrl?: string;
+  sourceType?: string;
 };
-const resolveIcon = (name?: string) =>
-  (name && ICONS[name]) || Apps24Regular;
+
+/** Shape of an entry in public/local-prototypes.json (all optional but id/title). */
+type LocalPrototypeEntry = {
+  id: string;
+  title: string;
+  description?: string;
+  status?: string;
+  author?: string;
+  createdBy?: string;
+  route?: string;
+};
+
+// ---------------------------------------------------------------------------
+// Status maps + local prototype loading
+// ---------------------------------------------------------------------------
 
 const statusColorMap: Record<
   string,
@@ -58,6 +81,77 @@ const statusLabels: Record<string, string> = {
   "coming-soon": "Coming soon",
   archived: "Archived",
 };
+
+/** Shape of an entry in data/live-prototypes.json (promoted prototypes). */
+type LivePrototypeEntry = {
+  id: string;
+  title: string;
+  description?: string;
+  status?: string;
+  author?: string;
+  route?: string;
+};
+
+/** Live (repo baseline) prototypes as flat card items. */
+const LIVE_ITEMS: CardItem[] = (() => {
+  const fromRegistry: CardItem[] = projects.map((p) => ({
+    id: p.id,
+    title: p.title,
+    description: p.description,
+    status: p.status,
+    author: p.author || p.owner,
+    createdBy: p.createdBy,
+    origin: "live" as const,
+    route: p.source.route,
+    deployUrl: p.source.deployUrl,
+    sourceType: p.source.type,
+  }));
+  // Prototypes promoted to live via "Make live" (committed data/live-prototypes.json).
+  const fromPromoted: CardItem[] = (liveExtras as LivePrototypeEntry[])
+    .filter((e) => e && e.id && e.title)
+    .map((e) => ({
+      id: e.id,
+      title: e.title,
+      description: e.description,
+      status: e.status || "in-progress",
+      author: e.author,
+      origin: "live" as const,
+      route: e.route || `/${e.id}`,
+      sourceType: "local",
+    }));
+  const seen = new Set(fromRegistry.map((p) => p.id));
+  return [...fromRegistry, ...fromPromoted.filter((p) => !seen.has(p.id))];
+})();
+
+/**
+ * Fetch locally-created prototypes from public/local-prototypes.json.
+ * The file is git-ignored and absent on the hosted site (→ no local items),
+ * so everything hosted shows as "Live".
+ */
+async function loadLocalItems(): Promise<CardItem[]> {
+  try {
+    const res = await fetch("/local-prototypes.json", { cache: "no-store" });
+    if (!res.ok) return [];
+    const entries = (await res.json()) as LocalPrototypeEntry[];
+    if (!Array.isArray(entries)) return [];
+    return entries
+      .filter((e) => e && e.id && e.title)
+      .map((e) => ({
+        id: e.id,
+        title: e.title,
+        description: e.description,
+        status: e.status || "in-progress",
+        author: e.author,
+        createdBy: e.createdBy,
+        origin: "local" as const,
+        route: e.route || `/${e.id}`,
+        sourceType: "local",
+      }));
+  } catch {
+    return [];
+  }
+}
+
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -190,6 +284,8 @@ const useStyles = makeStyles({
       transform: "translateX(4px)",
       color: tokens.colorBrandForeground1,
     },
+    ":hover .makeLiveBtn": { opacity: 1 },
+    ":focus-within .makeLiveBtn": { opacity: 1 },
     ":focus-visible": {
       outline: `2px solid ${tokens.colorBrandStroke1}`,
       outlineOffset: "2px",
@@ -230,6 +326,28 @@ const useStyles = makeStyles({
     WebkitLineClamp: 2,
     WebkitBoxOrient: "vertical" as const,
   },
+  metaRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalS,
+    flexWrap: "wrap",
+    marginTop: tokens.spacingVerticalXS,
+  },
+  metaDot: {
+    width: "3px",
+    height: "3px",
+    borderRadius: "50%",
+    backgroundColor: tokens.colorNeutralForeground4,
+  },
+  authorText: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground3,
+  },
+  youText: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorBrandForeground1,
+    fontWeight: tokens.fontWeightSemibold,
+  },
   chevron: {
     flexShrink: 0,
     color: tokens.colorNeutralForeground4,
@@ -237,6 +355,39 @@ const useStyles = makeStyles({
     transitionProperty: "transform, color",
     transitionDuration: tokens.durationNormal,
     transitionTimingFunction: tokens.curveEasyEase,
+  },
+  makeLiveBtn: {
+    flexShrink: 0,
+    opacity: 0,
+    transitionProperty: "opacity",
+    transitionDuration: tokens.durationNormal,
+  },
+  makeLiveBtnVisible: {
+    opacity: 1,
+  },
+  dialogText: {
+    color: tokens.colorNeutralForeground2,
+    lineHeight: "1.5",
+  },
+  dialogCode: {
+    fontFamily: tokens.fontFamilyMonospace,
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground1,
+    backgroundColor: tokens.colorNeutralBackground3,
+    padding: `1px ${tokens.spacingHorizontalXS}`,
+    borderRadius: tokens.borderRadiusSmall,
+  },
+  dialogStatus: {
+    display: "flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalS,
+    marginTop: tokens.spacingVerticalM,
+  },
+  dialogError: {
+    color: tokens.colorPaletteRedForeground1,
+    fontSize: tokens.fontSizeBase200,
+    marginTop: tokens.spacingVerticalM,
+    whiteSpace: "pre-wrap" as const,
   },
   empty: {
     padding: tokens.spacingVerticalXXXL,
@@ -251,17 +402,30 @@ const useStyles = makeStyles({
 // Card
 // ---------------------------------------------------------------------------
 
-function PrototypeCard({ project }: { project: Project }) {
+function PrototypeCard({
+  item,
+  currentEmail,
+  onMakeLive,
+}: {
+  item: CardItem;
+  currentEmail: string | null;
+  onMakeLive?: (item: CardItem) => void;
+}) {
   const styles = useStyles();
   const router = useRouter();
 
   const open = useCallback(() => {
-    if (project.source.type === "fork" && project.source.deployUrl) {
-      window.open(project.source.deployUrl, "_blank", "noopener");
-    } else if (project.source.route) {
-      router.push(project.source.route);
+    if (item.sourceType === "fork" && item.deployUrl) {
+      window.open(item.deployUrl, "_blank", "noopener");
+    } else if (item.route) {
+      router.push(item.route);
     }
-  }, [project, router]);
+  }, [item, router]);
+
+  const isMine =
+    !!currentEmail &&
+    !!item.createdBy &&
+    item.createdBy.toLowerCase() === currentEmail.toLowerCase();
 
   return (
     <div
@@ -278,20 +442,52 @@ function PrototypeCard({ project }: { project: Project }) {
     >
       <div className={styles.body}>
         <div className={styles.cardTitleRow}>
-          <Text className={styles.cardTitle}>{project.title}</Text>
+          <Text className={styles.cardTitle}>{item.title}</Text>
           <Badge
             appearance="tint"
             size="small"
-            color={statusColorMap[project.status] ?? "informative"}
+            color={item.origin === "live" ? "success" : "warning"}
           >
-            {statusLabels[project.status] ?? project.status}
+            {item.origin === "live" ? "Live" : "Local"}
+          </Badge>
+          <Badge
+            appearance="tint"
+            size="small"
+            color={statusColorMap[item.status] ?? "informative"}
+          >
+            {statusLabels[item.status] ?? item.status}
           </Badge>
         </div>
 
-        {project.description && (
-          <Text className={styles.cardDesc}>{project.description}</Text>
+        {item.description && (
+          <Text className={styles.cardDesc}>{item.description}</Text>
+        )}
+
+        {(isMine || item.author) && (
+          <div className={styles.metaRow}>
+            {isMine ? (
+              <Text className={styles.youText}>Created by you</Text>
+            ) : (
+              <Text className={styles.authorText}>By {item.author}</Text>
+            )}
+          </div>
         )}
       </div>
+
+      {onMakeLive && item.origin === "local" && (
+        <Button
+          className={`${styles.makeLiveBtn} makeLiveBtn`}
+          appearance="subtle"
+          size="small"
+          icon={<CloudArrowUp16Regular />}
+          onClick={(e) => {
+            e.stopPropagation();
+            onMakeLive(item);
+          }}
+        >
+          Make live
+        </Button>
+      )}
 
       <ArrowRight20Regular className={`${styles.chevron} protoChevron`} />
     </div>
@@ -302,15 +498,88 @@ function PrototypeCard({ project }: { project: Project }) {
 // Page
 // ---------------------------------------------------------------------------
 
+type PromotePhase = "confirm" | "working" | "done" | "error";
+
 function WorkspaceContent() {
   const styles = useStyles();
   const [query, setQuery] = useState("");
+  const [localItems, setLocalItems] = useState<CardItem[]>([]);
+  const [promotedItems, setPromotedItems] = useState<CardItem[]>([]);
+  const [currentEmail, setCurrentEmail] = useState<string | null>(null);
+  const [bridgeReady, setBridgeReady] = useState(false);
+
+  // Make-live dialog state.
+  const [target, setTarget] = useState<CardItem | null>(null);
+  const [phase, setPhase] = useState<PromotePhase>("confirm");
+  const [errorDetail, setErrorDetail] = useState("");
+
+  useEffect(() => {
+    loadLocalItems().then(setLocalItems);
+    try {
+      const account =
+        msalInstance.getActiveAccount() || msalInstance.getAllAccounts()[0];
+      setCurrentEmail(account?.username ?? null);
+    } catch {
+      setCurrentEmail(null);
+    }
+    // Probe the local bridge — "Make live" (git commit + push) only works when it's up.
+    fetch(`${BRIDGE_URL}/api/health`, { cache: "no-store" })
+      .then((r) => setBridgeReady(r.ok))
+      .catch(() => setBridgeReady(false));
+  }, []);
+
+  const openPromote = useCallback((item: CardItem) => {
+    setTarget(item);
+    setPhase("confirm");
+    setErrorDetail("");
+  }, []);
+
+  const runPromote = useCallback(async () => {
+    if (!target) return;
+    setPhase("working");
+    try {
+      const res = await fetch(`${BRIDGE_URL}/api/prototypes/make-live`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: target.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) {
+        setErrorDetail(data.detail || data.error || `Bridge returned ${res.status}.`);
+        setPhase("error");
+        return;
+      }
+      // Flip the card to Live locally so the change is reflected immediately.
+      setLocalItems((prev) => prev.filter((p) => p.id !== target.id));
+      setPromotedItems((prev) => [
+        { ...target, origin: "live" as const },
+        ...prev,
+      ]);
+      if (data.pushed === false) {
+        setErrorDetail(data.warning || "Committed locally, but push failed.");
+        setPhase("error");
+        return;
+      }
+      setPhase("done");
+    } catch {
+      setErrorDetail(
+        `Could not reach the local bridge at ${BRIDGE_URL}. Start it and try again.`,
+      );
+      setPhase("error");
+    }
+  }, [target]);
+
+  // Local prototypes first, then promoted (session), then live baseline.
+  const allItems = useMemo(
+    () => [...localItems, ...promotedItems, ...LIVE_ITEMS],
+    [localItems, promotedItems],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return projects;
-    return projects.filter((p) => p.title.toLowerCase().includes(q));
-  }, [query]);
+    if (!q) return allItems;
+    return allItems.filter((p) => p.title.toLowerCase().includes(q));
+  }, [query, allItems]);
 
   return (
     <div className={styles.container}>
@@ -329,7 +598,7 @@ function WorkspaceContent() {
 
         </div>
 
-        {projects.length > 0 && (
+        {allItems.length > 0 && (
           <SearchBox
             className={styles.searchBox}
             size="large"
@@ -340,7 +609,7 @@ function WorkspaceContent() {
           />
         )}
 
-        {projects.length === 0 ? (
+        {allItems.length === 0 ? (
           <div className={styles.empty}>
             No prototypes yet. Generate one from a design task and it will appear
             here.
@@ -352,11 +621,91 @@ function WorkspaceContent() {
         ) : (
           <div className={styles.list}>
             {filtered.map((p) => (
-              <PrototypeCard key={p.id} project={p} />
+              <PrototypeCard
+                key={p.id}
+                item={p}
+                currentEmail={currentEmail}
+                onMakeLive={bridgeReady ? openPromote : undefined}
+              />
             ))}
           </div>
         )}
       </div>
+
+      <Dialog
+        open={!!target}
+        onOpenChange={(_, data) => {
+          if (!data.open && phase !== "working") setTarget(null);
+        }}
+      >
+        <DialogSurface>
+          <DialogBody>
+            <DialogTitle>
+              {phase === "done" ? "Prototype is live" : "Make prototype live"}
+            </DialogTitle>
+            <DialogContent>
+              {phase === "confirm" && (
+                <Text className={styles.dialogText}>
+                  This commits <span className={styles.dialogCode}>{target?.id}</span>{" "}
+                  and pushes it to the repository, making it visible to everyone as
+                  a Live prototype. Continue?
+                </Text>
+              )}
+              {phase === "working" && (
+                <div className={styles.dialogStatus}>
+                  <Spinner size="tiny" />
+                  <Text className={styles.dialogText}>
+                    Committing and pushing to the repository…
+                  </Text>
+                </div>
+              )}
+              {phase === "done" && (
+                <Text className={styles.dialogText}>
+                  <span className={styles.dialogCode}>{target?.id}</span> was pushed
+                  to the repo. It now appears as Live for everyone once the hosted
+                  workspace redeploys.
+                </Text>
+              )}
+              {phase === "error" && (
+                <>
+                  <Text className={styles.dialogText}>
+                    Couldn&rsquo;t fully make this prototype live.
+                  </Text>
+                  <Text as="p" className={styles.dialogError}>
+                    {errorDetail}
+                  </Text>
+                </>
+              )}
+            </DialogContent>
+            <DialogActions>
+              {phase === "confirm" && (
+                <>
+                  <Button appearance="secondary" onClick={() => setTarget(null)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    appearance="primary"
+                    icon={<CloudArrowUp16Regular />}
+                    onClick={runPromote}
+                  >
+                    Make live
+                  </Button>
+                </>
+              )}
+              {phase === "working" && (
+                <Button appearance="primary" disabled>
+                  Working…
+                </Button>
+              )}
+              {(phase === "done" || phase === "error") && (
+                <Button appearance="primary" onClick={() => setTarget(null)}>
+                  Close
+                </Button>
+              )}
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
     </div>
   );
 }

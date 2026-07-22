@@ -23,3 +23,6 @@ prototype-workspace/out/
 # Local environment files (never commit — values are injected via CI variables)
 prototype-workspace/.env.local
 prototype-workspace/.env*.local
+
+# Locally-created prototypes registry (per-user, not part of the live repo baseline)
+prototype-workspace/public/local-prototypes.json

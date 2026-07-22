@@ -23,7 +23,7 @@ if (typeof window !== "undefined") {
   }
 }
 
-const msalInstance = new PublicClientApplication(msalConfig);
+export const msalInstance = new PublicClientApplication(msalConfig);
 
 function InitializingScreen() {
   return (

@@ -141,6 +141,17 @@ export interface Project {
   updatedAt?: string;
   /** Whether this project appears in the sidebar as a featured project */
   featured?: boolean;
+  /** Display name of who created this prototype */
+  author?: string;
+  /** Identity (email) of the creator, used to detect "created by you" */
+  createdBy?: string;
+  /**
+   * Where the prototype came from:
+   * - "live": shipped in the repo baseline (present when the repo is pulled)
+   * - "local": created locally by the current user, not yet committed/live
+   * Attached at runtime when the workspace list is assembled.
+   */
+  origin?: "live" | "local";
 }
 
 // ---------------------------------------------------------------------------
@@ -794,6 +805,7 @@ const ALL_PROJECTS: Project[] = [
     description:
       "Azure portal home page with clickable quick-action and service links",
     owner: "Designer Agent",
+    author: "Designer Agent",
     team: "FRE",
     status: "in-progress",
     area: "foundations",
@@ -813,22 +825,27 @@ const ALL_PROJECTS: Project[] = [
 ];
 
 /**
- * Prototypes created in THIS DesignLoop repo. For now the workspace lists only
- * these — the inherited Azure Portal PoC samples are intentionally excluded.
- * Add a project/task id here as new prototypes are generated in the repo, or
- * clear the filter below (return ALL_PROJECTS) to restore every prototype.
+ * Prototypes that ship LIVE in this repo baseline — the ones present when the
+ * repo is pulled. The workspace lists these as "Live". Locally-created
+ * prototypes are tracked separately (see public/local-prototypes.json) and
+ * surface as "Local" until they are committed and added here.
+ * Add a project/task id here when a prototype is promoted to live.
  */
-export const REPO_PROTOTYPE_IDS = new Set<string>([
+export const LIVE_PROTOTYPE_IDS = new Set<string>([
   "azure-home-page",
 ]);
 
+/** @deprecated Use LIVE_PROTOTYPE_IDS. Kept for backward compatibility. */
+export const REPO_PROTOTYPE_IDS = LIVE_PROTOTYPE_IDS;
+
 /**
- * The prototypes surfaced across the workspace (home grid, menu, connection
- * map, task-prototypes page). Filtered to repo-created prototypes only.
+ * The LIVE prototypes surfaced across the workspace (home grid, menu, connection
+ * map, task-prototypes page). Filtered to the repo's live baseline. Each is
+ * tagged origin "live".
  */
 export const projects: Project[] = ALL_PROJECTS.filter((p) =>
-  REPO_PROTOTYPE_IDS.has(p.id),
-);
+  LIVE_PROTOTYPE_IDS.has(p.id),
+).map((p) => ({ ...p, origin: "live" as const }));
 
 // ---------------------------------------------------------------------------
 // Helper functions
