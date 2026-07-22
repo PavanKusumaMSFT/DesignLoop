@@ -19,3 +19,7 @@ prototype-workspace/node_modules/
 prototype-workspace/.next/
 prototype-workspace/storybook-static/
 prototype-workspace/out/
+
+# Local environment files (never commit — values are injected via CI variables)
+prototype-workspace/.env.local
+prototype-workspace/.env*.local
