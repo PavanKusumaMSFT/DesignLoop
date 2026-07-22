@@ -67,5 +67,16 @@
     "storybook": "8.6.18",
     "@storybook/react-vite": "8.6.18",
     "vite": "^6.4.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "glob@>=10.2.0 <10.5.0": ">=10.5.0",
+      "js-yaml@>=4.0.0 <4.1.1": ">=4.1.1",
+      "tar@<=7.5.2": ">=7.5.3",
+      "tar@<=7.5.3": ">=7.5.4",
+      "@fluentui/react-popover": "9.14.4",
+      "@fluentui/react-motion": "9.16.1",
+      "@fluentui/react-motion-components-preview": "0.15.6"
+    }
   }
 }
