@@ -1,0 +1,16 @@
+{
+  "id": "design-engineering-changelog",
+  "name": "Design Engineering Changelog",
+  "description": "Document every design decision made during the project for the engineering team, including rationale, constraints, and change history.",
+  "stages": ["deliver"],
+  "agent": "design-engineering-changelog",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "implementation-guide", "required": true }
+  ],
+  "outputs": [
+    "handoff/design-engineering-changelog.md"
+  ],
+  "dependencies": ["implementation-guide"],
+  "required": true
+}

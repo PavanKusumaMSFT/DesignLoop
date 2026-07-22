@@ -1,0 +1,17 @@
+{
+  "id": "component-spec",
+  "name": "Component Specification",
+  "description": "Generate Fluent UI React v9 component documentation with reuse checks, exact shared component or Fluent primitive mappings, token mappings, variants, states, and accessibility requirements.",
+  "stages": ["design", "deliver"],
+  "agent": "component-spec",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "design-system-setup", "required": false },
+    { "type": "artifact", "from": "wireframe-spec", "required": false }
+  ],
+  "outputs": [
+    "tasks/{taskId}/designs/components/{ComponentName}.md"
+  ],
+  "dependencies": [],
+  "required": false
+}

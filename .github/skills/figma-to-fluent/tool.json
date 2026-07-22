@@ -1,0 +1,34 @@
+{
+  "id": "figma-to-fluent",
+  "name": "Figma to Fluent",
+  "description": "Convert Figma designs into Next.js + Fluent v9 and Fluent Copilot prototype code using shared DesAIgns workspace components.",
+  "stages": [
+    "prototype"
+  ],
+  "agent": "figma-to-fluent",
+  "inputs": [
+    {
+      "type": "task-description",
+      "required": true
+    },
+    {
+      "type": "artifact",
+      "from": "wireframe-spec",
+      "required": false
+    },
+    {
+      "type": "artifact",
+      "from": "component-spec",
+      "required": false
+    }
+  ],
+  "outputs": [
+    "prototype-workspace/components/projects/{taskId}/*.tsx",
+    "prototype-workspace/app/{taskId}/page.tsx"
+  ],
+  "dependencies": [
+    "wireframe-spec",
+    "component-spec"
+  ],
+  "required": false
+}

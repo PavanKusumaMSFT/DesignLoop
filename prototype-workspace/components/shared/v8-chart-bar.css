@@ -1,0 +1,16 @@
+/* ─── BarChart ────────────────────────────────────────────────────────────── */
+
+.ap-bar-chart__svg {
+  width: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.ap-bar-chart__bar {
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.ap-bar-chart__bar:hover {
+  opacity: 0.8;
+}

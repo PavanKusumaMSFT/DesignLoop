@@ -1,0 +1,167 @@
+/* ResourceLookupList — async cached-first lookup (State C). Tokens only. */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  min-width: 24rem;
+  max-width: 46rem;
+  background: var(--color-surface-overlay);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--elevation-2);
+  overflow: hidden;
+  animation: list-in var(--motion-duration-slow) var(--motion-easing-standard);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.headerLabel {
+  font-weight: var(--font-weight-medium);
+}
+
+.badgeLive {
+  color: var(--color-resource-live);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-xs);
+}
+
+.badgeLoading {
+  color: var(--color-resource-loading);
+  font-size: var(--font-size-xs);
+}
+
+.badgeMuted {
+  color: var(--color-validation-fallback-text);
+  font-size: var(--font-size-xs);
+}
+
+.loadingRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-2xs) var(--spacing-sm);
+}
+
+.shimmer {
+  display: inline-block;
+  flex: 1;
+  height: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--color-resource-loading-track) 0%,
+    var(--color-resource-loading) 50%,
+    var(--color-resource-loading-track) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer var(--motion-duration-slow) linear infinite;
+}
+
+.loadingText {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-resource-meta);
+  white-space: nowrap;
+}
+
+.rows {
+  margin: 0;
+  padding: var(--spacing-2xs);
+  list-style: none;
+  max-height: calc(8 * 1.9rem);
+  overflow-y: auto;
+}
+
+.refreshNote,
+.fallbackLine {
+  margin: 0;
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-validation-fallback-text);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border-top: 1px solid var(--color-border-subtle);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-2xs);
+  color: var(--color-resource-meta);
+}
+
+.count {
+  white-space: nowrap;
+}
+
+/* Plain variant (State F-1). */
+.plainLine {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-secondary);
+}
+
+.plainPrefix {
+  color: var(--color-param-flag);
+  font-weight: var(--font-weight-semibold);
+}
+
+.plainNote {
+  color: var(--color-text-muted);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes list-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Reduced motion: shimmer becomes a static bar, no sliding gradient. */
+@media (prefers-reduced-motion: reduce) {
+  .list {
+    animation: none;
+  }
+  .shimmer {
+    animation: none;
+    background: var(--color-resource-loading-track);
+  }
+}

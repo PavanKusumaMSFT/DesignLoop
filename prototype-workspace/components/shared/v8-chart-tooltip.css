@@ -1,0 +1,44 @@
+.ap-chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 10;
+  background: var(--chart-tooltip-bg);
+  color: var(--chart-tooltip-fg);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-family: var(--font-family);
+  font-size: var(--text-s-size);
+  line-height: var(--text-s-line-height);
+  white-space: nowrap;
+  box-shadow: var(--shadow-md);
+}
+
+.ap-chart-tooltip__title {
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: 2px;
+}
+
+.ap-chart-tooltip__row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 1px 0;
+}
+
+.ap-chart-tooltip__swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.ap-chart-tooltip__label {
+  flex: 1;
+  color: var(--neutral-60);
+}
+
+.ap-chart-tooltip__value {
+  font-weight: var(--font-weight-semibold);
+  margin-left: var(--spacing-sm);
+}

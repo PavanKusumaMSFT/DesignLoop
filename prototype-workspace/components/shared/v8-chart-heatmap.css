@@ -1,0 +1,15 @@
+.ap-heatmap-chart__svg {
+  width: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.ap-heatmap-chart__cell {
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.ap-heatmap-chart__cell:hover {
+  stroke: var(--neutral-160);
+  stroke-width: 1.5;
+}

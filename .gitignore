@@ -13,3 +13,9 @@ yarn-error.log*
 # Editor
 .idea/
 *.swp
+
+# Prototype workspace outputs
+prototype-workspace/node_modules/
+prototype-workspace/.next/
+prototype-workspace/storybook-static/
+prototype-workspace/out/

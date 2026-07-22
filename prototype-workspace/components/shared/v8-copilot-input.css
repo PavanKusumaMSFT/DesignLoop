@@ -1,0 +1,106 @@
+/* ===========================================
+   Copilot Input — Styles
+   =========================================== */
+
+.ap-copilot-input {
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
+  flex-shrink: 0;
+}
+
+.ap-copilot-input__field {
+  background: var(--copilot-input-bg);
+  border: 1px solid var(--copilot-input-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-xs);
+  transition: border-color var(--transition-fast);
+}
+
+.ap-copilot-input__field:focus-within {
+  border-color: var(--copilot-input-border-focus);
+}
+
+.ap-copilot-input__textarea {
+  display: block;
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  color: var(--text-primary);
+  background: transparent;
+  padding: var(--spacing-xs) var(--spacing-xs);
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.ap-copilot-input__textarea::placeholder {
+  color: var(--text-disabled);
+}
+
+.ap-copilot-input__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding-top: var(--spacing-xs);
+}
+
+/* Generic icon button in the input bar */
+.ap-copilot-input__action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+}
+
+.ap-copilot-input__action-btn:hover {
+  background: var(--neutral-20);
+  color: var(--text-primary);
+}
+
+.ap-copilot-input__action-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+/* Send button — circular blue */
+.ap-copilot-input__send-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: var(--copilot-send-bg);
+  color: var(--copilot-send-fg);
+  cursor: pointer;
+  padding: 0;
+  margin-left: auto;
+  transition: background var(--transition-fast);
+}
+
+.ap-copilot-input__send-btn:hover:not(:disabled) {
+  background: var(--copilot-send-bg-hover);
+}
+
+.ap-copilot-input__send-btn:disabled {
+  background: var(--copilot-send-bg-disabled);
+  color: var(--copilot-send-fg-disabled);
+  cursor: default;
+}
+
+.ap-copilot-input__send-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}

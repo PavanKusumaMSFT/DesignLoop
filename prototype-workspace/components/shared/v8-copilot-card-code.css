@@ -1,0 +1,39 @@
+/* ===========================================
+   Code Card — Styles
+   =========================================== */
+
+.ap-copilot-code-card {
+  /* Consumes the parent ap-copilot-card padding via negative margin */
+  margin: calc(-1 * var(--spacing-sm)) calc(-1 * var(--spacing-md));
+}
+
+.ap-copilot-code-card__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+/* Compact the buttons to fit the card header */
+.ap-copilot-code-card__actions .ap-button {
+  padding: 2px 8px;
+  min-height: 0;
+  font-size: var(--text-s-size);
+  line-height: var(--text-s-line-height);
+}
+
+.ap-copilot-code-card__actions .ap-button__icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.ap-copilot-code-card__code {
+  margin: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+  font-size: var(--text-s-size);
+  line-height: 20px;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--copilot-card-bg);
+}

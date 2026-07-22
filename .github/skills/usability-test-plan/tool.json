@@ -1,0 +1,19 @@
+{
+  "id": "usability-test-plan",
+  "name": "Usability Test Plan",
+  "description": "Create structured usability test plans with objectives, user scenarios, moderator scripts, success metrics, and observation frameworks.",
+  "stages": ["test"],
+  "agent": "usability-test-plan",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "personas", "required": false },
+    { "type": "artifact", "from": "design-to-code", "required": false }
+  ],
+  "outputs": [
+    "tests/usability/{feature}-test-plan.md",
+    "tests/usability/{feature}-task-scripts.md",
+    "tests/usability/{feature}-observation-sheet.md"
+  ],
+  "dependencies": [],
+  "required": false
+}

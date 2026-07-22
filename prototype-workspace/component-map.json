@@ -1,0 +1,425 @@
+{
+  "$schema": "Component pattern → implementation lookup. Style derived from path (portal-classic/ = classic). Used by /figma-to-fluent and /component-audit.",
+  "patterns": {
+    "page-header-bar": [
+      {
+        "component": "AzureHeaderBuildMVP",
+        "path": "shared/azure-header-buildmvp",
+        "style": "modern",
+        "description": "Top nav header with search, alerts, settings"
+      },
+      {
+        "component": "AzureHeaderP1",
+        "path": "shared/azure-header-p1",
+        "style": "modern",
+        "description": "P1 phase header variant"
+      },
+      {
+        "component": "TopNav",
+        "path": "shared/top-nav",
+        "style": "modern",
+        "description": "Vision/long-term header with agent mode toggle"
+      }
+    ],
+    "page-layout-shell": [
+      {
+        "component": "ProjectLayout",
+        "path": "shared/project-layout",
+        "style": "any",
+        "description": "Wraps every project page with FluentProvider, nav, header"
+      }
+    ],
+    "breadcrumb-navigation": [
+      {
+        "component": "PageBreadcrumb",
+        "path": "shared/page-breadcrumb",
+        "style": "any",
+        "description": "Breadcrumb nav with clickable items and separator"
+      }
+    ],
+    "page-title-header": [
+      {
+        "component": "PageHeader",
+        "path": "shared/page-header",
+        "style": "any",
+        "description": "Page header with icon, title, description, back/close buttons"
+      }
+    ],
+    "sidebar-navigation": [
+      {
+        "component": "NavigationPanel",
+        "path": "shared/navigation-panel",
+        "style": "any",
+        "description": "Fluent NavDrawer with hierarchy and favorites"
+      }
+    ],
+    "project-switcher-menu": [
+      {
+        "component": "ProjectsMenu",
+        "path": "shared/projects-menu",
+        "style": "any",
+        "description": "Sidebar menu for project selection"
+      }
+    ],
+    "icon-title-description-cta-card": [
+      {
+        "component": "ActionCard",
+        "path": "shared/action-card",
+        "style": "any",
+        "description": "Card with icon, title, description, CTA button. Grid wrapper: ActionCardGrid"
+      }
+    ],
+    "kpi-metric-tile": [
+      {
+        "component": "MetricCard",
+        "path": "shared/metric-card",
+        "style": "any",
+        "description": "KPI tile with label, value, unit, badge. Grid wrapper: MetricCardGrid"
+      }
+    ],
+    "resource-status-table": [
+      {
+        "component": "ResourceStatusTable",
+        "path": "shared/resource-status-table",
+        "style": "any",
+        "description": "Table with name, type, status, alerts, cost columns"
+      }
+    ],
+    "alert-summary-panel": [
+      {
+        "component": "AlertSummaryCard",
+        "path": "shared/alert-summary-card",
+        "style": "any",
+        "description": "Alert stats with stat boxes and action buttons"
+      }
+    ],
+    "cost-summary-panel": [
+      {
+        "component": "CostSummaryCard",
+        "path": "shared/cost-summary-card",
+        "style": "any",
+        "description": "Cost breakdown with stat grid and action button"
+      }
+    ],
+    "service-selection-tile": [
+      {
+        "component": "ServiceTile",
+        "path": "shared/service-tile",
+        "style": "any",
+        "description": "Service tile with icon, name, description, free badge. Grid: ServiceTileGrid"
+      }
+    ],
+    "search-suggestions-dropdown": [
+      {
+        "component": "HpCopilotSuggestionPanel",
+        "path": "shared/hp-copilot-suggestion-panel",
+        "style": "modern",
+        "description": "Copilot-powered search suggestion panel"
+      },
+      {
+        "component": "SearchSuggestionPanelBuildMVP",
+        "path": "shared/search-suggestion-panel-buildmvp",
+        "style": "modern",
+        "description": "Build MVP search results panel"
+      },
+      {
+        "component": "SearchSuggestionPanelP1",
+        "path": "shared/search-suggestion-panel-p1",
+        "style": "modern",
+        "description": "P1 search variant"
+      },
+      {
+        "component": "SimpleSearchSuggestions",
+        "path": "shared/simple-search-suggestions",
+        "style": "any",
+        "description": "Lightweight suggestion list"
+      }
+    ],
+    "search-fullpage-results": [
+      {
+        "component": "SearchFullPageResults",
+        "path": "shared/search-fullpage-results",
+        "style": "any",
+        "description": "Full page search results with filtering"
+      }
+    ],
+    "search-input-bar": [
+      {
+        "component": "EnhancedInputBar",
+        "path": "shared/enhanced-input-bar",
+        "style": "any",
+        "description": "Copilot-style input bar with attachments, mic, submit"
+      }
+    ],
+    "deployment-plan-preview": [
+      {
+        "component": "DeploymentPlanCard",
+        "path": "shared/deployment-plan-card",
+        "style": "any",
+        "description": "Pre-deployment plan with resource details and actions"
+      }
+    ],
+    "deployment-progress-tracker": [
+      {
+        "component": "DeploymentProgressCard",
+        "path": "shared/deployment-progress-card",
+        "style": "any",
+        "description": "In-progress deployment with status indicators"
+      }
+    ],
+    "deployment-complete-summary": [
+      {
+        "component": "DeploymentCompleteCard",
+        "path": "shared/deployment-complete-card",
+        "style": "any",
+        "description": "Post-deployment resource table with status"
+      },
+      {
+        "component": "DeploymentCompleteResourceCard",
+        "path": "shared/deployment-complete-resource-card",
+        "style": "any",
+        "description": "Single deployed resource details"
+      },
+      {
+        "component": "DeploymentSuccessCard",
+        "path": "shared/deployment-success-card",
+        "style": "any",
+        "description": "Success page with accordion, next-steps, footer"
+      }
+    ],
+    "agent-layout-fullscreen": [
+      {
+        "component": "AgentLayout",
+        "path": "shared/agent-layout",
+        "style": "any",
+        "description": "Full-screen agent shell with sidebar, chat, input, panel"
+      },
+      {
+        "component": "AgentImmersive",
+        "path": "shared/agent-immersive",
+        "style": "any",
+        "description": "Full-screen immersive agent variant"
+      }
+    ],
+    "agent-welcome-screen": [
+      {
+        "component": "AgentWelcome",
+        "path": "shared/agent-welcome",
+        "style": "any",
+        "description": "Agent onboarding/welcome with suggestions"
+      },
+      {
+        "component": "AgentWelcomeClean",
+        "path": "shared/agent-welcome-clean",
+        "style": "any",
+        "description": "Minimal agent welcome variant"
+      }
+    ],
+    "docked-chat-sidecar": [
+      {
+        "component": "DockedChatPanel",
+        "path": "shared/docked-chat-panel",
+        "style": "any",
+        "description": "Right-side panel docked onto existing page"
+      }
+    ],
+    "code-viewer-side-panel": [
+      {
+        "component": "CodeViewerPanel",
+        "path": "shared/code-viewer-panel",
+        "style": "any",
+        "description": "Sliding panel for Terraform/Bicep/code display"
+      }
+    ],
+    "copy-to-clipboard-button": [
+      {
+        "component": "CopyButton",
+        "path": "shared/copy-button",
+        "style": "any",
+        "description": "Copy button with checkmark feedback tooltip"
+      }
+    ],
+    "incident-investigation-card": [
+      {
+        "component": "IncidentInvestigationCard",
+        "path": "shared/incident-investigation-card",
+        "style": "any",
+        "description": "Investigation findings with work items and summary"
+      }
+    ],
+    "workload-recommendation-card": [
+      {
+        "component": "WorkloadRecommendationCard",
+        "path": "shared/workload-recommendation-card",
+        "style": "any",
+        "description": "Workload recommendations with features and tabs"
+      }
+    ],
+    "resolution-plan-card": [
+      {
+        "component": "ResolutionPlanCard",
+        "path": "shared/resolution-plan-card",
+        "style": "any",
+        "description": "Resolution plan with steps and CLI commands"
+      }
+    ],
+    "resolution-report-card": [
+      {
+        "component": "ResolutionReportCard",
+        "path": "shared/resolution-report-card",
+        "style": "any",
+        "description": "Resolution report with findings and next steps"
+      }
+    ],
+    "wizard-layout-shell": [
+      {
+        "component": "WizardLayout",
+        "path": "shared/wizard-layout",
+        "style": "any",
+        "description": "3-column grid: step nav + content + cost panel"
+      }
+    ],
+    "wizard-step-navigation": [
+      {
+        "component": "WizardStepNav",
+        "path": "shared/wizard-step-nav",
+        "style": "any",
+        "description": "Vertical step nav (flat TabList or grouped/collapsible)"
+      }
+    ],
+    "wizard-cost-estimation-panel": [
+      {
+        "component": "WizardCostPanel",
+        "path": "shared/wizard-cost-panel",
+        "style": "any",
+        "description": "Cost estimation with line items, totals, disclaimers"
+      }
+    ],
+    "wizard-form-section": [
+      {
+        "component": "WizardSection",
+        "path": "shared/wizard-section",
+        "style": "any",
+        "description": "Titled form section within a step"
+      }
+    ],
+    "wizard-bottom-action-bar": [
+      {
+        "component": "WizardActionBar",
+        "path": "shared/wizard-action-bar",
+        "style": "any",
+        "description": "Previous / Next / Create / Save draft buttons"
+      }
+    ],
+    "create-vm-wizard": [
+      {
+        "component": "CreateVmWizard",
+        "path": "shared/create-vm-wizard",
+        "style": "any",
+        "description": "VM creation wizard flow"
+      }
+    ],
+    "create-webapp-wizard": [
+      {
+        "component": "CreateWebAppWizard",
+        "path": "shared/create-webapp-wizard",
+        "style": "any",
+        "description": "Web app creation wizard flow"
+      }
+    ],
+    "create-function-app-wizard": [
+      {
+        "component": "CreateFunctionAppWizard",
+        "path": "shared/create-function-app-wizard",
+        "style": "any",
+        "description": "Function app creation wizard flow"
+      }
+    ],
+    "create-postgres-wizard": [
+      {
+        "component": "CreatePostgresWizard",
+        "path": "shared/create-postgres-wizard",
+        "style": "any",
+        "description": "PostgreSQL creation wizard flow"
+      }
+    ],
+    "signup-modal-form": [
+      {
+        "component": "SignupModal",
+        "path": "shared/signup-modal",
+        "style": "any",
+        "description": "Multi-step signup modal"
+      }
+    ],
+    "next-steps-carousel": [
+      {
+        "component": "NextStepsCarousel",
+        "path": "shared/next-steps-carousel",
+        "style": "any",
+        "description": "Post-action next steps carousel"
+      }
+    ],
+    "homepage-first-run": [
+      {
+        "component": "HpFre",
+        "path": "shared/hp-fre",
+        "style": "modern",
+        "description": "First-run experience homepage"
+      },
+      {
+        "component": "FreServices",
+        "path": "shared/fre-services",
+        "style": "modern",
+        "description": "Service selection in FRE flow"
+      }
+    ],
+    "homepage-returning-user": [
+      {
+        "component": "HpReturning",
+        "path": "shared/hp-returning",
+        "style": "modern",
+        "description": "Returning user personalized homepage"
+      }
+    ],
+    "level1-discover-page": [
+      {
+        "component": "Level1Discover",
+        "path": "shared/level1-discover",
+        "style": "modern",
+        "description": "Discover/marketplace section"
+      }
+    ],
+    "level1-build-page": [
+      {
+        "component": "Level1Build",
+        "path": "shared/level1-build",
+        "style": "modern",
+        "description": "Build/create section"
+      }
+    ],
+    "level1-manage-page": [
+      {
+        "component": "Level1Manage",
+        "path": "shared/level1-manage",
+        "style": "modern",
+        "description": "Manage/monitor section"
+      }
+    ],
+    "level2-project-detail": [
+      {
+        "component": "Level2ProjectDetail",
+        "path": "shared/level2-projectdetail",
+        "style": "modern",
+        "description": "Project detail view with tabs"
+      }
+    ],
+    "all-services-catalog": [
+      {
+        "component": "AllServicesPage",
+        "path": "shared/all-services-page",
+        "style": "any",
+        "description": "All Azure services with filter pills, favorites, scroll-sync"
+      }
+    ]
+  }
+}

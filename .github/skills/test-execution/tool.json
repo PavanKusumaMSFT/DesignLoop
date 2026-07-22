@@ -1,0 +1,16 @@
+{
+  "id": "test-execution",
+  "name": "Test Execution",
+  "description": "Execute the usability test plan, document participant findings per task, and summarise patterns, success rates, and recommended fixes.",
+  "stages": ["test"],
+  "agent": "test-execution",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "usability-test-plan", "required": true }
+  ],
+  "outputs": [
+    "tests/usability/test-findings.md"
+  ],
+  "dependencies": ["usability-test-plan"],
+  "required": false
+}

@@ -1,79 +1,110 @@
 ---
 name: design-system-setup
-description: "Scaffold a complete design token system with colors, typography, spacing, elevation, and motion tokens. Use when starting a new design system, setting up design tokens, creating theme files, or initializing CSS custom properties for a project."
-argument-hint: "Describe your brand or design direction (e.g., 'modern fintech app with blue primary color')"
+description: "Document the Fluent UI React v9 theme, token usage, and brand customization for the prototype workspace. Use when selecting webLightTheme/webDarkTheme, mapping design intent to Fluent token families, or preparing a createLightTheme snippet."
+argument-hint: "Describe the product brand direction and whether light/dark or Azure-blue customization is needed"
 ---
 
 # Design System Setup
 
 ## When to Use
-- Starting a new project that needs a design token foundation
-- Setting up a design system from scratch
-- Migrating from hardcoded values to design tokens
-- Creating light/dark theme support
+- Starting a task that needs a Fluent UI React v9 design foundation
+- Choosing between `webLightTheme`, `webDarkTheme`, or an Azure-branded Fluent theme
+- Mapping product design intent to Fluent token names before component specs or prototypes
+- Documenting how the prototype workspace should use Fluent tokens and theme providers
 
 ## Procedure
 
 ### 1. Gather Requirements
-Ask the user about:
-- Brand colors (primary, secondary, accent)
-- Typography preferences (font families, scale)
-- Spacing scale preference (4px base, 8px base)
-- Whether dark mode is needed
+Ask or infer from source artifacts:
+- Product surface and Azure portal context
+- Required theme modes: light, dark, or both
+- Whether default Fluent brand is sufficient or Azure-blue brand customization is needed
+- Any accessibility constraints for contrast, density, or motion
 
-### 2. Create Token JSON Files
+### 2. Read Fluent Workspace References
+Before writing token guidance, inspect the prototype workspace sources:
+- `prototype-workspace/AGENTS.md` — Fluent v9 rules, allowed styling patterns, icon rules, and do/don't guidance
+- `prototype-workspace/component-map.json` — existing shared patterns that component specs should reference
+- `prototype-workspace/components/shared/` — vendored shared components and theme/provider patterns
 
-Create the following files in `designs/tokens/`:
+Use Fluent UI React v9 as the token source of truth. Do not invent a parallel CSS custom property scheme.
 
-**`designs/tokens/colors.json`** — Color palette with semantic mappings
-Reference: [Color token template](./assets/colors.json.template)
+### 3. Create Fluent Theme Documentation
+Create `tasks/{taskId}/designs/tokens/fluent-theme.md` documenting:
+- The selected base theme: `webLightTheme`, `webDarkTheme`, or both
+- Where the theme is applied in `prototype-workspace` (for example, `FluentProvider` or shared `ThemeProvider`)
+- Any brand customization decision and rationale
+- The allowed Azure brand blues: `#0078D4`, `#106EBE`, `#005A9E`
+- How light and dark mode preserve contrast and state visibility
 
-**`designs/tokens/typography.json`** — Font families, sizes, weights, line heights
-Reference: [Typography token template](./assets/typography.json.template)
+### 4. Create Token Usage Guide
+Create `tasks/{taskId}/designs/tokens/token-usage-guide.md` mapping design intent to exact Fluent token names.
 
-**`designs/tokens/spacing.json`** — Spacing scale values
-Reference: [Spacing token template](./assets/spacing.json.template)
+Include these Fluent token families:
+- **Color**: `colorNeutralBackground1`, `colorNeutralBackground2`, `colorNeutralForeground1`, `colorNeutralForeground2`, `colorNeutralStroke1`, `colorBrandBackground`, `colorBrandForeground1`, `colorPaletteRedForeground1`, `colorPaletteGreenForeground1`, `colorPaletteYellowForeground1`
+- **Spacing**: `spacingHorizontalS`, `spacingHorizontalM`, `spacingHorizontalL`, `spacingHorizontalXXL`, `spacingVerticalS`, `spacingVerticalM`, `spacingVerticalL`, `spacingVerticalXXL`
+- **Typography**: `fontSizeBase200`, `fontSizeBase300`, `fontSizeBase400`, `fontSizeBase500`, `fontSizeHero800`, `fontWeightRegular`, `fontWeightMedium`, `fontWeightSemibold`, `lineHeightBase300`, `lineHeightBase400`
+- **Shape and stroke**: `borderRadiusSmall`, `borderRadiusMedium`, `borderRadiusLarge`, `borderRadiusXLarge`, `strokeWidthThin`, `strokeWidthThick`
+- **Elevation and motion**: `shadow4`, `shadow8`, `shadow16`, `durationNormal`, `curveEasyEase`
 
-**`designs/tokens/elevation.json`** — Box shadow definitions
-Reference: [Elevation token template](./assets/elevation.json.template)
+For each row, provide: Design intent | Fluent token | Use for | Do not use for | Light/dark considerations.
 
-**`designs/tokens/motion.json`** — Animation durations and easing curves
-Reference: [Motion token template](./assets/motion.json.template)
+### 5. Add Theme Snippet Only When Needed
+If brand customization is needed, create `tasks/{taskId}/designs/tokens/theme.ts` with a snippet for `prototype-workspace` using Fluent APIs:
 
-### 3. Generate CSS Custom Properties
+```ts
+import { createLightTheme, createDarkTheme, BrandVariants } from "@fluentui/react-components";
 
-Create `designs/tokens/tokens.css` that maps all JSON tokens to CSS custom properties following the `--{category}-{variant}-{scale}` naming convention.
+const azureBrandRamp: BrandVariants = {
+  10: "#005A9E",
+  20: "#005A9E",
+  30: "#005A9E",
+  40: "#005A9E",
+  50: "#106EBE",
+  60: "#0078D4",
+  70: "#0078D4",
+  80: "#0078D4",
+  90: "#0078D4",
+  100: "#0078D4",
+  110: "#0078D4",
+  120: "#0078D4",
+  130: "#0078D4",
+  140: "#0078D4",
+  150: "#0078D4",
+  160: "#0078D4",
+};
 
-Reference: [CSS tokens template](./assets/tokens.css.template)
+export const azureLightTheme = createLightTheme(azureBrandRamp);
+export const azureDarkTheme = createDarkTheme(azureBrandRamp);
+```
 
-### 4. Create Theme Files
+Explain that the Azure blues are confined to the brand ramp/theme definition; component styles must consume Fluent tokens such as `colorBrandForeground1` and `colorBrandBackground`.
 
-Create theme overrides for light and dark modes:
-- `designs/tokens/theme-light.css`
-- `designs/tokens/theme-dark.css`
+### 6. Validate Outputs
+Confirm:
+- No `colors.json`, `typography.json`, `spacing.json`, `elevation.json`, `motion.json`, `tokens.css`, or generic token CSS files were created
+- All token names are real Fluent token families, not `--{category}-{variant}-{scale}` names
+- Brand colors appear only in theme documentation or `theme.ts`, never as component styling guidance
+- Both light and dark behavior are documented
 
-### 5. Create Token Documentation
+## Fluent Token Families
 
-Create `designs/tokens/README.md` documenting:
-- Token naming conventions
-- Available categories and values
-- Usage examples in React components
-- How to add new tokens
-
-## Token Naming Convention
+Use Fluent UI React v9 token names exactly as exported by `tokens` from `@fluentui/react-components`.
 
 ```
---{category}-{variant}-{scale}
+Color:      colorNeutralBackground1, colorNeutralForeground1, colorBrandForeground1, colorBrandBackground
+Spacing:    spacingHorizontalM, spacingVerticalM, spacingHorizontalL, spacingVerticalL
+Typography: fontSizeBase300, fontSizeBase500, fontWeightSemibold, lineHeightBase400
+Radius:     borderRadiusMedium, borderRadiusLarge, borderRadiusXLarge
+Stroke:     strokeWidthThin, strokeWidthThick
+Elevation:  shadow4, shadow8, shadow16
+Motion:     durationNormal, curveEasyEase
+```
 
-Examples:
-  --color-primary-50 through --color-primary-900
-  --color-neutral-50 through --color-neutral-900
-  --color-success-500, --color-error-500, --color-warning-500
-  --spacing-xs (4px), --spacing-sm (8px), --spacing-md (16px), --spacing-lg (24px), --spacing-xl (32px)
-  --font-size-xs, --font-size-sm, --font-size-base, --font-size-lg, --font-size-xl
-  --font-weight-regular, --font-weight-medium, --font-weight-semibold, --font-weight-bold
-  --border-radius-sm, --border-radius-md, --border-radius-lg, --border-radius-full
-  --elevation-1, --elevation-2, --elevation-3
-  --motion-duration-fast, --motion-duration-normal, --motion-duration-slow
-  --motion-easing-default, --motion-easing-in, --motion-easing-out
+Do not create custom CSS variable names for these values. Component code in the prototype workspace must use:
+
+```ts
+import { makeStyles, tokens as fluentTokens } from "@fluentui/react-components";
+type SafeTokens = { [key: string]: any };
+const tokens: SafeTokens = fluentTokens;
 ```

@@ -1,0 +1,55 @@
+/* ===========================================
+   Breadcrumb
+   Navigation breadcrumb trail
+   =========================================== */
+
+.ap-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 10px var(--spacing-lg) 0 var(--spacing-lg); /* audit-ignore: hardcoded-spacing */
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--body-weight);
+}
+
+/* --- Breadcrumb Item (link) --- */
+.ap-breadcrumb__item {
+  color: var(--hyperlink-rest);
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+}
+
+.ap-breadcrumb__item:hover {
+  color: var(--hyperlink-hover);
+  text-decoration: underline;
+}
+
+.ap-breadcrumb__item:focus-visible {
+  outline: 1px solid var(--focus-outline);
+  outline-offset: 2px;
+}
+
+/* --- Separator (chevron icon) --- */
+.ap-breadcrumb__separator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+}
+
+.ap-breadcrumb__separator svg {
+  width: 9px;
+  height: 9px;
+}
+
+.ap-breadcrumb__separator svg path {
+  fill: var(--text-secondary);
+}

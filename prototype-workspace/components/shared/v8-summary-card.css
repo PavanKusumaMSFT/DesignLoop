@@ -1,0 +1,111 @@
+/* ===========================================
+   SummaryCard
+   =========================================== */
+
+.ap-summary-card {
+  display: flex;
+  flex-direction: column;
+  max-width: 528px;
+  max-height: 305px;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+/* --- Header --- */
+.ap-summary-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+}
+
+.ap-summary-card__header-start {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+/* Icon badge */
+.ap-summary-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.ap-summary-card__icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Icon color variants */
+.ap-summary-card__icon--success {
+  background: var(--status-success-bg);
+  color: var(--status-success-fg);
+}
+
+.ap-summary-card__icon--error {
+  background: var(--status-error-bg);
+  color: var(--status-error-fg);
+}
+
+.ap-summary-card__icon--warning {
+  background: var(--status-warning-bg);
+  color: var(--status-warning-fg);
+}
+
+.ap-summary-card__icon--info {
+  background: var(--status-info-bg);
+  color: var(--status-info-fg);
+}
+
+.ap-summary-card__icon--upsell {
+  background: var(--status-upsell-bg);
+  color: var(--status-upsell-fg);
+}
+
+/* Title */
+.ap-summary-card__title {
+  font-size: var(--h2-size);
+  line-height: var(--h2-line-height);
+  font-weight: var(--h2-weight);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Timestamp */
+.ap-summary-card__timestamp {
+  font-size: var(--text-s-size);
+  line-height: var(--text-s-line-height);
+  font-weight: var(--text-s-weight);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* --- Body --- */
+.ap-summary-card__body {
+  padding: 0 var(--spacing-md);
+  flex: 1 1 auto;
+  overflow: visible;
+}
+
+/* Ensure chart legend aligns to the top, not center */
+.ap-summary-card__body .ap-chart__body {
+  align-items: flex-start !important;
+}
+
+/* --- Footer --- */
+.ap-summary-card__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+}

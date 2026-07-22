@@ -1,0 +1,335 @@
+/*
+ * Project Cirrus — shared demo stylesheet.
+ * Mirrors the React CSS Modules using the SAME semantic tokens from tokens.css.
+ * No hardcoded colors or font values — everything via var(--token). This lets the
+ * self-contained HTML demos render the real component visuals with no build step.
+ */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: var(--spacing-xl);
+  background: var(--color-surface-terminal);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-ui);
+  min-height: 100vh;
+}
+
+.demo-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-xl);
+}
+
+.demo-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.demo-sub {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin: var(--spacing-2xs) 0 0;
+  font-family: var(--font-family-mono);
+}
+
+.demo-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.demo-controls button,
+.demo-controls select {
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-xs);
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--color-border-default);
+  background: var(--color-surface-overlay);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.demo-controls button:focus-visible,
+.demo-controls select:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+.demo-nav {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+.demo-nav a { color: var(--color-param-flag); }
+
+.demo-note {
+  margin-top: var(--spacing-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-left: 2px solid var(--color-border-subtle);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text-secondary);
+  max-width: 60ch;
+}
+.demo-note code {
+  font-family: var(--font-family-mono);
+  color: var(--color-param-flag);
+}
+
+/* ---------- terminal host ---------- */
+.host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  padding: var(--spacing-md);
+  background: var(--color-surface-terminal);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--border-radius-lg);
+  font-family: var(--font-family-mono);
+  max-width: 62rem;
+}
+
+.line {
+  display: flex;
+  align-items: baseline;
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-tight);
+  color: var(--color-text-command);
+  white-space: pre;
+}
+.prompt { color: var(--color-param-flag); font-weight: var(--font-weight-semibold); }
+.command { color: var(--color-text-command); }
+/* The command span is the focusable combobox (A11Y-3); give it a visible ring. */
+.command:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--border-radius-sm);
+}
+
+.caret {
+  display: inline-block;
+  width: 0.5ch;
+  height: 1.1em;
+  margin-inline-start: 1px;
+  background: var(--color-text-command);
+  transform: translateY(0.15em);
+  animation: blink 1s steps(2, start) infinite;
+}
+
+.below {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  padding-inline-start: 2ch;
+}
+
+/* ---------- ghost text ---------- */
+.ghost {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-tight);
+  color: var(--color-ghost-text);
+  white-space: pre;
+  transition: var(--motion-transition-fade);
+}
+.ghost .emphasis { color: var(--color-ghost-text-emphasis); font-weight: var(--font-weight-medium); }
+
+/* ---------- suggestion row ---------- */
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border-left: 2px solid transparent;
+  border-radius: var(--border-radius-sm);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-snug);
+  color: var(--color-suggestion-idle-text);
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+.row.selected {
+  background: var(--color-suggestion-active-bg);
+  color: var(--color-suggestion-active-text);
+  border-left-color: var(--color-suggestion-active-border);
+}
+.row .rprimary { font-weight: var(--font-weight-medium); color: var(--color-param-flag); }
+.row.selected .rprimary { color: var(--color-suggestion-active-text); }
+/* A11Y-1 (WCAG 1.4.3): recolour EVERY child of the active row to the on-active
+   foreground token so nothing falls below 4.5:1 on the active background.
+   Mirrors SuggestionItem.module.css; non-colour signalling (glyph + word) is kept. */
+.row.selected .match,
+.row.selected .requiredGlyph,
+.row.selected .typeHint,
+.row.selected .secondary,
+.row.selected .badge-valid,
+.row.selected .badge-deprecated,
+.row.selected .badge-required,
+.row.selected .badge-optional,
+.row.selected .badge-live,
+.row.selected .badge-cached { color: var(--color-suggestion-active-text); }
+.match { color: var(--color-suggestion-match); font-weight: var(--font-weight-semibold); text-decoration: underline; text-underline-offset: 0.15em; }
+.requiredGlyph { color: var(--color-param-required); font-weight: var(--font-weight-bold); }
+.typeHint { color: var(--color-param-type); font-size: var(--font-size-xs); }
+.secondary { color: var(--color-text-secondary); font-size: var(--font-size-xs); margin-inline-start: auto; }
+.badge-valid { color: var(--color-enum-valid); font-size: var(--font-size-2xs); font-weight: var(--font-weight-medium); margin-inline-start: var(--spacing-sm); }
+.badge-deprecated { color: var(--color-enum-deprecated); font-size: var(--font-size-2xs); font-weight: var(--font-weight-semibold); margin-inline-start: var(--spacing-sm); }
+.badge-required { color: var(--color-param-required); font-size: var(--font-size-2xs); font-weight: var(--font-weight-semibold); margin-inline-start: var(--spacing-sm); }
+.badge-optional { color: var(--color-param-optional); font-size: var(--font-size-2xs); margin-inline-start: var(--spacing-sm); }
+.badge-live { color: var(--color-resource-live); font-size: var(--font-size-2xs); font-weight: var(--font-weight-semibold); margin-inline-start: var(--spacing-sm); }
+.badge-cached { color: var(--color-resource-cached); font-size: var(--font-size-2xs); font-weight: var(--font-weight-medium); margin-inline-start: var(--spacing-sm); }
+
+/* ---------- palette / list container ---------- */
+.overlay {
+  display: flex;
+  flex-direction: column;
+  min-width: 24rem;
+  max-width: 46rem;
+  background: var(--color-surface-overlay);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--elevation-2);
+  overflow: hidden;
+  animation: popover-in var(--motion-duration-base) var(--motion-easing-decelerate);
+}
+.overlay-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.overlay-header .hlabel { font-weight: var(--font-weight-medium); }
+.overlay-list { margin: 0; padding: var(--spacing-2xs); list-style: none; max-height: calc(8 * 1.9rem); overflow-y: auto; }
+.overlay-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border-top: 1px solid var(--color-border-subtle);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-2xs);
+  color: var(--color-resource-meta);
+}
+.group-divider { height: 1px; margin: var(--spacing-2xs) var(--spacing-sm); background: var(--color-border-subtle); list-style: none; }
+.empty-note, .fallback-line, .refresh-note {
+  margin: 0;
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-validation-fallback-text);
+  list-style: none;
+}
+
+/* ---------- loading shimmer ---------- */
+.loading-row { display: flex; align-items: center; gap: var(--spacing-sm); padding: var(--spacing-2xs) var(--spacing-sm); }
+.shimmer {
+  display: inline-block; flex: 1; height: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  background: linear-gradient(90deg, var(--color-resource-loading-track) 0%, var(--color-resource-loading) 50%, var(--color-resource-loading-track) 100%);
+  background-size: 200% 100%;
+  animation: shimmer var(--motion-duration-slow) linear infinite;
+}
+.loading-text { font-family: var(--font-family-mono); font-size: var(--font-size-xs); color: var(--color-resource-meta); white-space: nowrap; }
+
+/* ---------- hint line ---------- */
+.hint {
+  display: flex; align-items: center; gap: var(--spacing-xs);
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-hint-line-text);
+  transition: var(--motion-transition-fade);
+}
+.hint .accent { color: var(--color-hint-line-accent); font-weight: var(--font-weight-semibold); }
+.hint .copy { color: var(--color-hint-line-text); }
+.hint kbd {
+  display: inline-block; padding: 0 var(--spacing-2xs);
+  border-radius: var(--border-radius-sm);
+  background: var(--color-hint-line-key-bg);
+  color: var(--color-hint-line-key-text);
+  font-family: var(--font-family-mono); font-size: var(--font-size-2xs);
+}
+.hint .actions { display: flex; align-items: center; gap: var(--spacing-sm); margin-inline-start: auto; }
+.hint .hbtn {
+  appearance: none; border: 0; background: transparent;
+  color: var(--color-hint-line-dismiss);
+  font-family: var(--font-family-ui); font-size: var(--font-size-2xs);
+  cursor: pointer; padding: var(--spacing-3xs) var(--spacing-2xs);
+  border-radius: var(--border-radius-sm);
+}
+.hint .hbtn:hover { color: var(--color-hint-line-text); }
+.hint .hbtn:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 1px; }
+
+/* ---------- plain (F-1) ---------- */
+.plain-line {
+  margin: 0;
+  padding-inline-start: 2ch;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-secondary);
+}
+.plain-line .pprefix { color: var(--color-param-flag); font-weight: var(--font-weight-semibold); }
+.plain-line .pnote { color: var(--color-text-muted); }
+
+/* ---------- suppressed (E) ---------- */
+.suppressed-note {
+  padding-inline-start: 2ch;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.status-strip {
+  margin-top: var(--spacing-sm);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-2xs);
+  color: var(--color-text-muted);
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+@keyframes blink { to { opacity: 0; } }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes popover-in { from { opacity: 0; transform: translateY(-0.25rem); } to { opacity: 1; transform: translateY(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .caret, .overlay, .hint, .ghost { animation: none !important; transition: none !important; }
+  .shimmer { animation: none; background: var(--color-resource-loading-track); }
+}
+
+/* Manual demo override so stakeholders can preview reduced-motion behaviour
+   without changing OS settings — mirrors the tokens.css reduced-motion block. */
+.force-reduced-motion {
+  --motion-duration-fast: 0ms;
+  --motion-duration-base: 0ms;
+  --motion-duration-slow: 0ms;
+  --motion-transition-fade: none;
+  --motion-transition-popover: none;
+}
+.force-reduced-motion .caret,
+.force-reduced-motion .overlay,
+.force-reduced-motion .hint,
+.force-reduced-motion .ghost { animation: none !important; transition: none !important; }
+.force-reduced-motion .shimmer { animation: none; background: var(--color-resource-loading-track); }

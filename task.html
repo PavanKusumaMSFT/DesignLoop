@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task — Design Loop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://static2.sharepointonline.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/typescript.min.js"></script>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+<div class="app">
+  <!-- TASK SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-header-row">
+        <div class="sidebar-logo">
+          <img src="assets/designloop-logo.svg" alt="Design Loop Logo" class="sidebar-logo-mark" width="30" height="30" style="cursor:pointer" onclick="goHome()">
+          <span class="sidebar-logo-text" style="cursor:pointer" onclick="goHome()">Design Loop</span>
+        </div>
+      </div>
+      <div class="sidebar-subtitle">Task workspace</div>
+    </div>
+    <nav class="sidebar-nav" id="sidebarNav"></nav>
+  </aside>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- MAIN -->
+  <main class="main">
+    <header class="topbar" id="topbar">
+      <button class="hamburger" id="hamburgerBtn" aria-label="Toggle sidebar">&#9776;</button>
+      <div class="breadcrumb" id="breadcrumb">
+        <span class="crumb-active">Task</span>
+      </div>
+    </header>
+    <div class="content-area" id="contentArea"></div>
+  </main>
+</div>
+
+<script src="assets/app.js"></script>
+<script>initTaskPage();</script>
+</body>
+</html>

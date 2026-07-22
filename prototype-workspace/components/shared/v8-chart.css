@@ -1,0 +1,44 @@
+/* ─── Shared chart chrome ─────────────────────────────────────────────────── */
+
+.ap-chart {
+  position: relative;
+  font-family: var(--font-family);
+}
+
+.ap-chart__title {
+  font-size: var(--h3-size);
+  line-height: var(--h3-line-height);
+  font-weight: var(--h3-weight);
+  color: var(--chart-title);
+  margin-bottom: var(--spacing-sm);
+}
+
+.ap-chart__body {
+  gap: var(--spacing-md);
+}
+
+.ap-chart__grid-line {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.ap-chart__axis-line {
+  stroke: var(--chart-axis);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.ap-chart__tick-label {
+  fill: var(--chart-tick-label);
+  font-family: var(--font-family);
+  font-size: var(--text-s-size);
+  font-weight: var(--font-weight-regular);
+}
+
+.ap-chart__axis-label {
+  fill: var(--chart-axis-label);
+  font-family: var(--font-family);
+  font-size: var(--text-s-size);
+  font-weight: var(--font-weight-semibold);
+}

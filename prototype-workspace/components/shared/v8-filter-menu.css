@@ -1,0 +1,63 @@
+/* ===========================================
+   Filter Menu
+   Dialog panel for configuring filter values
+   =========================================== */
+
+.ap-filter-menu {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  min-width: 320px;
+  padding: var(--spacing-md);
+  background-color: var(--neutral-0);
+  border: 1px solid var(--neutral-30);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-family);
+  box-sizing: border-box;
+}
+
+/* --- Filter Menu Arrow --- */
+.ap-filter-menu::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: var(--spacing-xl);
+  width: 14px;
+  height: 14px;
+  background-color: var(--neutral-0);
+  border-left: 1px solid var(--neutral-30);
+  border-top: 1px solid var(--neutral-30);
+  transform: rotate(45deg);
+}
+
+/* --- Filter Menu Title --- */
+.ap-filter-menu__title {
+  font-size: var(--h1-size);
+  line-height: var(--h1-line-height);
+  font-weight: var(--h1-weight);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* --- Filter Menu Field --- */
+.ap-filter-menu__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.ap-filter-menu__label {
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+}
+
+/* --- Filter Menu Actions --- */
+.ap-filter-menu__actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
+}

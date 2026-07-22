@@ -1,0 +1,120 @@
+/* ===========================================
+   Copilot Sidecar — Styles
+   =========================================== */
+
+/* ---- Panel shell ---- */
+.ap-copilot-sidecar {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  transition: width var(--transition-normal), min-width var(--transition-normal);
+  border-left: 1px solid var(--copilot-sidecar-border);
+  background: var(--copilot-sidecar-bg);
+  flex-shrink: 0;
+  height: 100%;
+}
+
+.ap-copilot-sidecar--open {
+  width: var(--copilot-sidecar-width);
+  min-width: var(--copilot-sidecar-width);
+}
+
+.ap-copilot-sidecar__inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: var(--copilot-sidecar-width);
+}
+
+/* ---- Header ---- */
+.ap-copilot-sidecar__header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--copilot-sidecar-header-bg);
+  border-bottom: 1px solid var(--copilot-sidecar-border);
+  flex-shrink: 0;
+  min-height: 40px;
+}
+
+.ap-copilot-sidecar__title {
+  flex: 1;
+  font-size: var(--body-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ap-copilot-sidecar__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.ap-copilot-sidecar__header-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+}
+
+.ap-copilot-sidecar__header-btn:hover {
+  background: var(--neutral-20);
+  color: var(--text-primary);
+}
+
+.ap-copilot-sidecar__header-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+/* ---- Messages area ---- */
+.ap-copilot-sidecar__messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* ---- Loading / progress bar ---- */
+.ap-copilot-sidecar__loading {
+  padding: var(--spacing-sm) 0;
+}
+
+.ap-copilot-sidecar__progress-bar {
+  height: 2px;
+  background: var(--copilot-progress-bg);
+  border-radius: 1px;
+  overflow: hidden;
+  position: relative;
+}
+
+.ap-copilot-sidecar__progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 40%;
+  background: var(--copilot-progress-fg);
+  border-radius: 1px;
+  animation: copilot-progress-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes copilot-progress-slide {
+  0%   { left: -40%; }
+  100% { left: 100%; }
+}

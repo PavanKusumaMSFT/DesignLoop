@@ -1,0 +1,31 @@
+{
+  "$description": "Project Cirrus spacing + border-radius primitives. 0.25rem base grid; terminal overlays are dense.",
+  "spacing": {
+    "none": "0",
+    "3xs": "0.125rem",
+    "2xs": "0.25rem",
+    "xs": "0.375rem",
+    "sm": "0.5rem",
+    "md": "0.75rem",
+    "lg": "1rem",
+    "xl": "1.5rem",
+    "2xl": "2rem"
+  },
+  "border-radius": {
+    "none": "0",
+    "sm": "0.125rem",
+    "md": "0.25rem",
+    "lg": "0.375rem",
+    "pill": "9999px"
+  },
+  "usage": {
+    "palette-padding": "sm",
+    "suggestion-row-padding-y": "2xs",
+    "suggestion-row-padding-x": "sm",
+    "badge-padding-x": "xs",
+    "kbd-chip-padding-x": "2xs",
+    "popover-radius": "md",
+    "panel-radius": "lg",
+    "chip-radius": "sm"
+  }
+}

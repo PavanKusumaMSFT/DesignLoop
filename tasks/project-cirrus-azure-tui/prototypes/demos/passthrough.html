@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cirrus — Non-az Passthrough (State E)</title>
+  <link rel="stylesheet" href="../../designs/tokens/tokens.css" />
+  <link rel="stylesheet" href="cirrus-demo.css" />
+</head>
+<body>
+  <main class="host" id="host" tabindex="0" aria-label="Terminal">
+    <div class="line">
+      <span class="prompt">$ </span><span class="command" id="cmd">kubectl get pods -n staging | grep Running</span><span class="caret"></span>
+    </div>
+    <div class="below" id="below"></div>
+    <span class="sr-only" id="live" aria-live="polite"></span>
+  </main>
+
+  <div class="demo-controls" style="margin-top: var(--spacing-lg)">
+    <span class="demo-nav">token-0 command:</span>
+    <button data-cmd="kubectl get pods -n staging | grep Running" type="button">kubectl …</button>
+    <button data-cmd="git commit -am 'wip' && git push" type="button">git …</button>
+    <button data-cmd="aws s3 ls" type="button">aws …</button>
+    <button data-cmd="pwsh -Command Get-Process" type="button">pwsh …</button>
+    <button data-cmd="az servicebus namespace create --sku " type="button" id="azBtn">az … (surfaces return)</button>
+    <button data-cmd="az storage account create | jq '.id'" type="button">az … | jq (past pipe)</button>
+  </div>
+
+  <p class="demo-note">
+    <strong>State E — non-az passthrough (FR-5).</strong> The instant token-0 is not <code>az</code>,
+    <em>every</em> Cirrus surface is suppressed — no ghost text, no palette, no hint, and Cirrus holds
+    <em>zero</em> keybindings (<code>Tab</code> reverts to the shell's native completion). Pipes, <code>&amp;&amp;</code>,
+    redirects, and tmux prefixes pass through untouched. In a composed <code>az … | jq …</code> line,
+    surfaces suppress once the caret moves past the pipe. This is the interoperability guarantee (NG2).
+  </p>
+
+  <script src="cirrus-demo.js"></script>
+  <script>
+    CirrusDemo.mount({ title: 'Non-az Passthrough — State E', sub: 'FR-5 · Maya\u2019s gate', current: 'passthrough.html' });
+
+    const cmd = document.getElementById('cmd');
+    const below = document.getElementById('below');
+    const live = document.getElementById('live');
+
+    function isAz(text) {
+      const t0 = text.trim().split(/\s+/)[0];
+      // Composed line: only the az segment while caret is before a pipe.
+      const pastPipe = /\|/.test(text);
+      return t0 === 'az' && !pastPipe;
+    }
+
+    function render(text) {
+      cmd.textContent = text;
+      below.innerHTML = '';
+      if (isAz(text)) {
+        below.innerHTML =
+          '<div class="overlay"><div class="overlay-header">' +
+          '<span class="hlabel">parameters · az servicebus namespace create</span>' +
+          '<span class="badge-cached">\u26A1 cached</span></div>' +
+          '<ul class="overlay-list" role="listbox" aria-label="parameters" aria-activedescendant="pass-opt-0">' +
+          '<li id="pass-opt-0" role="option" aria-selected="true" aria-label="--sku, required, Pricing tier" class="row selected">' +
+          '<span class="rprimary" aria-hidden="true">--sku</span>' +
+          '<span class="typeHint" aria-hidden="true">&lt;enum&gt;</span>' +
+          '<span class="secondary" aria-hidden="true">Pricing tier</span>' +
+          '<span class="badge-required">required</span></li></ul></div>';
+        live.textContent = 'az context — Cirrus surfaces active';
+      } else {
+        below.innerHTML = '<p class="suppressed-note">(no ghost text · no palette · no hint · nothing rendered — Cirrus suppressed)</p>';
+        live.textContent = 'non-az command — Cirrus suppressed, no keybindings held';
+      }
+    }
+
+    document.querySelectorAll('[data-cmd]').forEach((b) => {
+      b.addEventListener('click', () => render(b.getAttribute('data-cmd')));
+    });
+
+    render(cmd.textContent);
+  </script>
+</body>
+</html>

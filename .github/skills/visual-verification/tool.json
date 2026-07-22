@@ -1,0 +1,17 @@
+{
+  "id": "visual-verification",
+  "name": "Visual Verification",
+  "description": "Run Playwright visual regression checks against the running Fluent UI React v9 prototype workspace and document pixel-level diffs, failures, and resolutions.",
+  "stages": ["prototype"],
+  "agent": "visual-verification",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "demo-pages", "required": true }
+  ],
+  "outputs": [
+    "tasks/{taskId}/prototypes/visual-verification.md",
+    "tasks/{taskId}/prototypes/screenshots/"
+  ],
+  "dependencies": ["demo-pages"],
+  "required": false
+}

@@ -1,0 +1,361 @@
+/* ===========================================
+   DataGrid
+   Data table with sorting, selection, hierarchy
+   =========================================== */
+
+.ap-datagrid {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  color: var(--text-primary);
+  background-color: var(--neutral-0);
+  box-sizing: border-box;
+}
+
+
+/* ===========================================
+   Header Row
+   =========================================== */
+
+.ap-datagrid__header {
+  display: flex;
+  align-items: center;
+  height: 42px;
+  min-height: 42px;
+  background-color: var(--neutral-0);
+  border-bottom: 1px solid var(--neutral-30);
+}
+
+.ap-datagrid__header-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  height: 100%;
+  padding: 0 var(--spacing-sm);
+  flex: 1 1 0;
+  min-width: 0;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.ap-datagrid__header-cell--checkbox {
+  flex: 0 0 40px;
+  width: 40px;
+  justify-content: center;
+  padding: 0;
+}
+
+.ap-datagrid__header-cell--sortable {
+  cursor: pointer;
+}
+
+.ap-datagrid__header-cell--sorted {
+  color: var(--text-primary);
+}
+
+.ap-datagrid__header-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ap-datagrid__sort-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.ap-datagrid__sort-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+
+/* ===========================================
+   Body (scrollable region)
+   =========================================== */
+
+.ap-datagrid__body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+
+/* ===========================================
+   Data Rows
+   =========================================== */
+
+.ap-datagrid__row {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  min-height: 32px;
+  border-bottom: 1px solid var(--neutral-30);
+  cursor: default;
+  outline: none;
+}
+
+/* --- Row States --- */
+
+.ap-datagrid__row:hover {
+  background-color: var(--control-bg-hover);
+}
+
+.ap-datagrid__row--selected {
+  background-color: var(--control-bg-selected);
+}
+
+.ap-datagrid__row--selected:hover {
+  background-color: var(--control-bg-selected-hover);
+}
+
+.ap-datagrid__row:focus-visible {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: -2px;
+}
+
+.ap-datagrid__row--selected:focus-visible {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: -2px;
+}
+
+
+/* ===========================================
+   Cells (shared)
+   =========================================== */
+
+.ap-datagrid__cell {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  height: 100%;
+  padding: 0 var(--spacing-sm);
+  flex: 1 1 0;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.ap-datagrid__cell--checkbox {
+  flex: 0 0 40px;
+  width: 40px;
+  justify-content: center;
+  padding: 0;
+}
+
+.ap-datagrid__cell-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Cell type modifiers (semantic hooks from column.type) */
+.ap-datagrid__cell--text { }
+.ap-datagrid__cell--link { }
+.ap-datagrid__cell--icon-text { }
+.ap-datagrid__cell--tag {
+  overflow: hidden;
+}
+
+
+/* ===========================================
+   Icon cells
+   =========================================== */
+
+.ap-datagrid__cell-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.ap-datagrid__cell-icon svg {
+  width: inherit;
+  height: inherit;
+}
+
+
+/* ===========================================
+   Link cells
+   =========================================== */
+
+.ap-datagrid__link {
+  color: var(--link-rest);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ap-datagrid__link:hover {
+  color: var(--link-hover);
+  text-decoration: underline;
+}
+
+.ap-datagrid__link:active {
+  color: var(--link-pressed);
+}
+
+
+/* ===========================================
+   Tag cells
+   =========================================== */
+
+.ap-datagrid__tags {
+  display: flex;
+  gap: var(--spacing-xs);
+  overflow: hidden;
+}
+
+
+/* ===========================================
+   Action cells (overflow / icon buttons)
+   =========================================== */
+
+.ap-datagrid__cell--action {
+  flex: 0 0 40px;
+  width: 40px;
+  justify-content: center;
+  padding: 0;
+}
+
+.ap-datagrid__header-cell--action {
+  flex: 0 0 40px;
+  width: 40px;
+  justify-content: center;
+  padding: 0;
+}
+
+.ap-datagrid__action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: 0;
+}
+
+.ap-datagrid__action-btn:hover {
+  background-color: var(--neutral-30);
+  color: var(--text-primary);
+}
+
+.ap-datagrid__action-btn:focus-visible {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: -1px;
+}
+
+.ap-datagrid__action-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+
+/* ===========================================
+   Tree / Hierarchy controls
+   =========================================== */
+
+.ap-datagrid__tree-indent {
+  flex-shrink: 0;
+}
+
+.ap-datagrid__tree-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+}
+
+.ap-datagrid__tree-toggle:hover {
+  background-color: var(--neutral-30);
+}
+
+.ap-datagrid__tree-toggle:focus-visible {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: -1px;
+}
+
+.ap-datagrid__tree-toggle svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ap-datagrid__tree-leaf-spacer {
+  width: 20px;
+  flex-shrink: 0;
+}
+
+
+/* ===========================================
+   Progress cells
+   =========================================== */
+
+.ap-datagrid__cell--progress {
+  align-items: center;
+}
+
+.ap-datagrid__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  padding-bottom: 2px;
+}
+
+.ap-datagrid__progress-text {
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ap-datagrid__progress-track {
+  width: 100%;
+  height: 4px;
+  background: var(--neutral-30);
+  overflow: hidden;
+}
+
+.ap-datagrid__progress-bar {
+  height: 100%;
+  background: var(--data-10);
+  transition: width var(--transition-normal);
+}
+
+/* Status-colored variants */
+.ap-datagrid__progress-bar--success {
+  background: var(--status-success-fg);
+}
+
+.ap-datagrid__progress-bar--warning {
+  background: var(--status-warning-fg);
+}
+
+.ap-datagrid__progress-bar--error {
+  background: var(--status-error-fg);
+}
+
+
+/* ===========================================
+   Checkbox (uses Checkbox component)
+   =========================================== */

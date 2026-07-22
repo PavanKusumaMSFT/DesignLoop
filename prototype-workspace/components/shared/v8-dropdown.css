@@ -1,0 +1,278 @@
+/* ===========================================
+   Dropdown
+   Select input with menu
+   =========================================== */
+
+/* --- Dropdown Input Trigger --- */
+.ap-dropdown {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  width: 100%;
+  min-width: 180px;
+  height: 24px;
+  padding: 0 var(--spacing-sm);
+  border: 1px solid var(--input-border-rest);
+  border-radius: var(--radius-sm);
+  background-color: var(--input-bg-rest);
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.ap-dropdown:hover:not(:disabled):not(.ap-dropdown--error) {
+  border-color: var(--input-border-hover);
+}
+
+.ap-dropdown:focus-visible:not(:disabled) {
+  outline: none;
+  border-color: var(--input-border-focus);
+}
+
+.ap-dropdown:disabled {
+  background-color: var(--input-bg-disabled);
+  border-color: var(--input-border-disabled);
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+.ap-dropdown--error {
+  border-color: var(--input-border-error);
+}
+
+.ap-dropdown--open {
+  border-color: var(--input-border-focus);
+}
+
+/* --- Dropdown Label --- */
+.ap-dropdown__label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ap-dropdown__label--placeholder {
+  color: var(--text-secondary);
+}
+
+.ap-dropdown:disabled .ap-dropdown__label {
+  color: var(--text-disabled);
+}
+
+/* --- Dropdown Chevron --- */
+.ap-dropdown__chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: var(--text-primary);
+  transition: transform var(--transition-fast);
+}
+
+.ap-dropdown__chevron svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ap-dropdown--open .ap-dropdown__chevron {
+  transform: rotate(180deg);
+}
+
+.ap-dropdown:disabled .ap-dropdown__chevron {
+  color: var(--text-disabled);
+}
+
+/* --- Dropdown Error Message (now uses FormMessage) --- */
+
+/* ===========================================
+   Dropdown Menu
+   Container for dropdown options
+   =========================================== */
+
+.ap-dropdown-menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  max-height: 300px;
+  padding: var(--spacing-xs) 0;
+  background-color: var(--neutral-0);
+  border: 1px solid var(--neutral-30);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-family);
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+/* --- Dropdown Menu Search --- */
+.ap-dropdown-menu__search {
+  padding: var(--spacing-sm);
+  border-bottom: 1px solid var(--neutral-30);
+  flex-shrink: 0;
+}
+
+.ap-dropdown-menu__search .ap-text-input {
+  width: 100%;
+}
+
+/* ===========================================
+   Dropdown Item (Single Select)
+   =========================================== */
+
+.ap-dropdown-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 36px;
+  padding: 0 var(--spacing-sm);
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.ap-dropdown-item:hover:not(:disabled) {
+  background-color: var(--control-bg-hover);
+}
+
+.ap-dropdown-item:active:not(:disabled) {
+  background-color: var(--control-bg-pressed);
+}
+
+.ap-dropdown-item:focus-visible {
+  outline: 1px solid var(--neutral-160);
+  outline-offset: -1px;
+  background-color: transparent;
+}
+
+.ap-dropdown-item:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+.ap-dropdown-item--selected {
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ===========================================
+   Dropdown Checkbox Item (Multi Select)
+   =========================================== */
+
+.ap-dropdown-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  height: 36px;
+  padding: 0 var(--spacing-sm);
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.ap-dropdown-checkbox-item:hover:not(:disabled) {
+  background-color: var(--control-bg-hover);
+}
+
+.ap-dropdown-checkbox-item:active:not(:disabled) {
+  background-color: var(--control-bg-pressed);
+}
+
+.ap-dropdown-checkbox-item:focus-visible {
+  outline: 1px solid var(--neutral-160);
+  outline-offset: -1px;
+  background-color: transparent;
+}
+
+.ap-dropdown-checkbox-item:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+/* --- Checkbox Box --- */
+.ap-dropdown-checkbox-item__checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 1px solid var(--input-border-rest);
+  border-radius: var(--radius-sm);
+  background-color: var(--neutral-0);
+  box-sizing: border-box;
+}
+
+.ap-dropdown-checkbox-item--checked .ap-dropdown-checkbox-item__checkbox {
+  background-color: var(--input-accent);
+  border-color: var(--input-accent);
+}
+
+.ap-dropdown-checkbox-item__checkbox svg {
+  width: 12px;
+  height: 12px;
+  color: var(--neutral-0);
+}
+
+.ap-dropdown-checkbox-item:disabled .ap-dropdown-checkbox-item__checkbox {
+  border-color: var(--input-border-disabled);
+  background-color: var(--input-bg-disabled);
+}
+
+.ap-dropdown-checkbox-item--checked:disabled .ap-dropdown-checkbox-item__checkbox {
+  background-color: var(--input-accent-disabled);
+  border-color: var(--input-accent-disabled);
+}
+
+/* --- Checkbox Label --- */
+.ap-dropdown-checkbox-item__label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===========================================
+   Dropdown Header (Group Label)
+   =========================================== */
+
+.ap-dropdown-header {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 var(--spacing-sm);
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.ap-dropdown-header--border {
+  border-top: 1px solid var(--neutral-20);
+  margin-top: var(--spacing-xs);
+  padding-top: var(--spacing-xs);
+}

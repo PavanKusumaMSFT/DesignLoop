@@ -1,68 +1,129 @@
 ---
 name: design-to-code
-description: "Convert design specifications or Figma files into React components with TypeScript, CSS Modules using design tokens, and Storybook stories. Use when translating designs to code, building components from specs, converting Figma to React, or generating Storybook stories from component definitions."
-argument-hint: "Component name and design source (e.g., 'Card component from designs/components/card-spec.md')"
+description: "Convert design specifications or Figma files into runnable Fluent UI React v9 prototypes in the shared Next.js prototype workspace. Use when translating designs to code, building task prototypes from specs, converting Figma to Fluent, or preparing workspace routes for demos and Storybook."
+argument-hint: "Task ID, title, and design source (e.g., 'cost-dashboard \"Cost dashboard\" from tasks/cost-dashboard/designs/')"
 ---
 
 # Design-to-Code Conversion
 
 ## When to Use
-- Converting a design specification into a React component
-- Extracting component structure from Figma (via MCP)
-- Generating a Storybook story for a new component
-- Building a component that matches an existing design spec
+- Converting task design artifacts into a runnable Fluent UI React v9 prototype
+- Extracting component structure from Figma and implementing it with Fluent primitives
+- Creating or updating `prototype-workspace/app/{taskId}/` and `prototype-workspace/components/projects/{taskId}/`
+- Preparing a prototype route that demo-pages, Storybook, and visual verification will use
 
 ## Procedure
 
 ### 1. Read the Design Source
 
-Check for the design spec in one of these locations:
-- `designs/components/{ComponentName}.md` — Written component spec
-- Figma file via `figma/*` MCP tools — Live design data
-- `designs/wireframes/` — Wireframe references
+Check for the design source in `tasks/{taskId}/designs/`:
+- `component-spec*.md` or `components/*.md` — component specs, props, variants, states
+- `wireframe*.md` or `wireframes/` — page layout and interaction notes
+- `fluent-theme*.md`, `tokens/`, or design-system artifacts — Fluent theme and token guidance
+- Figma file via `figma/*` MCP tools — live design data, if provided
 
 Extract:
-- Component name and description
+- Task ID, page title, and route intent
+- Component names and descriptions
 - Props and their types
-- Visual variants (primary, secondary, etc.)
-- Interactive states (hover, active, disabled, focus)
-- Design tokens used
-- Layout and spacing details
+- Visual variants and interactive states
+- Fluent token mappings and theme requirements
+- Layout, spacing, breakpoints, and responsive behavior
+- Icon requirements, including Azure service logos, portal icons, and UI chrome icons
+- Copilot, agent, chat, or AI surfaces that require Fluent Copilot components
 
-### 2. Generate the React Component
+### 2. Scaffold the Workspace Route
 
-Use the template at [component.tsx.template](./assets/component.tsx.template):
-- Create a functional component with TypeScript
-- Define a props interface with all variants and states
-- Use CSS Modules for styling
-- Reference design tokens as CSS custom properties
-- Add ARIA attributes for accessibility
-- Add keyboard event handlers where needed
+Run the workspace scaffolder from the repo root:
 
-Save to: `prototypes/components/{ComponentName}/{ComponentName}.tsx`
+```bash
+node prototype-workspace/scripts/create-task-prototype.mjs <taskId> "<Title>"
+```
 
-### 3. Generate CSS Module
+This creates:
+- `prototype-workspace/app/{taskId}/page.tsx`
+- `prototype-workspace/components/projects/{taskId}/index.tsx`
 
-Create `prototypes/components/{ComponentName}/{ComponentName}.module.css`:
-- Use design tokens (`var(--token-name)`) for all values
-- Include styles for all variants and states
-- Add focus-visible styles for keyboard navigation
-- Include responsive breakpoints if specified
-- Use `prefers-reduced-motion` for animation
+The route must render at `/{taskId}` and remain wrapped in `ProjectLayout`.
 
-### 4. Generate Storybook Story
+### 3. Reuse Before Building
 
-Use the template at [story.tsx.template](./assets/story.tsx.template):
-- Create stories for each variant
-- Add stories for interactive states
-- Include a playground story with all controls
-- Add accessibility documentation
+Before writing or replacing any component, search in this order:
 
-Save to: `prototypes/components/{ComponentName}/{ComponentName}.stories.tsx`
+1. `prototype-workspace/component-map.json` — pattern-to-component lookup
+2. `prototype-workspace/components/shared/` — shared reusable components
+3. `prototype-workspace/components/projects/*/` — reusable project-scoped patterns
+4. Fluent v9 exports from `@fluentui/react-components`
+5. Fluent Copilot exports from `@fluentui-copilot/react-copilot` and latency components where relevant
 
-### 5. Verify
+Run Fluent discovery from `prototype-workspace/` before building a custom primitive:
 
-- Check all design tokens are valid (exist in `designs/tokens/`)
-- Ensure TypeScript types are complete
-- Verify accessibility attributes are present
-- Confirm the component matches the design spec
+```bash
+node -e "console.log(Object.keys(require('@fluentui/react-components')).filter(k=>/^[A-Z]/.test(k)&&/KW/i.test(k)).join('\n'))"
+```
+
+Replace `KW` with the component keyword (for example `Card`, `Dialog`, `Table`, `Field`, `Nav`, `Drawer`). For agent or chat UI, also inspect Fluent Copilot exports before creating custom message, prompt, reasoning, citation, or feedback UI.
+
+If a match exists, use or extend it. Do not rebuild shared portal patterns such as `ProjectLayout`, page headers, metric cards, action cards, resource tables, service tiles, wizards, docked chat panels, or Copilot chat shells.
+
+### 4. Generate Fluent UI React v9 Components
+
+Implement the prototype in:
+- `prototype-workspace/components/projects/{taskId}/index.tsx`
+- Additional reusable files under `prototype-workspace/components/projects/{taskId}/`
+- Shared reusable components under `prototype-workspace/components/shared/` only when the workspace convention says the pattern is reusable beyond the task
+
+Every generated TSX file must:
+- Use Fluent UI React v9 primitives from `@fluentui/react-components`
+- Use Fluent Copilot components for copilot, agent, chat, prompt, reasoning, citation, feedback, latency, and AI surfaces
+- Use `makeStyles` and Fluent tokens; no CSS Modules, Tailwind, or static HTML/CSS output
+- Include the SafeTokens pattern:
+
+```typescript
+import { makeStyles, tokens as fluentTokens } from "@fluentui/react-components";
+type SafeTokens = { [key:string]: any };
+const tokens: SafeTokens = fluentTokens;
+```
+
+- Use Fluent typography components (`Text`, `Body1`, `Subtitle1`, `Title2`, etc.) instead of raw HTML text elements
+- Use Fluent `Button`, `Card`, `Field`, `Input`, `Table`, `Badge`, `Divider`, `Dialog`, `TabList`, and related primitives instead of custom visual wrappers
+- Use raw `<div>` only for layout containers that have no Fluent equivalent and no visual styling
+- Use Azure service logos from `prototype-workspace/public/azure-service-icons/{category}/*.svg`
+- Use custom portal icons from `prototype-workspace/public/icons/`
+- Use `@fluentui/react-icons` for UI chrome icons
+- Never inline SVG
+- Avoid inline `style={}` except for truly dynamic values
+- Use only the allowed hardcoded hex values: `#0078D4`, `#106EBE`, `#005A9E`; otherwise use Fluent tokens
+
+### 5. Verify the Workspace Build
+
+Run:
+
+```bash
+pnpm --dir prototype-workspace build
+```
+
+Fix TypeScript, lint, import, token, route, or static export failures before considering the prototype complete.
+
+The workspace uses `output: "export"`, so this build also emits a self-contained static export at `prototype-workspace/out/{taskId}/index.html` (an offline fallback the bridge can serve).
+
+**The in-task preview does NOT require a build.** The DesignLoop bridge auto-runs a managed live dev server for the workspace (default port 3100), so the task page embeds the live route `/{taskId}` directly with hot reload — the prototype appears in the Prototype phase as soon as the workspace route (`app/{taskId}/page.tsx`) exists. Still run the build to catch TypeScript, lint, token, and static-export errors before considering the prototype complete.
+
+### 6. Write the Prototype Manifest Pointer
+
+Generated prototype source lives in `prototype-workspace/`, not in `tasks/{taskId}/prototypes/`.
+
+Create or update `tasks/{taskId}/prototypes/manifest.md` with:
+- Task ID and title
+- Workspace route: `/{taskId}`
+- In-task embedded preview: live dev-server route `/{taskId}` (shown automatically in the Prototype phase of the task page; the bridge auto-runs the workspace on port 3100 — no build required). Static export fallback: `/prototype-workspace/out/{taskId}/index.html`
+- Source paths:
+  - `prototype-workspace/app/{taskId}/page.tsx`
+  - `prototype-workspace/components/projects/{taskId}/`
+- Shared components reused
+- Fluent primitives and Fluent Copilot components used
+- Icon sources used by tier
+- Variants and states implemented
+- Build command and result: `pnpm --dir prototype-workspace build`
+- How to preview locally: `pnpm --dir prototype-workspace dev` then open `http://localhost:3000/{taskId}`
+

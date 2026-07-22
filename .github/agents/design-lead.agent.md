@@ -1,7 +1,7 @@
 ---
 name: "Design Lead"
 description: "Orchestrates the full product design lifecycle. Use when starting a new design project, coordinating across design phases (Discover → Define → Ideate → Design → Prototype → Test → Deliver), or when the task spans multiple design disciplines. Delegates to specialist agents based on the current phase."
-tools: [read, search, edit, agent, web, todo, msgraph/*]
+tools: [read, search, edit, agent, web, todo, msgraph/*, execute]
 agents: [researcher, strategist, ideator, designer, prototyper, tester, handoff]
 handoffs: [researcher, strategist, ideator, designer, prototyper, tester, handoff]
 ---

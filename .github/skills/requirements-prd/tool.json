@@ -1,0 +1,17 @@
+{
+  "id": "requirements-prd",
+  "name": "Requirements PRD",
+  "description": "Write the product requirements document with functional requirements, acceptance criteria, constraints, and measurable success metrics.",
+  "stages": ["define"],
+  "agent": "requirements-prd",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "personas", "required": true },
+    { "type": "artifact", "from": "journey-map", "required": false }
+  ],
+  "outputs": [
+    "strategy/requirements-prd.md"
+  ],
+  "dependencies": ["personas", "journey-map"],
+  "required": true
+}

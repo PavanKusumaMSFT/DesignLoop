@@ -1,0 +1,252 @@
+/* ===========================================
+   ServiceNav (Table of Contents)
+   Left navigation panel for blade/resource pages
+   =========================================== */
+
+.ap-service-nav {
+  display: flex;
+  flex-direction: column;
+  width: 264px;
+  height: 100%;
+  background-color: var(--neutral-0);
+  font-family: var(--font-family);
+  box-sizing: border-box;
+}
+
+/* --- Search Header --- */
+.ap-service-nav__header {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-sm);
+  gap: var(--spacing-xs);
+
+}
+
+.ap-service-nav__search {
+  flex: 1;
+  min-width: 0;
+}
+
+.ap-service-nav__search-input {
+  width: 100%;
+  height: 24px;
+  padding: 0 var(--spacing-sm);
+  padding-left: var(--spacing-xxl);
+  border: 1px solid var(--input-border-rest);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  color: var(--text-primary);
+  background-color: var(--neutral-0);
+  background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10.5 0C13.5376 0 16 2.46243 16 5.5C16 6.83879 15.5217 8.06586 14.7266 9.01962L19.8536 14.1464L19.1465 14.8536L14.0194 9.72688C13.0656 10.5218 11.8387 11 10.5 11C7.46243 11 5 8.53757 5 5.5C5 2.46243 7.46243 0 10.5 0ZM10.5 1C8.01472 1 6 3.01472 6 5.5C6 7.98528 8.01472 10 10.5 10C12.9853 10 15 7.98528 15 5.5C15 3.01472 12.9853 1 10.5 1Z' fill='%23605E5C' transform='translate(-2.5, 2.5) scale(0.75)'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 8px center;
+  box-sizing: border-box;
+}
+
+.ap-service-nav__search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.ap-service-nav__search-input:hover {
+  border-color: var(--neutral-160);
+}
+
+.ap-service-nav__search-input:focus {
+  outline: none;
+  border-color: var(--blue-50);
+}
+
+.ap-service-nav__header-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+
+.ap-service-nav__header-action:hover {
+  background-color: var(--neutral-20);
+}
+
+.ap-service-nav__header-action:focus-visible {
+  outline: 1px solid var(--focus-outline);
+  outline-offset: 1px;
+}
+
+.ap-service-nav__header-action svg {
+  width: 8px;
+  height: 8px;
+}
+
+.ap-service-nav__header-action svg path {
+  fill: var(--text-secondary);
+}
+
+/* Collapse icon rotated to point left */
+.ap-service-nav__header-action--collapse svg {
+  transform: rotate(180deg);
+}
+
+/* --- Menu Container --- */
+.ap-service-nav__menu {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+/* --- Menu Item (base) --- */
+.ap-service-nav__item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--spacing-sm);
+  border: none;
+  background-color: var(--control-bg-rest);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  color: var(--text-primary);
+  text-align: left;
+  box-sizing: border-box;
+  border-left: 2px solid transparent;
+}
+
+.ap-service-nav__item:hover {
+  background-color: var(--control-bg-hover);
+}
+
+.ap-service-nav__item:active {
+  background-color: var(--control-bg-pressed);
+}
+
+.ap-service-nav__item:focus-visible {
+  background-color: var(--control-bg-rest);
+  outline: 1px solid var(--focus-outline);
+  outline-offset: -1px;
+}
+
+/* --- Selected State --- */
+.ap-service-nav__item--selected {
+  background-color: var(--neutral-30);
+  border-left-color: var(--input-accent);
+}
+
+.ap-service-nav__item--selected:hover {
+  background-color: var(--neutral-40);
+}
+
+.ap-service-nav__item--selected:active {
+  background-color: var(--neutral-50);
+}
+
+.ap-service-nav__item--selected:focus-visible {
+  background-color: var(--neutral-30);
+  outline: 1px solid var(--focus-outline);
+  outline-offset: -1px;
+}
+
+/* --- Group Item (indented) --- */
+.ap-service-nav__item--child {
+  padding-left: calc(var(--spacing-sm) + 24px);
+}
+
+/* --- Item Icon --- */
+.ap-service-nav__item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+.ap-service-nav__item-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Chevron icon for groups */
+.ap-service-nav__item-icon--chevron svg {
+  width: 12px;
+  height: 12px;
+  transition: transform var(--transition-fast);
+}
+
+.ap-service-nav__item-icon--chevron svg path {
+  fill: var(--text-secondary);
+}
+
+.ap-service-nav__item--expanded .ap-service-nav__item-icon--chevron svg {
+  transform: rotate(90deg);
+}
+
+/* --- Item Label --- */
+.ap-service-nav__item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Item Action (favorite star) --- */
+.ap-service-nav__item-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: var(--spacing-xs);
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.ap-service-nav__item:hover .ap-service-nav__item-action,
+.ap-service-nav__item:focus-within .ap-service-nav__item-action,
+.ap-service-nav__item-action--visible {
+  opacity: 1;
+}
+
+.ap-service-nav__item-action:hover {
+  background-color: var(--neutral-30);
+}
+
+.ap-service-nav__item-action:focus-visible {
+  outline: 1px solid var(--focus-outline);
+  outline-offset: 1px;
+  opacity: 1;
+}
+
+.ap-service-nav__item-action svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ap-service-nav__item-action svg path {
+  fill: var(--input-accent);
+}
+
+/* --- Group Children Container --- */
+.ap-service-nav__group-children {
+  display: none;
+}
+
+.ap-service-nav__group--expanded > .ap-service-nav__group-children {
+  display: block;
+}

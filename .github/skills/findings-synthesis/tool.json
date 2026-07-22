@@ -1,0 +1,17 @@
+{
+  "id": "findings-synthesis",
+  "name": "Findings Synthesis",
+  "description": "Synthesise all research artifacts into key themes, validated insights, and ranked opportunity areas.",
+  "stages": ["discover"],
+  "agent": "findings-synthesis",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "competitive-analysis", "required": false },
+    { "type": "artifact", "from": "user-interviews", "required": false }
+  ],
+  "outputs": [
+    "research/findings-synthesis.md"
+  ],
+  "dependencies": ["competitive-analysis", "user-interviews"],
+  "required": true
+}

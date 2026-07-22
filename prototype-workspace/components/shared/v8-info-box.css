@@ -1,0 +1,156 @@
+/* ===========================================
+   INFOBOX
+   Status message banner with icon, text, and
+   optional dismiss button
+   =========================================== */
+
+.ap-infobox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) 12px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  color: var(--text-primary);
+}
+
+
+/* --- Icon --- */
+
+.ap-infobox__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: var(--body-line-height);
+}
+
+.ap-infobox__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+
+/* --- Content --- */
+
+.ap-infobox__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.ap-infobox__message {
+  /* Inline so link flows naturally after message text */
+  line-height: var(--text-s-line-height);
+}
+
+.ap-infobox__link {
+  margin-left: var(--spacing-xs);
+  color: var(--hyperlink-rest);
+  text-decoration: none;
+  font-size: var(--body-size);
+  line-height: var(--text-s-line-height);
+}
+
+.ap-infobox__link:hover {
+  color: var(--hyperlink-hover);
+  text-decoration: underline;
+}
+
+
+/* --- Dismiss button --- */
+
+.ap-infobox__dismiss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: var(--body-line-height);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.ap-infobox__dismiss svg {
+  width: 10px;
+  height: 10px;
+}
+
+.ap-infobox__dismiss:hover {
+  color: var(--text-primary);
+}
+
+.ap-infobox__dismiss:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px var(--control-outline-focus-light),
+    0 0 0 2px var(--control-outline-focus-dark);
+}
+
+
+/* ===========================================
+   VARIANTS
+   Background + icon color per status type
+   =========================================== */
+
+/* --- Info --- */
+.ap-infobox--info {
+  background: var(--status-info-bg);
+}
+.ap-infobox--info .ap-infobox__icon {
+  color: var(--status-info-fg);
+}
+
+/* --- Success --- */
+.ap-infobox--success {
+  background: var(--status-success-bg);
+}
+.ap-infobox--success .ap-infobox__icon {
+  color: var(--status-success-fg);
+}
+
+/* --- Warning --- */
+.ap-infobox--warning {
+  background: var(--status-warning-bg);
+}
+.ap-infobox--warning .ap-infobox__icon {
+  color: var(--status-warning-fg);
+}
+
+/* --- Error --- */
+.ap-infobox--error {
+  background: var(--status-error-bg);
+}
+.ap-infobox--error .ap-infobox__icon {
+  color: var(--status-error-fg);
+}
+
+/* --- Upsell --- */
+.ap-infobox--upsell {
+  background: var(--status-upsell-bg);
+}
+.ap-infobox--upsell .ap-infobox__icon {
+  color: var(--status-upsell-fg);
+}
+
+/* --- Blocked (reuses error palette) --- */
+.ap-infobox--blocked {
+  background: var(--status-error-bg);
+}
+.ap-infobox--blocked .ap-infobox__icon {
+  color: var(--status-error-fg);
+}
+
+/* --- Severe Warning (reuses warning palette) --- */
+.ap-infobox--severe-warning {
+  background: var(--status-warning-bg);
+}
+.ap-infobox--severe-warning .ap-infobox__icon {
+  color: var(--status-warning-fg);
+}

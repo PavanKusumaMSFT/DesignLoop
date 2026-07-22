@@ -1,0 +1,17 @@
+{
+  "id": "handoff-checklist",
+  "name": "Handoff Checklist",
+  "description": "Generate the final design-to-engineering handoff checklist; every item must be checked before the project is considered ready for build.",
+  "stages": ["deliver"],
+  "agent": "handoff-checklist",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "implementation-guide", "required": true },
+    { "type": "artifact", "from": "design-engineering-changelog", "required": true }
+  ],
+  "outputs": [
+    "handoff/handoff-checklist.md"
+  ],
+  "dependencies": ["implementation-guide", "design-engineering-changelog"],
+  "required": true
+}

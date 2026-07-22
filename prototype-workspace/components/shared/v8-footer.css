@@ -1,0 +1,204 @@
+/* ===========================================
+   FOOTER
+   Page-level footer bar with left / center / right zones
+   =========================================== */
+
+.ap-footer {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 56px;
+  flex-shrink: 0;
+  border-top: 1px solid var(--neutral-20);
+  padding: 0 var(--spacing-lg);
+  box-sizing: border-box;
+  font-family: var(--font-family);
+  background-color: var(--neutral-0);
+}
+
+/* --- Layout zones --- */
+
+.ap-footer__left {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.ap-footer__center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ap-footer__right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+  min-width: 0;
+}
+
+
+/* ===========================================
+   FOOTER ACTIONS
+   Horizontal button group for the left zone
+   =========================================== */
+
+.ap-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+
+/* ===========================================
+   FOOTER FEEDBACK
+   "Give feedback" link with icon
+   =========================================== */
+
+.ap-footer-feedback {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-regular);
+  color: var(--link-rest);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ap-footer-feedback:hover {
+  color: var(--link-hover);
+  text-decoration: underline;
+}
+
+.ap-footer-feedback svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+
+/* ===========================================
+   FOOTER BROWSE INFO
+   "X-Y of Z. Display count:" + native select
+   =========================================== */
+
+.ap-footer-browse-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.ap-footer-browse-info__text {
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.ap-footer-browse-info__select {
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  color: var(--text-primary);
+  background-color: var(--neutral-0);
+  border: 1px solid var(--input-border-rest);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--spacing-xs);
+  cursor: pointer;
+}
+
+.ap-footer-browse-info__select:hover {
+  border-color: var(--input-border-hover);
+}
+
+.ap-footer-browse-info__select:focus-visible {
+  outline: none;
+  border-color: var(--input-border-focus);
+  box-shadow: 0 0 0 1px var(--input-border-focus);
+}
+
+
+/* ===========================================
+   FOOTER PAGINATION
+   Page navigation with prev/next chevrons
+   =========================================== */
+
+.ap-footer-pagination {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Chevron buttons */
+.ap-footer-pagination__chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.ap-footer-pagination__chevron:hover:not(:disabled) {
+  background-color: var(--neutral-20);
+}
+
+.ap-footer-pagination__chevron:disabled {
+  color: var(--text-disabled);
+  cursor: default;
+}
+
+.ap-footer-pagination__chevron svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Page number buttons */
+.ap-footer-pagination__page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 var(--spacing-xs);
+  border: none;
+  background: none;
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  color: var(--link-rest);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.ap-footer-pagination__page:hover {
+  text-decoration: underline;
+  background-color: var(--neutral-20);
+}
+
+.ap-footer-pagination__page:focus-visible {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: -1px;
+}
+
+/* Current page — not a link, bold text */
+.ap-footer-pagination__page--current {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  cursor: default;
+}
+
+.ap-footer-pagination__page--current:hover {
+  text-decoration: none;
+  background: none;
+}

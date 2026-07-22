@@ -1,0 +1,100 @@
+/* HITS Design System Tokens */
+:root {
+  /* Primary Colors - Microsoft Blue */
+  --color-primary-50: #F0F6FF;
+  --color-primary-100: #D0E4FF;
+  --color-primary-200: #A0C8FF;
+  --color-primary-300: #5EA1F7;
+  --color-primary-400: #2B88D8;
+  --color-primary-500: #0078D4;
+  --color-primary-600: #106EBE;
+  --color-primary-700: #005A9E;
+  --color-primary-800: #004578;
+  --color-primary-900: #003052;
+
+  /* Neutral Colors */
+  --color-neutral-0: #FFFFFF;
+  --color-neutral-50: #FAFAFA;
+  --color-neutral-100: #F5F5F5;
+  --color-neutral-200: #E8E8E8;
+  --color-neutral-300: #D1D1D1;
+  --color-neutral-400: #B0B0B0;
+  --color-neutral-500: #8A8A8A;
+  --color-neutral-600: #6E6E6E;
+  --color-neutral-700: #4F4F4F;
+  --color-neutral-800: #333333;
+  --color-neutral-900: #1A1A1A;
+
+  /* Success Colors */
+  --color-success-50: #F0FFF4;
+  --color-success-100: #C6F6D5;
+  --color-success-500: #107C10;
+  --color-success-600: #0B6A0B;
+  --color-success-700: #085808;
+
+  /* Warning Colors */
+  --color-warning-50: #FFFBF0;
+  --color-warning-100: #FFF4CE;
+  --color-warning-500: #FFB900;
+  --color-warning-600: #E6A700;
+  --color-warning-700: #C49400;
+
+  /* Error Colors */
+  --color-error-50: #FFF5F5;
+  --color-error-100: #FED7D7;
+  --color-error-500: #D13438;
+  --color-error-600: #BC2F32;
+  --color-error-700: #A4262C;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+
+  /* Typography */
+  --font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-size-xs: 10px;
+  --font-size-sm: 12px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+
+  /* Border Radius */
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-xl: 16px;
+  --border-radius-full: 9999px;
+
+  /* Elevation */
+  --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --elevation-2: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --elevation-3: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+  --elevation-4: 0 20px 25px rgba(0, 0, 0, 0.1), 0 10px 10px rgba(0, 0, 0, 0.04);
+
+  /* Motion */
+  --motion-duration-fast: 150ms;
+  --motion-duration-normal: 250ms;
+  --motion-duration-slow: 400ms;
+  --motion-easing-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-easing-enter: cubic-bezier(0, 0, 0.2, 1);
+  --motion-easing-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-fast: 0ms;
+    --motion-duration-normal: 0ms;
+    --motion-duration-slow: 0ms;
+  }
+}

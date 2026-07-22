@@ -1,0 +1,17 @@
+{
+  "id": "competitive-analysis",
+  "name": "Competitive Analysis",
+  "description": "Analyse competing products across UX, features, pricing, and positioning to identify market gaps and opportunities.",
+  "stages": ["discover"],
+  "agent": "competitive-analysis",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "research-brief", "required": false }
+  ],
+  "outputs": [
+    "research/competitive/{category}-matrix.md",
+    "research/competitive/{category}-brief.md"
+  ],
+  "dependencies": [],
+  "required": false
+}

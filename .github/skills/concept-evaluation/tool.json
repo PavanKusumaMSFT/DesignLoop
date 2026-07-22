@@ -1,0 +1,16 @@
+{
+  "id": "concept-evaluation",
+  "name": "Concept Evaluation",
+  "description": "Score and prioritise solution concepts against feasibility, desirability, and viability dimensions to select concepts for prototyping.",
+  "stages": ["ideate"],
+  "agent": "concept-evaluation",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "concept-brainstorm", "required": true }
+  ],
+  "outputs": [
+    "ideation/concept-evaluation.md"
+  ],
+  "dependencies": ["concept-brainstorm"],
+  "required": true
+}

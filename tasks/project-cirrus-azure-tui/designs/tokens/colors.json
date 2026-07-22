@@ -1,0 +1,76 @@
+{
+  "$description": "Project Cirrus color primitives + semantic role tokens (dark/light/high-contrast). Semantic tokens reference primitives by name; components consume only semantic tokens.",
+  "primitive": {
+    "neutral": {
+      "0": "#ffffff", "50": "#f6f8fa", "100": "#eceff2", "200": "#d5dae0",
+      "300": "#b3bcc6", "400": "#8b95a1", "500": "#667180", "600": "#4a5561",
+      "700": "#333c47", "800": "#212831", "900": "#151a21", "950": "#0b0e13"
+    },
+    "primary": {
+      "100": "#cfe6ff", "200": "#9cccff", "300": "#64abff", "400": "#3b8eea",
+      "500": "#1f78e0", "600": "#1160bd", "700": "#0d4c96", "800": "#0a3a72"
+    },
+    "accent": { "200": "#9be9f0", "300": "#57d6e2", "400": "#21b8c7", "500": "#1596a3", "600": "#0f7580" },
+    "success": { "200": "#a7e8bd", "300": "#5fd287", "400": "#2fb567", "500": "#1f8f50", "600": "#16703e" },
+    "warning": { "200": "#ffe08a", "300": "#f6c750", "400": "#e0a423", "500": "#b57e12", "600": "#8a5f0d" },
+    "danger": { "200": "#ffb4b4", "300": "#ff8080", "400": "#ec5a5a", "500": "#d13438", "600": "#a52427" },
+    "hint": { "300": "#c4b6ff", "400": "#9b86f0", "500": "#7a63d6", "600": "#5d47ad" }
+  },
+  "semantic": {
+    "dark": {
+      "surface-terminal": "neutral.950",
+      "surface-overlay": "neutral.800",
+      "surface-selected": "primary.800",
+      "text-primary": "neutral.100",
+      "text-secondary": "neutral.300",
+      "text-muted": "neutral.400",
+      "ghost-text": "neutral.400",
+      "suggestion-active-bg": "primary.800",
+      "suggestion-active-text": "neutral.0",
+      "suggestion-match": "primary.300",
+      "param-flag": "primary.300",
+      "param-value": "accent.300",
+      "param-required": "danger.300",
+      "enum-valid": "success.300",
+      "enum-deprecated": "warning.300",
+      "resource-loading": "accent.300",
+      "resource-live": "success.300",
+      "resource-cached": "accent.400",
+      "validation-error-text": "danger.300",
+      "hint-line-text": "neutral.300",
+      "hint-line-accent": "hint.400",
+      "focus-ring": "primary.300"
+    },
+    "light": {
+      "surface-terminal": "neutral.0",
+      "surface-overlay": "neutral.50",
+      "surface-selected": "primary.100",
+      "text-primary": "neutral.900",
+      "text-secondary": "neutral.700",
+      "text-muted": "neutral.600",
+      "ghost-text": "neutral.500",
+      "suggestion-active-bg": "primary.100",
+      "suggestion-active-text": "primary.800",
+      "suggestion-match": "primary.600",
+      "param-flag": "primary.600",
+      "param-value": "accent.600",
+      "param-required": "danger.600",
+      "enum-valid": "success.600",
+      "enum-deprecated": "warning.600",
+      "resource-loading": "accent.600",
+      "resource-live": "success.600",
+      "resource-cached": "accent.600",
+      "validation-error-text": "danger.600",
+      "hint-line-text": "neutral.700",
+      "hint-line-accent": "hint.600",
+      "focus-ring": "primary.600"
+    }
+  },
+  "contrastNotes": {
+    "text-primary/surface-terminal (dark)": "13.9:1 AAA",
+    "text-muted/surface-terminal (dark)": "4.8:1 AA",
+    "ghost-text/surface-terminal (dark)": "4.8:1 AA",
+    "validation-error-text/surface-terminal (dark)": "5.9:1 AA",
+    "ghost-text/surface-terminal (light)": "4.9:1 AA"
+  }
+}

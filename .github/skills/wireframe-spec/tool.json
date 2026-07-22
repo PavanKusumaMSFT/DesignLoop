@@ -1,0 +1,17 @@
+{
+  "id": "wireframe-spec",
+  "name": "Wireframe Spec",
+  "description": "Write detailed Fluent-aware wireframe specifications for each screen and state, including component-map pattern matches, shared components, Fluent primitives, content hierarchy, interactions, and annotations.",
+  "stages": ["design"],
+  "agent": "wireframe-spec",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "requirements-prd", "required": true }
+  ],
+  "outputs": [
+    "tasks/{taskId}/designs/wireframes/{screen-name}.md",
+    "tasks/{taskId}/designs/wireframes/index.md"
+  ],
+  "dependencies": ["requirements-prd"],
+  "required": true
+}

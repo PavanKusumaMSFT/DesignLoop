@@ -1,0 +1,16 @@
+{
+  "id": "personas",
+  "name": "Personas",
+  "description": "Create research-grounded user personas with goals, pain points, behaviours, and scenario narratives for each major user segment.",
+  "stages": ["define"],
+  "agent": "personas",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "problem-statements", "required": true }
+  ],
+  "outputs": [
+    "strategy/personas.md"
+  ],
+  "dependencies": ["problem-statements"],
+  "required": true
+}

@@ -1,0 +1,17 @@
+{
+  "id": "design-system-assembly",
+  "name": "Design System Assembly",
+  "description": "Assemble the task design system index for the vendored Fluent UI React v9 kit, including theme guidance, token families, component-map patterns, shared component inventory, Fluent rules, and do/don't patterns.",
+  "stages": ["design"],
+  "agent": "design-system-assembly",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "design-system-setup", "required": true },
+    { "type": "artifact", "from": "component-spec", "required": true }
+  ],
+  "outputs": [
+    "tasks/{taskId}/designs/design-system.md"
+  ],
+  "dependencies": ["design-system-setup", "component-spec"],
+  "required": false
+}

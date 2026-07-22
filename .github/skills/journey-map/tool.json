@@ -1,0 +1,16 @@
+{
+  "id": "journey-map",
+  "name": "Journey Map",
+  "description": "Map the current-state user journey across all stages with actions, emotions, pain points, and opportunity annotations per phase.",
+  "stages": ["define"],
+  "agent": "journey-map",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "problem-statements", "required": true }
+  ],
+  "outputs": [
+    "strategy/journey-map.md"
+  ],
+  "dependencies": ["problem-statements"],
+  "required": false
+}

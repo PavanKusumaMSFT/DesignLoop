@@ -1,0 +1,22 @@
+.ap-area-chart__svg {
+  width: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.ap-area-chart__line {
+  vector-effect: non-scaling-stroke;
+}
+
+.ap-area-chart__area {
+  pointer-events: none;
+}
+
+.ap-area-chart__dot {
+  cursor: pointer;
+  transition: r var(--transition-fast);
+}
+
+.ap-area-chart__dot:hover {
+  r: 6;
+}

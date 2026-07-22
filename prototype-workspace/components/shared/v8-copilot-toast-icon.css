@@ -1,0 +1,85 @@
+/* ===========================================
+   Copilot Toast Icon — Animated Status Icons
+   =========================================== */
+
+.ap-copilot-toast-icon {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ap-copilot-toast-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ---- Progress variant: rotating ring around icon ---- */
+
+.ap-copilot-toast-icon--progress::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--copilot-toast-gradient-start);
+  border-right-color: var(--copilot-toast-gradient-mid);
+  animation: copilot-icon-spin 1.2s linear infinite;
+}
+
+@keyframes copilot-icon-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---- Completed variant: brief scale-in pulse ---- */
+
+.ap-copilot-toast-icon--completed {
+  animation: copilot-icon-check-pop 400ms ease-out;
+}
+
+.ap-copilot-toast-icon--completed svg {
+  color: var(--green-40);
+}
+
+@keyframes copilot-icon-check-pop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+/* ---- Input-required variant: gentle pulse ---- */
+
+.ap-copilot-toast-icon--input-required {
+  animation: copilot-icon-attention 2s ease-in-out infinite;
+}
+
+@keyframes copilot-icon-attention {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.12); }
+}
+
+/* ---- Error variant: shake + red tint ---- */
+
+.ap-copilot-toast-icon--error {
+  animation: copilot-icon-shake 500ms ease-in-out;
+}
+
+.ap-copilot-toast-icon--error svg {
+  color: var(--red-50);
+}
+
+@keyframes copilot-icon-shake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-2px); }
+  40%      { transform: translateX(2px); }
+  60%      { transform: translateX(-1.5px); }
+  80%      { transform: translateX(1.5px); }
+}
+
+/* ---- Generic: no animation ---- */
+.ap-copilot-toast-icon--generic {
+  /* static, no animation */
+}

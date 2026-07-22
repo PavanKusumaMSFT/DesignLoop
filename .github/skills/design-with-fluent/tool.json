@@ -1,0 +1,34 @@
+{
+  "id": "design-with-fluent",
+  "name": "Design with Fluent",
+  "description": "Build Azure-style prototype UI using Fluent v9, Fluent Copilot components, shared DesAIgns prototype components, and strict token conventions.",
+  "stages": [
+    "design"
+  ],
+  "agent": "design-with-fluent",
+  "inputs": [
+    {
+      "type": "task-description",
+      "required": true
+    },
+    {
+      "type": "artifact",
+      "from": "wireframe-spec",
+      "required": false
+    },
+    {
+      "type": "artifact",
+      "from": "component-spec",
+      "required": false
+    }
+  ],
+  "outputs": [
+    "prototype-workspace/components/projects/{taskId}/*.tsx",
+    "prototype-workspace/app/{taskId}/page.tsx"
+  ],
+  "dependencies": [
+    "wireframe-spec",
+    "component-spec"
+  ],
+  "required": false
+}

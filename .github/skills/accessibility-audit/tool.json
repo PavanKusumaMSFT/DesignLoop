@@ -1,0 +1,16 @@
+{
+  "id": "accessibility-audit",
+  "name": "Accessibility Audit",
+  "description": "Audit all components and screens against WCAG 2.1 AA: contrast, keyboard navigation, ARIA, focus management, and screen reader behaviour.",
+  "stages": ["test"],
+  "agent": "accessibility-audit",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "demo-pages", "required": true }
+  ],
+  "outputs": [
+    "tests/accessibility/accessibility-audit.md"
+  ],
+  "dependencies": ["demo-pages"],
+  "required": true
+}

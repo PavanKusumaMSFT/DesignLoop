@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cirrus — Hint Line (State D)</title>
+  <link rel="stylesheet" href="../../designs/tokens/tokens.css" />
+  <link rel="stylesheet" href="cirrus-demo.css" />
+</head>
+<body>
+  <main class="host" id="host" tabindex="0" aria-label="Terminal">
+    <div class="line">
+      <span class="prompt">$ </span><span class="command">az aks nodepool add </span><span class="caret"></span>
+    </div>
+    <div class="below" id="below">
+      <div class="hint" id="hint" role="note" aria-label="Cirrus hint" aria-live="polite">
+        <span class="accent" aria-hidden="true">&#8961;</span>
+        <span class="copy">3 required flags remain · <kbd>Ctrl+Space</kbd> to review</span>
+        <span class="actions">
+          <button class="hbtn" id="disableBtn" type="button">Don't show hints</button>
+          <button class="hbtn" id="hideBtn" type="button" aria-label="Hide hint">&#10005; hide</button>
+        </span>
+      </div>
+    </div>
+    <span class="sr-only" id="live" aria-live="polite"></span>
+  </main>
+
+  <div class="demo-controls" style="margin-top: var(--spacing-lg)">
+    <button id="showBtn" type="button">Show hint</button>
+    <button id="cycleBtn" type="button">Next hint copy</button>
+    <button id="escBtn" type="button">Esc (dismiss)</button>
+  </div>
+
+  <p class="demo-note">
+    <strong>State D — dismissible expert hint (FR-4).</strong> The quietest surface on screen. Copy is
+    <em>expert-neutral and factual</em> — never "tip for beginners" (NG5). <code>role="note"</code> in a
+    polite live region announces new hints without stealing focus. <code>✕ hide</code> is a real focusable
+    <code>&lt;button&gt;</code> (Tab to it — visible focus ring); a secondary "Don't show hints" exposes the
+    persistent disable (AC-4.3). <code>Esc</code> also dismisses.
+  </p>
+
+  <script src="cirrus-demo.js"></script>
+  <script>
+    CirrusDemo.mount({ title: 'Hint Line — State D', sub: 'FR-4 · concepts C13/C14', current: 'hint-line.html' });
+
+    const COPIES = [
+      { msg: '3 required flags remain', keys: 'Ctrl+Space', action: 'review' },
+      { msg: '42 SKUs available', keys: 'Ctrl+Space', action: 'browse' },
+      { msg: '--resource-group not set', keys: 'Tab', action: 'complete' },
+    ];
+    const hint = document.getElementById('hint');
+    const copy = hint.querySelector('.copy');
+    const live = document.getElementById('live');
+    let idx = 0;
+
+    function paint() {
+      const c = COPIES[idx];
+      copy.innerHTML = c.msg + ' · <kbd>' + c.keys + '</kbd> to ' + c.action;
+      live.textContent = 'hint: ' + c.msg;
+    }
+    document.getElementById('hideBtn').onclick = () => { hint.style.display = 'none'; live.textContent = 'hint hidden'; };
+    document.getElementById('disableBtn').onclick = () => { hint.style.display = 'none'; live.textContent = 'hints disabled'; };
+    document.getElementById('showBtn').onclick = () => { hint.style.display = 'flex'; paint(); };
+    document.getElementById('cycleBtn').onclick = () => { idx = (idx + 1) % COPIES.length; hint.style.display='flex'; paint(); };
+    document.getElementById('escBtn').onclick = () => { hint.style.display = 'none'; live.textContent = 'hint dismissed'; };
+    document.getElementById('host').addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { hint.style.display = 'none'; live.textContent = 'hint dismissed'; }
+    });
+    paint();
+  </script>
+</body>
+</html>

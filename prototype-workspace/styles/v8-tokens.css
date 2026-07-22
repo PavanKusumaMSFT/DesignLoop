@@ -1,0 +1,383 @@
+:root {
+  /* ===========================================
+     BASE PALETTE
+     Raw color values - single source of truth
+     =========================================== */
+
+  /* --- Neutrals (light to dark) --- */
+  --neutral-0: #FFFFFF;
+  --neutral-10: #FAF9F8;
+  --neutral-20: #F3F2F1;
+  --neutral-30: #EDEBE9;
+  --neutral-40: #E1DFDD;
+  --neutral-50: #D2D0CE;
+  --neutral-60: #C8C6C4;
+  --neutral-70: #BEBBB8;
+  --neutral-80: #B3B0AD;
+  --neutral-90: #A19F9D;
+  --neutral-100: #979693;
+  --neutral-110: #8A8886;
+  --neutral-120: #797775;
+  --neutral-130: #605E5C;
+  --neutral-140: #484644;
+  --neutral-150: #3B3A39;
+  --neutral-160: #323130;
+  --neutral-170: #292827;
+  --neutral-180: #252423;
+  --neutral-190: #201F1E;
+  --neutral-200: #1B1A19;
+  --neutral-210: #161514;
+  --neutral-220: #11100F;
+  --neutral-230: #000000;
+
+  /* --- Blues (light to dark) --- */
+  --blue-10: #EFF6FC;
+  --blue-20: #DEECF9;
+  --blue-30: #C7E0F4;
+  --blue-40: #69AFE5;
+  --blue-50: #0078D4;
+  --blue-60: #106EBE;
+  --blue-70: #005A9E;
+  --blue-80: #004578;
+
+  /* --- Reds (light to dark) --- */
+  --red-10: #FEF0F1;
+  --red-50: #E00B1C;
+  --red-60: #C32727;
+  --red-70: #A4262C;
+  --red-80: #791818;
+
+  /* --- Greens (light to dark) --- */
+  --green-10: #F8FFF0;
+  --green-40: #57A300;
+  --green-80: #428000;
+
+  /* --- Oranges (light to dark) --- */
+  --orange-10: #FFF8F0;
+  --orange-40: #DB7500;
+
+  /* --- Purples (light to dark) --- */
+  --purple-10: #F9F3FC;
+  --purple-40: #8A2DA5;
+
+  /* --- Other --- */
+  --blue-info: #015CDA;
+  --blue-bg: #F0F6FF;
+
+  /* --- Data Visualization --- */
+  --data-10: #637CEF;
+  --data-20: #E3008C;
+  --data-30: #2AA0A4;
+  --data-40: #9373C0;
+  --data-50: #13A10E;
+  --data-60: #3A96DD;
+  --data-70: #CA5010;
+  --data-80: #57811B;
+  --data-90: #B146C2;
+  --data-100: #AE8C00;
+
+  /* --- Chart Semantic Tokens --- */
+  --chart-grid: var(--neutral-30);
+  --chart-axis: var(--neutral-50);
+  --chart-tick-label: var(--text-secondary);
+  --chart-axis-label: var(--text-secondary);
+  --chart-title: var(--text-primary);
+  --chart-tooltip-bg: var(--neutral-220);
+  --chart-tooltip-fg: var(--neutral-0);
+
+
+  /* ===========================================
+     SEMANTIC TOKENS
+     Functional mappings to base palette
+     =========================================== */
+
+  /* --- Text --- */
+  --text-primary: var(--neutral-170);
+  --text-secondary: var(--neutral-130);
+  --text-disabled: var(--neutral-90);
+
+  /* --- Links --- */
+  --link-rest: var(--blue-50);
+  --link-hover: var(--blue-60);
+  --link-pressed: var(--blue-70);
+
+  /* --- Hyperlinks (inline text links) --- */
+  --hyperlink-rest: var(--blue-50);
+  --hyperlink-hover: var(--blue-80);
+
+  /* --- Primary Button --- */
+  --button-primary-bg-rest: var(--blue-50);
+  --button-primary-bg-hover: var(--blue-60);
+  --button-primary-bg-pressed: var(--blue-70);
+  --button-primary-bg-focus: var(--blue-50);
+  --button-primary-bg-disabled: var(--neutral-20);
+  --button-primary-fg-rest: var(--neutral-0);
+  --button-primary-fg-hover: var(--neutral-0);
+  --button-primary-fg-pressed: var(--neutral-0);
+  --button-primary-fg-focus: var(--neutral-0);
+  --button-primary-fg-disabled: var(--neutral-90);
+  --button-primary-focus-inner: var(--neutral-0);
+
+  /* --- Secondary Button --- */
+  --button-secondary-bg-rest: var(--neutral-0);
+  --button-secondary-bg-hover: var(--neutral-20);
+  --button-secondary-bg-pressed: var(--neutral-30);
+  --button-secondary-bg-focus: var(--neutral-0);
+  --button-secondary-bg-disabled: var(--neutral-20);
+  --button-secondary-fg-rest: var(--neutral-160);
+  --button-secondary-fg-hover: var(--neutral-190);
+  --button-secondary-fg-pressed: var(--neutral-190);
+  --button-secondary-fg-focus: var(--neutral-160);
+  --button-secondary-fg-disabled: var(--neutral-90);
+  --button-secondary-border-rest: var(--neutral-110);
+  --button-secondary-border-hover: var(--neutral-110);
+  --button-secondary-border-pressed: var(--neutral-110);
+  --button-secondary-border-focus: var(--neutral-110);
+  --button-secondary-focus-inner: var(--neutral-130);
+
+  /* --- Destructive Button --- */
+  --button-destructive-bg-rest: var(--red-60);
+  --button-destructive-bg-hover: var(--red-70);
+  --button-destructive-bg-pressed: var(--red-80);
+  --button-destructive-bg-focus: var(--red-80);
+  --button-destructive-bg-disabled: var(--neutral-20);
+  --button-destructive-fg-rest: var(--neutral-0);
+  --button-destructive-fg-hover: var(--neutral-0);
+  --button-destructive-fg-pressed: var(--neutral-0);
+  --button-destructive-fg-focus: var(--neutral-0);
+  --button-destructive-fg-disabled: var(--neutral-90);
+  --button-destructive-focus-inner: var(--neutral-0);
+
+  /* --- Icon Button (header toolbar style) --- */
+  --button-icon-bg-rest: var(--blue-50);
+  --button-icon-bg-hover: var(--blue-60);
+  --button-icon-bg-pressed: var(--blue-70);
+  --button-icon-bg-focus: var(--blue-50);
+  --button-icon-bg-disabled: var(--blue-50);
+  --button-icon-bg-selected: var(--neutral-0);
+  --button-icon-fg-rest: var(--neutral-0);
+  --button-icon-fg-hover: var(--neutral-0);
+  --button-icon-fg-pressed: var(--neutral-0);
+  --button-icon-fg-focus: var(--neutral-0);
+  --button-icon-fg-disabled: var(--neutral-0);
+  --button-icon-fg-selected: var(--blue-50);
+  --button-icon-focus-border: var(--neutral-0);
+
+  /* --- Copilot Sidecar --- */
+  --copilot-sidecar-width: 380px;
+  --copilot-sidecar-bg: var(--neutral-20);
+  --copilot-sidecar-header-bg: var(--neutral-0);
+  --copilot-sidecar-border: var(--neutral-40);
+  --copilot-message-user-bg: var(--blue-10);
+  --copilot-message-user-fg: var(--text-primary);
+  --copilot-message-assistant-fg: var(--text-primary);
+  --copilot-disclaimer-bg: var(--neutral-30);
+  --copilot-disclaimer-fg: var(--neutral-130);
+  --copilot-card-bg: var(--neutral-0);
+  --copilot-card-border: var(--neutral-40);
+  --copilot-card-header-bg: var(--neutral-10);
+  --copilot-suggestion-bg: var(--neutral-0);
+  --copilot-suggestion-bg-hover: var(--neutral-20);
+  --copilot-suggestion-border: var(--neutral-60);
+  --copilot-suggestion-fg: var(--text-primary);
+  --copilot-input-bg: var(--neutral-0);
+  --copilot-input-border: var(--neutral-60);
+  --copilot-input-border-focus: var(--blue-50);
+  --copilot-send-bg: var(--blue-50);
+  --copilot-send-bg-hover: var(--blue-60);
+  --copilot-send-fg: var(--neutral-0);
+  --copilot-send-bg-disabled: var(--neutral-40);
+  --copilot-send-fg-disabled: var(--neutral-90);
+  --copilot-feedback-fg: var(--neutral-110);
+  --copilot-feedback-fg-hover: var(--neutral-160);
+  --copilot-progress-bg: var(--neutral-40);
+  --copilot-progress-fg: var(--blue-50);
+
+  /* --- Copilot Toast --- */
+  --copilot-toast-bg: var(--neutral-0);
+  --copilot-toast-border: var(--neutral-40);
+  --copilot-toast-shadow: rgba(138, 45, 165, 0.15);
+  --copilot-toast-shadow-accent: rgba(99, 102, 241, 0.1);
+  --copilot-toast-border-1: rgba(13, 145, 225, 0);      /* 2%  — transparent             */
+  --copilot-toast-border-2: rgba(17, 40, 163, 0.08);   /* 17% — dark blue 8%            */
+  --copilot-toast-border-3: rgba(13, 145, 225, 0.15);  /* 29% — blue 15%                */
+  --copilot-toast-border-4: rgba(210, 0, 126, 0.15);   /* 59% — magenta 15%             */
+  --copilot-toast-border-5: rgba(255, 95, 61, 0.15);   /* 96% — orange 15%              */
+  --copilot-toast-glow-2: rgba(13, 145, 225, 0.03);    /* blue 3%                       */
+  --copilot-toast-glow-3: rgba(45, 180, 255, 0.15);    /* light blue 15%                */
+  --copilot-toast-glow-4: rgba(214, 96, 255, 0.15);    /* purple 15%                    */
+  --copilot-toast-glow-5: rgba(254, 168, 116, 0.15);   /* peach 15%                     */
+  --copilot-toast-border-spin-duration: 12s;
+  --copilot-toast-width: 410px;
+  --copilot-toast-title-fg: var(--text-primary);
+  --copilot-toast-body-fg: var(--text-secondary);
+  --copilot-toast-close-fg: var(--neutral-110);
+  --copilot-toast-close-fg-hover: var(--neutral-160);
+
+  /* --- Copilot Toast Animation Timing --- */
+  /* New card entrance */
+  --copilot-toast-enter-fade-duration: 200ms;   /* 0 → 200ms: new card fades in           */
+  --copilot-toast-enter-slide-duration: 250ms;  /* 0 → 250ms: new card slides in           */
+  /* Background card re-stacking */
+  --copilot-toast-stack-narrow-delay: 0ms;    /* 150ms: wait before narrowing starts      */
+  --copilot-toast-stack-slide-duration: 250ms;  /* 0 → 250ms: background card slides down  */
+  --copilot-toast-stack-narrow-duration: 200ms; /* 150 → 300ms: background card narrows     */
+  /* Card exit */
+  --copilot-toast-exit-duration: 200ms;         /* card fade + slide out                   */
+
+  /* --- Copilot Button --- 
+       Separate tokens to allow easy extraction to Button variant or standalone component */
+  --button-copilot-bg-rest: var(--neutral-0);
+  --button-copilot-bg-hover: #e6f4fe;
+  --button-copilot-bg-pressed: #c7e8ff;
+  --button-copilot-bg-focus: var(--neutral-0);
+  --button-copilot-bg-disabled: var(--neutral-20);
+  --button-copilot-fg-rest: var(--neutral-170);
+  --button-copilot-fg-hover: var(--neutral-190);
+  --button-copilot-fg-pressed: var(--neutral-190);
+  --button-copilot-fg-focus: var(--neutral-170);
+  --button-copilot-fg-disabled: var(--neutral-90);
+  --button-copilot-border-rest: var(--neutral-60);
+  --button-copilot-border-hover: #818CF8;
+  --button-copilot-border-pressed: #6366F1;
+  --button-copilot-border-focus: var(--neutral-60);
+  --button-copilot-focus-inner: var(--neutral-130);
+
+  /* --- Control Outlines --- */
+  --control-outline-rest: var(--neutral-110);
+  --control-outline-focus-dark: var(--neutral-130);
+  --control-outline-focus-light: var(--neutral-0);
+  --focus-outline: var(--blue-50);
+
+  /* --- Control Backgrounds --- */
+  --control-bg-rest: var(--neutral-0);
+  --control-bg-hover: var(--neutral-20);
+  --control-bg-pressed: var(--neutral-30);
+  --control-bg-selected: var(--neutral-30);
+  --control-bg-selected-hover: var(--neutral-40);
+
+  /* --- Text Input --- */
+  --input-bg-rest: var(--neutral-0);
+  --input-bg-disabled: var(--neutral-20);
+  --input-border-rest: var(--neutral-110);
+  --input-border-hover: var(--neutral-160);
+  --input-border-focus: var(--blue-50);
+  --input-border-disabled: var(--neutral-60);
+  --input-border-error: var(--red-70);
+  --input-icon-rest: var(--blue-50);
+  --input-accent: var(--blue-50);
+  --input-accent-disabled: var(--neutral-60);
+
+  /* --- Header Search --- */
+  --header-search-bg-rest: var(--blue-30);
+  --header-search-bg-focus: var(--neutral-0);
+  --header-search-bg-open: var(--neutral-0);
+  --header-search-text-rest: var(--blue-70);
+  --header-search-text-focus: var(--neutral-180);
+  --header-search-icon-rest: var(--blue-70);
+  --header-search-icon-focus: var(--blue-70);
+  --header-search-border-focus: var(--neutral-130);
+
+  /* --- Status Foreground --- */
+  --status-success-fg: var(--green-40);
+  --status-error-fg: var(--red-50);
+  --status-warning-fg: var(--orange-40);
+  --status-info-fg: var(--blue-info);
+  --status-upsell-fg: var(--purple-40);
+
+  /* --- Status Background --- */
+  --status-success-bg: var(--green-10);
+  --status-error-bg: var(--red-10);
+  --status-warning-bg: var(--orange-10);
+  --status-info-bg: var(--blue-bg);
+  --status-upsell-bg: var(--purple-10);
+
+
+  /* ===========================================
+     SPACING
+     =========================================== */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 20px;
+  --spacing-xl: 24px;
+  --spacing-xxl: 32px;
+
+
+  /* ===========================================
+     BORDER RADIUS
+     =========================================== */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-pill: 9999px;
+
+
+  /* ===========================================
+     TYPOGRAPHY
+     =========================================== */
+  --font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", "Helvetica Neue", sans-serif;
+
+  --font-weight-regular: 400;
+  --font-weight-semibold: 600;
+
+  /* --- Standard Text Styles --- */
+  /* h1: 18/24 semibold */
+  --h1-size: 18px;
+  --h1-line-height: 24px;
+  --h1-weight: var(--font-weight-semibold);
+
+  /* h2: 16/22 semibold */
+  --h2-size: 16px;
+  --h2-line-height: 22px;
+  --h2-weight: var(--font-weight-semibold);
+
+  /* h3: 14/20 semibold */
+  --h3-size: 14px;
+  --h3-line-height: 20px;
+  --h3-weight: var(--font-weight-semibold);
+
+  /* body: 13/18 regular */
+  --body-size: 13px;
+  --body-line-height: 18px;
+  --body-weight: var(--font-weight-regular);
+
+  /* --- Extended Text Scale (t-shirt sizes) --- */
+  /* text-xl: 24/32 semibold */
+  --text-xl-size: 24px;
+  --text-xl-line-height: 32px;
+  --text-xl-weight: var(--font-weight-semibold);
+
+  /* text-l: 20/28 semibold */
+  --text-l-size: 20px;
+  --text-l-line-height: 28px;
+  --text-l-weight: var(--font-weight-semibold);
+
+  /* text-s: 12/16 regular */
+  --text-s-size: 12px;
+  --text-s-line-height: 16px;
+  --text-s-weight: var(--font-weight-regular);
+
+  /* text-xs: 10/14 regular */
+  --text-xs-size: 10px;
+  --text-xs-line-height: 14px;
+  --text-xs-weight: var(--font-weight-regular);
+
+  /* --- Component-specific type overrides --- */
+  --site-header-title-size: 15px;
+
+
+  /* ===========================================
+     SHADOWS
+     =========================================== */
+  --shadow-sm: 0 1.6px 3.6px rgba(0, 0, 0, 0.13), 0 0.3px 0.9px rgba(0, 0, 0, 0.11);
+  --shadow-md: 0 3.2px 7.2px rgba(0, 0, 0, 0.13), 0 0.6px 1.8px rgba(0, 0, 0, 0.11);
+  --shadow-lg: 0 6.4px 14.4px rgba(0, 0, 0, 0.13), 0 1.2px 3.6px rgba(0, 0, 0, 0.11);
+
+
+  /* ===========================================
+     TRANSITIONS
+     =========================================== */
+  --transition-fast: 100ms ease-in-out;
+  --transition-normal: 200ms ease-in-out;
+}

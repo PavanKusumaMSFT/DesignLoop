@@ -1,0 +1,102 @@
+/* ===========================================
+   Filter Bar
+   Horizontal bar with search, filters, and grouping
+   =========================================== */
+
+.ap-filter-bar {
+  display: flex;
+
+  gap: var(--spacing-sm);
+  width: 100%;
+  font-family: var(--font-family);
+  box-sizing: border-box;
+}
+
+/* --- Filter Bar Search --- */
+.ap-filter-bar__search {
+  flex-shrink: 0;
+  width: 180px;
+}
+
+.ap-filter-bar__search .ap-text-input {
+  width: 100%;
+}
+
+/* --- Filter Bar Pills --- */
+.ap-filter-bar__pills {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+/* --- Filter Bar Add Button --- */
+.ap-filter-bar__add {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+
+  padding: 0 var(--spacing-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background-color: var(--blue-10);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.ap-filter-bar__add:hover:not(:disabled) {
+  background-color: var(--blue-20);
+}
+
+.ap-filter-bar__add:active:not(:disabled) {
+  background-color: var(--blue-30);
+}
+
+.ap-filter-bar__add:focus-visible {
+  outline: none;
+  border-color: var(--neutral-130);
+  background-color: var(--blue-30);
+}
+
+.ap-filter-bar__add:disabled {
+  background-color: var(--neutral-20);
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+.ap-filter-bar__add-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  color: var(--text-primary);
+}
+
+.ap-filter-bar__add-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ap-filter-bar__add:disabled .ap-filter-bar__add-icon {
+  color: var(--text-disabled);
+}
+
+/* --- Filter Bar Group By --- */
+.ap-filter-bar__group-by {
+  flex-shrink: 0;
+  margin-left: auto;
+  width: 180px;
+}
+
+.ap-filter-bar__group-by .ap-dropdown {
+  width: 100%;
+}

@@ -3,34 +3,48 @@ description: "Use when editing design token files, creating CSS custom propertie
 applyTo: ["**/tokens/**", "**/design-system/**"]
 ---
 
-# Design Token Standards
+# Design Token Standards — Fluent UI React v9
 
-## Naming Convention
+## Prototype and React Code
 
-All tokens must follow the pattern: `--{category}-{variant}-{scale}`
+Design and Prototype phase React code must use Fluent UI React v9 tokens from `@fluentui/react-components`, not bespoke CSS custom-property token systems.
 
-### Required Categories
+```tsx
+import { makeStyles, tokens as fluentTokens } from "@fluentui/react-components";
+type SafeTokens = { [key: string]: any };
+const tokens: SafeTokens = fluentTokens;
+```
 
-| Category | Example | Format |
-|----------|---------|--------|
-| `color` | `--color-primary-500` | `--color-{palette}-{shade}` |
-| `spacing` | `--spacing-md` | `--spacing-{size}` |
-| `font-size` | `--font-size-lg` | `--font-size-{size}` |
-| `font-weight` | `--font-weight-bold` | `--font-weight-{name}` |
-| `line-height` | `--line-height-normal` | `--line-height-{name}` |
-| `border-radius` | `--border-radius-md` | `--border-radius-{size}` |
-| `elevation` | `--elevation-2` | `--elevation-{level}` |
-| `motion` | `--motion-duration-fast` | `--motion-{property}-{name}` |
+Use these Fluent token families in `makeStyles`:
 
-## Forbidden Patterns
+| Need | Fluent token families |
+|------|-----------------------|
+| Neutral colors | `colorNeutralBackground*`, `colorNeutralForeground*`, `colorNeutralStroke*` |
+| Brand colors | `colorBrandBackground*`, `colorBrandForeground*`, `colorBrandStroke*` |
+| Status colors | `colorPaletteRed*`, `colorPaletteGreen*`, `colorStatus*` |
+| Spacing | `spacingHorizontal*`, `spacingVertical*` |
+| Typography | `fontSize*`, `fontWeight*`, `lineHeight*`, `fontFamily*` |
+| Shape | `borderRadius*`, `strokeWidth*` |
+| Elevation | `shadow2`, `shadow4`, `shadow8`, `shadow16`, `shadow28`, `shadow64` |
+| Motion | `duration*`, `curve*` |
 
-- **No hardcoded hex colors**: Use `var(--color-*)` instead of `#3B82F6`
-- **No hardcoded pixel values**: Use `var(--spacing-*)` instead of `16px`
-- **No raw font stacks**: Use `var(--font-family-*)` instead of `'Inter', sans-serif`
-- **No magic numbers**: Every value should reference a token
+Brand customization belongs in the `FluentProvider` theme. Use Azure brand blues only for theme seed values or approved brand accents: `#0078D4`, `#106EBE`, `#005A9E`.
 
-## Token File Format
+## Forbidden in Prototype React Code
 
-- JSON tokens go in `designs/tokens/*.json`
-- CSS custom properties go in `designs/tokens/tokens.css`
-- Theme overrides go in `designs/tokens/theme-{name}.css`
+- No CSS Modules or styled-components for token application.
+- No Tailwind utility classes.
+- No generic `var(--color-*)`, `var(--spacing-*)`, or `--{category}-{variant}-{scale}` mandates inside TSX prototypes.
+- No hardcoded hex colors except `#0078D4`, `#106EBE`, `#005A9E`.
+- No hardcoded font stacks, font sizes, line heights, shadows, radii, or spacing where a Fluent token exists.
+- No inline `style={}` except truly dynamic values.
+
+## Non-React Design Artifacts
+
+The older generic token convention (`--{category}-{variant}-{scale}`, such as `--color-primary-500` or `--spacing-md`) may still be useful in non-React design documents, exported token references, or exploratory design-system notes. When those artifacts are later implemented in `prototype-workspace/`, map them to Fluent token families and a `FluentProvider` theme rather than carrying custom CSS variables into React components.
+
+## Token File Guidance
+
+- Store source design-token documentation under the task's `designs/tokens/` directory when the Design phase needs it.
+- Store runnable React theme code in `prototype-workspace/` when the Prototype phase needs it.
+- Document any Azure brand theme overrides explicitly, including why a Fluent default was not sufficient.

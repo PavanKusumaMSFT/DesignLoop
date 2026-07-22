@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cirrus — Degraded / Plain (State F)</title>
+  <link rel="stylesheet" href="../../designs/tokens/tokens.css" />
+  <link rel="stylesheet" href="cirrus-demo.css" />
+</head>
+<body>
+  <main class="host" id="host" aria-label="Terminal">
+    <div class="line">
+      <span class="prompt">$ </span><span class="command">az storage account create --sku </span><span class="caret"></span>
+    </div>
+    <div class="below" id="below"></div>
+    <span class="sr-only" id="live" aria-live="polite"></span>
+  </main>
+
+  <div class="demo-controls" style="margin-top: var(--spacing-lg)">
+    <span class="demo-nav">capability tier:</span>
+    <button id="richBtn" type="button">rich (overlays)</button>
+    <button id="plainBtn" type="button">plain — F-1 (constrained TTY)</button>
+    <button id="noopBtn" type="button">no-op — F-2 (CI / no TTY)</button>
+  </div>
+
+  <p class="demo-note">
+    <strong>State F — degraded / low-capability (FR-6).</strong> The <code>useCapability()</code> cascade
+    steps <em>down</em> in lockstep. <strong>F-1</strong> (constrained TTY): overlays and elevation are
+    dropped; guidance becomes a single plain-text advisory line whose meaning never depends on color
+    (works on no-color terminals). There is <em>no selection model</em> — read-only text, so nothing can
+    trap the user (NG2). <strong>F-2</strong> (CI / piped / no TTY): Cirrus is a strict no-op — no stdout
+    contamination, no exit-code change. When the probe is uncertain, it fails <em>down</em> to the plainer
+    tier (safe default).
+  </p>
+
+  <script src="cirrus-demo.js"></script>
+  <script>
+    CirrusDemo.mount({ title: 'Degraded / Plain — State F', sub: 'FR-6 · concept C17 (capability layer)', current: 'degraded-plain.html' });
+
+    const below = document.getElementById('below');
+    const live = document.getElementById('live');
+
+    const RICH = () =>
+      '<div class="overlay"><div class="overlay-header">' +
+      '<span class="hlabel">parameters · az storage account create</span>' +
+      '<span class="badge-cached">\u26A1 cached</span></div>' +
+      '<ul class="overlay-list" role="listbox" aria-label="parameters" aria-activedescendant="deg-opt-0">' +
+      '<li id="deg-opt-0" role="option" aria-selected="true" aria-label="Standard_LRS, valid" class="row selected"><span class="rprimary" aria-hidden="true">Standard_LRS</span><span class="badge-valid">valid</span></li>' +
+      '<li id="deg-opt-1" role="option" aria-selected="false" aria-label="Standard_GRS, valid" class="row"><span class="rprimary" aria-hidden="true">Standard_GRS</span><span class="badge-valid">valid</span></li>' +
+      '<li id="deg-opt-2" role="option" aria-selected="false" aria-label="Premium_LRS, valid" class="row"><span class="rprimary" aria-hidden="true">Premium_LRS</span><span class="badge-valid">valid</span></li>' +
+      '</ul></div>';
+
+    const PLAIN = () =>
+      '<p class="plain-line"><span class="pprefix">cirrus:</span> valid --sku values: ' +
+      'Standard_LRS, Standard_GRS, Premium_LRS ' +
+      '<span class="pnote">(type value; Tab completion unavailable)</span></p>';
+
+    function setTier(tier) {
+      if (tier === 'rich') { below.innerHTML = RICH(); live.textContent = 'rich overlays active'; }
+      else if (tier === 'plain') { below.innerHTML = PLAIN(); live.textContent = 'plain advisory line — no selection model'; }
+      else {
+        below.innerHTML = '<p class="suppressed-note"># (cirrus emits nothing — silent no-op; script output unchanged)</p>';
+        live.textContent = 'no-op — Cirrus emits nothing';
+      }
+    }
+    document.getElementById('richBtn').onclick = () => setTier('rich');
+    document.getElementById('plainBtn').onclick = () => setTier('plain');
+    document.getElementById('noopBtn').onclick = () => setTier('noop');
+    setTier('plain');
+  </script>
+</body>
+</html>

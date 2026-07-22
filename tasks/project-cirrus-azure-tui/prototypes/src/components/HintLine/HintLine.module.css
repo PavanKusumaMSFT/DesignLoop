@@ -1,0 +1,82 @@
+/* HintLine — dismissible expert hint (State D). Quietest surface. Tokens only. */
+
+.hint {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-hint-line-text);
+  transition: var(--motion-transition-fade);
+}
+
+.accent {
+  color: var(--color-hint-line-accent);
+  font-weight: var(--font-weight-semibold);
+}
+
+.copy {
+  color: var(--color-hint-line-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kbd {
+  display: inline-block;
+  padding: 0 var(--spacing-2xs);
+  border-radius: var(--border-radius-sm);
+  background: var(--color-hint-line-key-bg);
+  color: var(--color-hint-line-key-text);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-2xs);
+  line-height: var(--line-height-tight);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-inline-start: auto;
+}
+
+.dismiss,
+.disableAll {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--color-hint-line-dismiss);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-2xs);
+  cursor: pointer;
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border-radius: var(--border-radius-sm);
+}
+
+.dismiss:hover,
+.disableAll:hover {
+  color: var(--color-hint-line-text);
+}
+
+.dismiss:focus-visible,
+.disableAll:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+/* Plain variant (State F-1). */
+.plainLine {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  color: var(--color-hint-line-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hint {
+    transition: none;
+  }
+}

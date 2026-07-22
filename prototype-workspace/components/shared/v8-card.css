@@ -1,0 +1,35 @@
+.ap-card {
+  font-family: var(--font-family);
+  border-radius: var(--radius-md);
+  background-color: var(--control-bg-rest);
+}
+
+/* Variants */
+.ap-card--elevated {
+  box-shadow: var(--shadow-md);
+}
+
+.ap-card--outlined {
+  border: 1px solid var(--neutral-40);
+}
+
+.ap-card--filled {
+  background-color: var(--control-bg-hover);
+}
+
+/* Padding */
+.ap-card--padding-none {
+  padding: 0;
+}
+
+.ap-card--padding-small {
+  padding: var(--spacing-sm);
+}
+
+.ap-card--padding-medium {
+  padding: var(--spacing-md);
+}
+
+.ap-card--padding-large {
+  padding: var(--spacing-xl);
+}

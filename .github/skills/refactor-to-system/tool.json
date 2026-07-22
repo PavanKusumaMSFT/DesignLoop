@@ -1,0 +1,21 @@
+{
+  "id": "refactor-to-system",
+  "name": "Refactor to System",
+  "description": "Refactor existing prototype code in place to follow Fluent v9, Fluent Copilot, shared component, and token conventions without changing behavior.",
+  "stages": [
+    "prototype"
+  ],
+  "agent": "refactor-to-system",
+  "inputs": [
+    {
+      "type": "target-reference",
+      "required": true,
+      "description": "Target file, component, or folder under prototype-workspace/ to refactor"
+    }
+  ],
+  "outputs": [
+    "prototype-workspace/{target}"
+  ],
+  "dependencies": [],
+  "required": false
+}

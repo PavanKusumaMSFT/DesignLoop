@@ -1,0 +1,357 @@
+/*
+ * Project Cirrus — Design Tokens
+ * Inline, non-modal Azure CLI intelligence layer.
+ *
+ * Convention: --{category}-{variant}-{scale}
+ * Categories: color, spacing, font-size, font-weight, line-height,
+ *             border-radius, elevation, motion, font-family (support)
+ *
+ * Layer model:
+ *   1. Primitive tokens  — raw palette/scale values (the ONLY place literals live)
+ *   2. Semantic tokens   — role-based aliases that map to primitives per theme
+ *
+ * Terminal/CLI-flavoured: primitives are tuned for monospace surfaces on
+ * dark and light terminal backgrounds. Components MUST consume semantic tokens.
+ * All contrast pairs meet WCAG 2.1 AA (>= 4.5:1 for text) on their intended surface.
+ */
+
+/* =========================================================================
+ * 1. PRIMITIVE TOKENS  (theme-agnostic raw values)
+ * ========================================================================= */
+:root {
+  /* ---- color: neutral (terminal greys) ---- */
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f6f8fa;
+  --color-neutral-100: #eceff2;
+  --color-neutral-200: #d5dae0;
+  --color-neutral-300: #b3bcc6;
+  --color-neutral-400: #8b95a1;
+  --color-neutral-500: #667180;
+  --color-neutral-600: #4a5561;
+  --color-neutral-700: #333c47;
+  --color-neutral-800: #212831;
+  --color-neutral-900: #151a21;
+  --color-neutral-950: #0b0e13;
+
+  /* ---- color: primary (Azure blue) ---- */
+  --color-primary-100: #cfe6ff;
+  --color-primary-200: #9cccff;
+  --color-primary-300: #64abff;
+  --color-primary-400: #3b8eea;
+  --color-primary-500: #1f78e0;
+  --color-primary-600: #1160bd;
+  --color-primary-700: #0d4c96;
+  --color-primary-800: #0a3a72;
+
+  /* ---- color: accent (cyan — resource/live lookup) ---- */
+  --color-accent-200: #9be9f0;
+  --color-accent-300: #57d6e2;
+  --color-accent-400: #21b8c7;
+  --color-accent-500: #1596a3;
+  --color-accent-600: #0f7580;
+
+  /* ---- color: success (validated enum / valid value) ---- */
+  --color-success-200: #a7e8bd;
+  --color-success-300: #5fd287;
+  --color-success-400: #2fb567;
+  --color-success-500: #1f8f50;
+  --color-success-600: #16703e;
+
+  /* ---- color: warning (deprecated / caution) ---- */
+  --color-warning-200: #ffe08a;
+  --color-warning-300: #f6c750;
+  --color-warning-400: #e0a423;
+  --color-warning-500: #b57e12;
+  --color-warning-600: #8a5f0d;
+
+  /* ---- color: danger (invalid / validation error) ---- */
+  --color-danger-200: #ffb4b4;
+  --color-danger-300: #ff8080;
+  --color-danger-400: #ec5a5a;
+  --color-danger-500: #d13438;
+  --color-danger-600: #a52427;
+
+  /* ---- color: muted accent for hint-line (violet, expert-neutral) ---- */
+  --color-hint-300: #c4b6ff;
+  --color-hint-400: #9b86f0;
+  --color-hint-500: #7a63d6;
+  --color-hint-600: #5d47ad;
+
+  /* ---- spacing (0.25rem base grid; terminal is dense) ---- */
+  --spacing-none: 0;
+  --spacing-3xs: 0.125rem; /* 2px  hairline padding */
+  --spacing-2xs: 0.25rem;  /* 4px  */
+  --spacing-xs: 0.375rem;  /* 6px  */
+  --spacing-sm: 0.5rem;    /* 8px  */
+  --spacing-md: 0.75rem;   /* 12px */
+  --spacing-lg: 1rem;      /* 16px */
+  --spacing-xl: 1.5rem;    /* 24px */
+  --spacing-2xl: 2rem;     /* 32px */
+
+  /* ---- font-family ---- */
+  --font-family-mono: ui-monospace, "SFMono-Regular", "SF Mono", "Cascadia Code",
+    "JetBrains Mono", "Fira Code", Menlo, Consolas, "Liberation Mono", monospace;
+  --font-family-ui: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+
+  /* ---- font-size (terminal cells + UI chrome) ---- */
+  --font-size-2xs: 0.6875rem; /* 11px micro-badges */
+  --font-size-xs: 0.75rem;    /* 12px meta/labels  */
+  --font-size-sm: 0.8125rem;  /* 13px secondary    */
+  --font-size-base: 0.875rem; /* 14px terminal body (default cell) */
+  --font-size-md: 1rem;       /* 16px comfortable  */
+  --font-size-lg: 1.125rem;   /* 18px emphasis     */
+
+  /* ---- font-weight ---- */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* ---- line-height ---- */
+  --line-height-tight: 1.2;   /* terminal rows       */
+  --line-height-snug: 1.35;   /* dense lists         */
+  --line-height-normal: 1.5;  /* readable copy       */
+  --line-height-relaxed: 1.7; /* hint prose          */
+
+  /* ---- border-radius (subtle; terminal overlays) ---- */
+  --border-radius-none: 0;
+  --border-radius-sm: 0.125rem; /* 2px chips        */
+  --border-radius-md: 0.25rem;  /* 4px popovers     */
+  --border-radius-lg: 0.375rem; /* 6px panels       */
+  --border-radius-pill: 9999px;
+
+  /* ---- elevation (overlay depth — shadow tokens set per theme below) ---- */
+  --elevation-0: none;
+
+  /* ---- motion: duration ---- */
+  --motion-duration-instant: 0ms;
+  --motion-duration-fast: 90ms;   /* ghost-text fade (feels within 100ms budget) */
+  --motion-duration-base: 150ms;  /* palette open/close */
+  --motion-duration-slow: 240ms;  /* list expand        */
+
+  /* ---- motion: easing ---- */
+  --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-easing-decelerate: cubic-bezier(0, 0, 0, 1);
+  --motion-easing-accelerate: cubic-bezier(0.3, 0, 1, 1);
+
+  /* ---- motion: named transitions (composed) ---- */
+  --motion-transition-fade: opacity var(--motion-duration-fast)
+    var(--motion-easing-standard);
+  --motion-transition-popover: opacity var(--motion-duration-base)
+    var(--motion-easing-decelerate),
+    transform var(--motion-duration-base) var(--motion-easing-decelerate);
+}
+
+/* =========================================================================
+ * 2. SEMANTIC TOKENS — DARK TERMINAL THEME (default)
+ * data-theme="dark" or :root default
+ * ========================================================================= */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* surfaces */
+  --color-surface-terminal: var(--color-neutral-950);   /* the shell background */
+  --color-surface-overlay: var(--color-neutral-800);    /* palette / popover bg */
+  --color-surface-overlay-raised: var(--color-neutral-700);
+  --color-surface-selected: var(--color-primary-800);   /* active row bg */
+  --color-surface-scrim: rgba(11, 14, 19, 0.6);
+
+  /* borders */
+  --color-border-subtle: var(--color-neutral-700);
+  --color-border-default: var(--color-neutral-600);
+  --color-border-focus: var(--color-primary-400);
+
+  /* text on terminal / overlay */
+  --color-text-primary: var(--color-neutral-100);       /* 13.9:1 on terminal */
+  --color-text-secondary: var(--color-neutral-300);     /* 8.1:1  */
+  --color-text-muted: var(--color-neutral-400);         /* 4.8:1  meta labels */
+  --color-text-inverse: var(--color-neutral-950);
+  --color-text-command: var(--color-neutral-0);         /* what the user typed */
+
+  /* --- SEMANTIC SUGGESTION STATES --- */
+
+  /* Ghost text (C1): inline, low-emphasis prediction after the caret.
+     Kept >= 4.5:1 so it is readable, but visually recessive vs command text. */
+  --color-ghost-text: var(--color-neutral-400);         /* 4.8:1 on terminal */
+  --color-ghost-text-emphasis: var(--color-neutral-300);/* matched-segment underline/bold */
+
+  /* Active / highlighted suggestion (selected row in palette/list) */
+  --color-suggestion-active-bg: var(--color-primary-800);
+  --color-suggestion-active-text: var(--color-neutral-0);
+  --color-suggestion-active-border: var(--color-primary-400);
+  --color-suggestion-match: var(--color-primary-300);   /* fuzzy-match char highlight */
+  --color-suggestion-idle-text: var(--color-neutral-200);
+  --color-suggestion-idle-bg: transparent;
+
+  /* Parameter hint (C5): flag names + required/optional signalling */
+  --color-param-flag: var(--color-primary-300);         /* --flag token color */
+  --color-param-value: var(--color-accent-300);         /* value placeholder   */
+  --color-param-required: var(--color-danger-300);      /* required marker text */
+  --color-param-optional: var(--color-text-muted);
+  --color-param-type: var(--color-hint-300);            /* <string> type hint  */
+
+  /* Enum / valid-value (C6) */
+  --color-enum-valid: var(--color-success-300);
+  --color-enum-deprecated: var(--color-warning-300);
+
+  /* Resource-lookup (C9/C10) loading + results */
+  --color-resource-loading: var(--color-accent-300);    /* spinner/shimmer accent */
+  --color-resource-loading-track: var(--color-neutral-700);
+  --color-resource-cached: var(--color-accent-400);     /* "cached" badge */
+  --color-resource-live: var(--color-success-300);      /* "live" badge   */
+  --color-resource-name: var(--color-text-primary);
+  --color-resource-meta: var(--color-text-muted);       /* region/sub id  */
+
+  /* Validation / error */
+  --color-validation-error-text: var(--color-danger-300); /* 5.9:1 */
+  --color-validation-error-bg: rgba(209, 52, 56, 0.14);
+  --color-validation-error-border: var(--color-danger-400);
+  --color-validation-fallback-text: var(--color-text-muted); /* "free text" note */
+
+  /* Dismissible expert hint line (C13) — additive, neutral, non-stigma */
+  --color-hint-line-text: var(--color-neutral-300);     /* 8.1:1, quiet */
+  --color-hint-line-accent: var(--color-hint-400);      /* leading glyph / key */
+  --color-hint-line-key-bg: var(--color-neutral-700);   /* kbd chip bg */
+  --color-hint-line-key-text: var(--color-neutral-100);
+  --color-hint-line-dismiss: var(--color-text-muted);
+
+  /* focus ring (keyboard) */
+  --color-focus-ring: var(--color-primary-300);
+
+  /* elevation (dark overlays lean on darker shadow + subtle border) */
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --elevation-2: 0 4px 12px rgba(0, 0, 0, 0.55);
+  --elevation-3: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+/* =========================================================================
+ * 2b. SEMANTIC TOKENS — LIGHT TERMINAL THEME
+ * data-theme="light"
+ * ========================================================================= */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --color-surface-terminal: var(--color-neutral-0);
+  --color-surface-overlay: var(--color-neutral-50);
+  --color-surface-overlay-raised: var(--color-neutral-100);
+  --color-surface-selected: var(--color-primary-100);
+  --color-surface-scrim: rgba(21, 26, 33, 0.35);
+
+  --color-border-subtle: var(--color-neutral-200);
+  --color-border-default: var(--color-neutral-300);
+  --color-border-focus: var(--color-primary-600);
+
+  --color-text-primary: var(--color-neutral-900);       /* 15.8:1 */
+  --color-text-secondary: var(--color-neutral-700);     /* 9.7:1  */
+  --color-text-muted: var(--color-neutral-600);         /* 6.4:1  */
+  --color-text-inverse: var(--color-neutral-0);
+  --color-text-command: var(--color-neutral-950);
+
+  --color-ghost-text: var(--color-neutral-500);         /* 4.9:1 on white */
+  --color-ghost-text-emphasis: var(--color-neutral-600);
+
+  --color-suggestion-active-bg: var(--color-primary-100);
+  --color-suggestion-active-text: var(--color-primary-800);
+  --color-suggestion-active-border: var(--color-primary-500);
+  --color-suggestion-match: var(--color-primary-600);
+  --color-suggestion-idle-text: var(--color-neutral-800);
+  --color-suggestion-idle-bg: transparent;
+
+  --color-param-flag: var(--color-primary-600);
+  --color-param-value: var(--color-accent-600);
+  --color-param-required: var(--color-danger-600);
+  --color-param-optional: var(--color-text-muted);
+  --color-param-type: var(--color-hint-600);
+
+  --color-enum-valid: var(--color-success-600);
+  --color-enum-deprecated: var(--color-warning-600);
+
+  --color-resource-loading: var(--color-accent-600);
+  --color-resource-loading-track: var(--color-neutral-200);
+  --color-resource-cached: var(--color-accent-600);
+  --color-resource-live: var(--color-success-600);
+  --color-resource-name: var(--color-text-primary);
+  --color-resource-meta: var(--color-text-muted);
+
+  --color-validation-error-text: var(--color-danger-600);
+  --color-validation-error-bg: rgba(209, 52, 56, 0.1);
+  --color-validation-error-border: var(--color-danger-500);
+  --color-validation-fallback-text: var(--color-text-muted);
+
+  --color-hint-line-text: var(--color-neutral-700);
+  --color-hint-line-accent: var(--color-hint-600);
+  --color-hint-line-key-bg: var(--color-neutral-100);
+  --color-hint-line-key-text: var(--color-neutral-800);
+  --color-hint-line-dismiss: var(--color-text-muted);
+
+  --color-focus-ring: var(--color-primary-600);
+
+  --elevation-1: 0 1px 2px rgba(21, 26, 33, 0.12);
+  --elevation-2: 0 4px 12px rgba(21, 26, 33, 0.16);
+  --elevation-3: 0 8px 24px rgba(21, 26, 33, 0.2);
+}
+
+/* =========================================================================
+ * 2c. HIGH-CONTRAST THEME (honours OS/terminal high-contrast — NFR-2)
+ * data-theme="high-contrast"
+ * ========================================================================= */
+[data-theme="high-contrast"] {
+  color-scheme: dark;
+
+  --color-surface-terminal: #000000;
+  --color-surface-overlay: #000000;
+  --color-surface-overlay-raised: #000000;
+  --color-surface-selected: #0d4c96;
+  --color-surface-scrim: rgba(0, 0, 0, 0.8);
+
+  --color-border-subtle: #ffffff;
+  --color-border-default: #ffffff;
+  --color-border-focus: #ffff00;
+
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #ffffff;
+  --color-text-muted: #e6e6e6;
+  --color-text-command: #ffffff;
+
+  --color-ghost-text: #e6e6e6;
+  --color-ghost-text-emphasis: #ffffff;
+
+  /* Darkened from --color-primary-500 (#1f78e0, white = 4.36:1, sub-AA) to
+     --color-primary-800 (#0a3a72, white = 11.28:1) so the active pair clears the
+     high-contrast >= 7:1 target and every recoloured child row (A11Y-1) passes. */
+  --color-suggestion-active-bg: var(--color-primary-800);
+  --color-suggestion-active-text: #ffffff;
+  --color-suggestion-active-border: #ffff00;
+  --color-suggestion-match: #ffff00;
+
+  --color-param-flag: #64abff;
+  --color-param-required: #ffb4b4;
+  --color-enum-valid: #5fd287;
+  --color-enum-deprecated: #ffe08a;
+
+  --color-resource-loading: #57d6e2;
+  --color-resource-live: #5fd287;
+  --color-resource-cached: #57d6e2;
+
+  --color-validation-error-text: #ffb4b4;
+  --color-validation-error-border: #ff8080;
+
+  --color-hint-line-text: #ffffff;
+  --color-hint-line-accent: #c4b6ff;
+  --color-focus-ring: #ffff00;
+}
+
+/* =========================================================================
+ * 3. REDUCED-MOTION (honours prefers-reduced-motion — NFR-2)
+ * ========================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-fast: 0ms;
+    --motion-duration-base: 0ms;
+    --motion-duration-slow: 0ms;
+    --motion-transition-fade: none;
+    --motion-transition-popover: none;
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "security-audit",
+  "name": "Security Audit",
+  "description": "Audit a design, prototype, or code artifact against the Microsoft Secure Future Initiative, SBD patterns, and OWASP design-phase checks.",
+  "stages": ["discover", "define", "ideate", "design", "prototype", "test", "deliver"],
+  "agent": "security-auditor",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "required": true }
+  ],
+  "outputs": [
+    "tests/security/audit-{target}-{date}.md"
+  ],
+  "dependencies": [],
+  "required": false
+}

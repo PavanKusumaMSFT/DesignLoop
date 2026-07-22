@@ -1,0 +1,176 @@
+/* ===========================================
+   CHECKBOX COMPONENT
+   Tri-state checkbox with optional label
+   =========================================== */
+
+.ap-checkbox {
+  /* Reset */
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font-family: inherit;
+
+  /* Layout */
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+
+  /* Match standard input height so labels align in form fields */
+  min-height: 24px;
+}
+
+.ap-checkbox:focus-visible {
+  outline: none;
+  border-radius: var(--radius-sm);
+  box-shadow:
+    0 0 0 1px var(--neutral-0),
+    0 0 0 2px var(--neutral-160);
+}
+
+
+/* ===========================================
+   CHECKBOX BOX
+   =========================================== */
+
+.ap-checkbox__box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 1px solid var(--input-border-rest);
+  border-radius: var(--radius-sm);
+  background-color: var(--neutral-0);
+  box-sizing: border-box;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+/* Check icon sizing */
+.ap-checkbox__box svg {
+  width: 11px;
+  height: 11px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+
+/* ===========================================
+   INDETERMINATE INDICATOR
+   8px square centered in checkbox
+   =========================================== */
+
+.ap-checkbox__indeterminate {
+  display: block;
+  width: 8px;
+  height: 8px;
+  background-color: var(--input-accent);
+  border-radius: var(--radius-sm);
+}
+
+
+/* ===========================================
+   LABEL
+   =========================================== */
+
+.ap-checkbox__label {
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+  user-select: none;
+}
+
+
+/* ===========================================
+   STATES
+   =========================================== */
+
+/* --- Hover (unchecked) — show ghost check --- */
+.ap-checkbox:hover:not(:disabled) .ap-checkbox__box {
+  border-color: var(--input-border-hover);
+}
+
+.ap-checkbox:hover:not(:disabled):not(.ap-checkbox--checked):not(.ap-checkbox--indeterminate) .ap-checkbox__box svg {
+  opacity: 1;
+}
+
+.ap-checkbox:hover:not(:disabled):not(.ap-checkbox--checked):not(.ap-checkbox--indeterminate) .ap-checkbox__box svg path {
+  fill: var(--text-secondary);
+}
+
+/* --- Checked --- */
+.ap-checkbox--checked .ap-checkbox__box {
+  background-color: var(--input-accent);
+  border-color: var(--input-accent);
+}
+
+.ap-checkbox--checked .ap-checkbox__box svg {
+  opacity: 1;
+}
+
+.ap-checkbox--checked .ap-checkbox__box svg path {
+  fill: var(--neutral-0);
+}
+
+/* --- Checked + Hover --- */
+.ap-checkbox--checked:hover:not(:disabled) .ap-checkbox__box {
+  background-color: var(--blue-60);
+  border-color: var(--blue-60);
+}
+
+/* --- Indeterminate + Hover --- */
+.ap-checkbox--indeterminate:hover:not(:disabled) .ap-checkbox__box {
+  border-color: var(--input-border-hover);
+}
+
+/* --- Focus --- */
+.ap-checkbox:focus-visible .ap-checkbox__box {
+  border-color: var(--input-border-hover);
+}
+
+.ap-checkbox--checked:focus-visible .ap-checkbox__box {
+  border-color: var(--input-accent);
+}
+
+/* --- Disabled --- */
+.ap-checkbox--disabled {
+  cursor: not-allowed;
+}
+
+.ap-checkbox--disabled .ap-checkbox__box {
+  border-color: var(--input-border-disabled);
+  background-color: var(--input-bg-disabled);
+}
+
+.ap-checkbox--disabled .ap-checkbox__label {
+  color: var(--text-disabled);
+}
+
+/* --- Checked + Disabled --- */
+.ap-checkbox--checked.ap-checkbox--disabled .ap-checkbox__box {
+  background-color: var(--input-accent-disabled);
+  border-color: var(--input-accent-disabled);
+}
+
+/* --- Indeterminate + Disabled --- */
+.ap-checkbox--indeterminate.ap-checkbox--disabled .ap-checkbox__indeterminate {
+  background-color: var(--input-accent-disabled);
+}
+
+
+/* ===========================================
+   CHECKBOX GROUP
+   Vertically stacked checkboxes
+   =========================================== */
+
+.ap-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}

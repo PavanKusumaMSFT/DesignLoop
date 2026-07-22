@@ -1,0 +1,21 @@
+{
+  "id": "design-to-code",
+  "name": "Design to Code",
+  "description": "Convert design specifications or Figma files into runnable Fluent UI React v9 prototypes in the shared Next.js prototype workspace.",
+  "stages": ["prototype"],
+  "agent": "design-to-code",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "component-spec", "required": false },
+    { "type": "artifact", "from": "wireframe-spec", "required": false },
+    { "type": "artifact", "from": "design-system-setup", "required": false }
+  ],
+  "outputs": [
+    "prototype-workspace/app/{taskId}/page.tsx",
+    "prototype-workspace/components/projects/{taskId}/index.tsx",
+    "prototype-workspace/components/projects/{taskId}/**/*.tsx",
+    "tasks/{taskId}/prototypes/manifest.md"
+  ],
+  "dependencies": ["design-system-setup"],
+  "required": true
+}

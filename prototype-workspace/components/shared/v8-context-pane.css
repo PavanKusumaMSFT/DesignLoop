@@ -1,0 +1,151 @@
+/* ===========================================
+   Context Pane
+   Right-side panel for forms, details, etc.
+   =========================================== */
+
+/* --- Context Pane Container --- */
+.ap-context-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--neutral-0);
+  border-left: 1px solid var(--neutral-30);
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-family);
+  box-sizing: border-box;
+}
+
+/* --- Size Variants --- */
+.ap-context-pane--narrow {
+  width: 315px;
+}
+
+.ap-context-pane--medium {
+  width: 585px;
+}
+
+.ap-context-pane--wide {
+  width: 855px;
+}
+
+.ap-context-pane--extra-wide {
+  width: 1125px;
+}
+
+/* --- Context Pane Header --- */
+.ap-context-pane__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--neutral-30);
+  flex-shrink: 0;
+}
+
+.ap-context-pane__header-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.ap-context-pane__title {
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line-height);
+  font-weight: var(--text-xl-weight);
+  color: var(--text-primary);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ap-context-pane__subtitle {
+  font-size: var(--text-s-size);
+  line-height: var(--text-s-line-height);
+  font-weight: var(--text-s-weight);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.ap-context-pane__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.ap-context-pane__close:hover {
+  background-color: var(--control-bg-hover);
+}
+
+.ap-context-pane__close:active {
+  background-color: var(--control-bg-pressed);
+}
+
+.ap-context-pane__close:focus-visible {
+  outline: 1px solid var(--neutral-160);
+  outline-offset: -1px;
+}
+
+.ap-context-pane__close svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* --- Context Pane Content --- */
+.ap-context-pane__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-md) var(--spacing-lg);
+}
+
+/* --- Context Pane Footer --- */
+.ap-context-pane__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-top: 1px solid var(--neutral-30);
+  flex-shrink: 0;
+}
+
+.ap-context-pane__footer-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.ap-context-pane__footer-link {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  color: var(--hyperlink-rest);
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+}
+
+.ap-context-pane__footer-link:hover {
+  color: var(--hyperlink-hover);
+  text-decoration: underline;
+}
+
+.ap-context-pane__footer-link svg {
+  width: 16px;
+  height: 16px;
+}

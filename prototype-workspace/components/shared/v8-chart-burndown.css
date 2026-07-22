@@ -1,0 +1,34 @@
+.ap-burndown-chart__svg {
+  width: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.ap-burndown-chart__line {
+  vector-effect: non-scaling-stroke;
+}
+
+.ap-burndown-chart__area {
+  pointer-events: none;
+}
+
+.ap-burndown-chart__target-line {
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.ap-burndown-chart__dot {
+  cursor: pointer;
+  transition: r var(--transition-fast);
+}
+
+.ap-burndown-chart__dot:hover {
+  r: 6;
+}
+
+.ap-burndown-chart__divider-line {
+  stroke: var(--neutral-100);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: none;
+}

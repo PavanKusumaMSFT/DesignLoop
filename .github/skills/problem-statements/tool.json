@@ -1,0 +1,16 @@
+{
+  "id": "problem-statements",
+  "name": "Problem Statements",
+  "description": "Write HMW problem statements grounded in research findings, each tied to a validated insight and a specific user segment.",
+  "stages": ["define"],
+  "agent": "problem-statements",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "findings-synthesis", "required": true }
+  ],
+  "outputs": [
+    "strategy/problem-statements.md"
+  ],
+  "dependencies": ["findings-synthesis"],
+  "required": true
+}

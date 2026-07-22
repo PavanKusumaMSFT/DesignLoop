@@ -1,0 +1,43 @@
+/* GhostTextCompletion — inline greyed prediction (State A). Tokens only. */
+
+.ghost {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-tight);
+  color: var(--color-ghost-text);
+  /* Share the command line baseline; must not shift the caret or reflow. */
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline;
+  transition: var(--motion-transition-fade);
+}
+
+.emphasis {
+  color: var(--color-ghost-text-emphasis);
+  font-weight: var(--font-weight-medium);
+}
+
+.continuation {
+  color: var(--color-ghost-text);
+}
+
+/* Visually hidden but announced by assistive tech. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ghost {
+    transition: none;
+  }
+}

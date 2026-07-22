@@ -1,0 +1,17 @@
+{
+  "id": "design-system-setup",
+  "name": "Design System Setup",
+  "description": "Document the Fluent UI React v9 theme choice, token usage guide, and optional Azure brand theme snippet for the prototype workspace.",
+  "stages": ["design"],
+  "agent": "design-system-setup",
+  "inputs": [
+    { "type": "task-description", "required": true }
+  ],
+  "outputs": [
+    "tasks/{taskId}/designs/tokens/fluent-theme.md",
+    "tasks/{taskId}/designs/tokens/token-usage-guide.md",
+    "tasks/{taskId}/designs/tokens/theme.ts"
+  ],
+  "dependencies": [],
+  "required": true
+}

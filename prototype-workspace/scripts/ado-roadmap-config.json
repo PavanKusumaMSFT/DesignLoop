@@ -1,0 +1,111 @@
+{
+  "_comment": "ADO → CIX Roadmap sync configuration. Edit this file to adjust org, area paths, and field mappings without touching the sync script.",
+
+  "ado": {
+    "organization": "msazure",
+    "project": "One",
+    "apiVersion": "7.0",
+    "workItemTypes": ["Feature", "Epic"],
+    "excludeStates": ["Closed", "Removed", "Cut"],
+    "maxResults": 500,
+
+    "_comment_areaRoot": "All work items UNDER this area path will be fetched. Uses ADO 'UNDER' operator.",
+    "areaRoot": "One\\IaaSExp"
+  },
+
+  "sources": {
+    "_comment": "STRICT include pattern: keep all queries disabled by default and drive sync from follow[]. This prevents accidental bulk import from area path/tag queries.",
+    "queries": [
+      {
+        "name": "Storage candidate discovery (DesignFullSupport)",
+        "enabled": false,
+        "areaPathUnder": "One\\IaaSExp\\Storage",
+        "workItemTypes": ["Feature", "Epic"],
+        "excludeStates": ["Closed", "Removed", "Cut"],
+        "includeTagsAny": [],
+        "includeTagsAll": ["DesignFullSupport"],
+        "maxResults": 500
+      },
+      {
+        "name": "Compute candidate discovery (DesignFullSupport)",
+        "enabled": false,
+        "areaPathUnder": "One\\IaaSExp\\Compute",
+        "workItemTypes": ["Feature", "Epic"],
+        "excludeStates": ["Closed", "Removed", "Cut"],
+        "includeTagsAny": [],
+        "includeTagsAll": ["DesignFullSupport"],
+        "maxResults": 500
+      }
+    ],
+    "follow": [
+      {
+        "_comment": "Follow list is the allow-list. Add only items that must appear in roadmap. ID or full URL both supported.",
+        "id": 31814,
+        "forceArea": "Storage"
+      },
+      {
+        "id": 116620,
+        "forceArea": "Compute"
+      }
+    ]
+  },
+
+  "_comment_areaPathMap": "Maps a roadmap area (Storage/Compute/AKS/Horizontal) to one or more substrings. An ADO item's System.AreaPath is checked with contains() against each substring. First match wins. Update these to match your actual ADO area path structure.",
+  "areaPathMap": {
+    "Storage": ["IaaSExp\\Storage", "\\Storage"],
+    "Compute": ["IaaSExp\\Compute", "\\Compute", "\\VM"],
+    "AKS": ["IaaSExp\\AKS", "\\AKS", "\\Kubernetes", "\\Container"],
+    "Horizontal": ["IaaSExp\\Horizontal", "\\Horizontal", "\\Platform", "\\Cross"]
+  },
+
+  "_comment_fallbackArea": "Area assigned when no areaPathMap entry matches. Set to null to skip unmatched items.",
+  "fallbackArea": null,
+
+  "fieldMap": {
+    "_comment": "ADO field reference names for each roadmap property. Change if your org uses different field names.",
+    "name":         "System.Title",
+    "assignee":     "System.AssignedTo",
+    "start":        "Microsoft.VSTS.Scheduling.StartDate",
+    "end":          "Microsoft.VSTS.Scheduling.TargetDate",
+    "status":       "System.State",
+    "priority":     "Microsoft.VSTS.Common.Priority",
+    "stakeholders": "System.Tags",
+    "size":         "Microsoft.VSTS.Scheduling.StoryPoints"
+  },
+
+  "assigneeFormat": "firstName",
+  "_comment_assigneeFormat": "How to render the assignee name. 'firstName' = first token of displayName. 'fullName' = full displayName. 'email' = account name portion of uniqueName.",
+
+  "priorityMap": {
+    "_comment": "ADO priority integers (1–4) → roadmap priority strings. Adjust labels as needed.",
+    "1": "P0",
+    "2": "P1",
+    "3": "P2",
+    "4": "P3"
+  },
+
+  "storyPointsSizeMap": {
+    "_comment": "ADO story points → roadmap size (S/M/L/XL). Items outside these bounds get ''.",
+    "1": "S",
+    "2": "S",
+    "3": "S",
+    "5": "M",
+    "8": "M",
+    "13": "L",
+    "20": "L",
+    "40": "XL",
+    "100": "XL"
+  },
+
+  "merge": {
+    "_comment": "Controls how the sync merges ADO data with the existing seed file.",
+    "syncKey": "link",
+    "_comment_syncKey": "'link' = match by ADO work item URL (recommended). Items without a link are treated as manual and never overwritten.",
+    "preserveManualFields": ["notes", "stakeholders"],
+    "_comment_preserveManualFields": "Fields that are never overwritten by ADO even when a matching link exists. Useful for hand-written notes.",
+    "appendNewItems": true,
+    "_comment_appendNewItems": "If true, ADO items with no matching seed entry are appended to the area array.",
+    "removeClosedItems": false,
+    "_comment_removeClosedItems": "If true, seed items whose ADO work item is now Closed/Removed will be deleted. Safer to leave false and handle manually."
+  }
+}

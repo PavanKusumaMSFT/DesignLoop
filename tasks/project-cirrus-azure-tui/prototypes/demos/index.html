@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Project Cirrus — Prototype Demos</title>
+  <link rel="stylesheet" href="../../designs/tokens/tokens.css" />
+  <link rel="stylesheet" href="cirrus-demo.css" />
+  <style>
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: var(--spacing-lg); max-width: 64rem; }
+    .card {
+      display: block; text-decoration: none;
+      padding: var(--spacing-lg);
+      background: var(--color-surface-overlay);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--border-radius-lg);
+      box-shadow: var(--elevation-1);
+    }
+    .card:hover { border-color: var(--color-border-focus); }
+    .card:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+    .card h2 { margin: 0 0 var(--spacing-2xs); font-size: var(--font-size-md); color: var(--color-param-flag); font-family: var(--font-family-mono); }
+    .card p { margin: 0; font-size: var(--font-size-xs); line-height: var(--line-height-relaxed); color: var(--color-text-secondary); }
+    .card .tag { display: inline-block; margin-top: var(--spacing-sm); font-family: var(--font-family-mono); font-size: var(--font-size-2xs); color: var(--color-text-muted); }
+  </style>
+</head>
+<body>
+  <div class="demo-topbar">
+    <div>
+      <h1 class="demo-title">Project Cirrus — Prototype Demos</h1>
+      <p class="demo-sub">Inline, non-modal Azure CLI intelligence layer · self-contained, no build step</p>
+    </div>
+    <div class="demo-controls">
+      <label class="demo-nav">theme
+        <select id="themeSel" aria-label="Theme">
+          <option value="dark">dark</option>
+          <option value="light">light</option>
+          <option value="high-contrast">high-contrast</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <p class="demo-note" style="margin-top:0;margin-bottom:var(--spacing-xl)">
+    Each demo is interactive and token-driven (colors/typography from
+    <code>designs/tokens/tokens.css</code>). Switch <strong>theme</strong> on any page to verify
+    contrast across dark / light / high-contrast, and toggle <strong>reduce motion</strong> to confirm
+    animations degrade to none. Keyboard: <code>↑↓</code> move · <code>Tab</code> accept ·
+    <code>Esc</code> exits · <code>Enter</code> is never hijacked.
+  </p>
+
+  <nav class="cards">
+    <a class="card" href="ghost-text.html">
+      <h2>A · Ghost Text</h2>
+      <p>Inline greyed prediction after the caret. Tab accepts; diverging keystroke clears; aria-live announces.</p>
+      <span class="tag">GhostTextCompletion · FR-1</span>
+    </a>
+    <a class="card" href="parameter-palette.html">
+      <h2>B · Parameter Palette</h2>
+      <p>Non-modal flag/enum listbox. Roving aria-activedescendant, required-first, never color-alone, no focus trap.</p>
+      <span class="tag">ParameterPalette · FR-2</span>
+    </a>
+    <a class="card" href="resource-lookup.html">
+      <h2>C · Resource Lookup</h2>
+      <p>Cached-first async list. Loading → resolved merge; timeout / unauth / empty free-text fallbacks.</p>
+      <span class="tag">ResourceLookupList · FR-3</span>
+    </a>
+    <a class="card" href="hint-line.html">
+      <h2>D · Hint Line</h2>
+      <p>One quiet, expert-neutral, dismissible hint. role=note, focusable dismiss, persistent disable.</p>
+      <span class="tag">HintLine · FR-4</span>
+    </a>
+    <a class="card" href="passthrough.html">
+      <h2>E · Non-az Passthrough</h2>
+      <p>Non-az token-0 suppresses every surface; Cirrus holds zero keybindings. Pipes pass through.</p>
+      <span class="tag">Suppressed · FR-5</span>
+    </a>
+    <a class="card" href="degraded-plain.html">
+      <h2>F · Degraded / Plain</h2>
+      <p>Capability cascade: rich → plain single-line advisory (F-1) → silent no-op in CI (F-2).</p>
+      <span class="tag">useCapability · FR-6</span>
+    </a>
+  </nav>
+
+  <script>
+    const root = document.documentElement;
+    root.setAttribute('data-theme', 'dark');
+    document.getElementById('themeSel').addEventListener('change', (e) =>
+      root.setAttribute('data-theme', e.target.value),
+    );
+  </script>
+</body>
+</html>

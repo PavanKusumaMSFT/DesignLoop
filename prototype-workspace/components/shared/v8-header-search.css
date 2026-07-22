@@ -1,0 +1,122 @@
+/* ===========================================
+   HEADER SEARCH COMPONENT
+   Search input styled for the Azure header bar
+   =========================================== */
+
+.ap-header-search {
+  /* Layout */
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  box-sizing: border-box;
+
+  /* Appearance - Rest state */
+  background-color: var(--header-search-bg-rest);
+  border: none;
+  border-radius: var(--radius-sm);
+  transition: 
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+
+/* ===========================================
+   INPUT FIELD
+   =========================================== */
+.ap-header-search__field {
+  /* Reset */
+  border: none;
+  background: transparent;
+  outline: none;
+  margin: 0;
+  
+  /* Layout */
+  flex: 1;
+  min-width: 0;
+  padding: 0 var(--spacing-sm);
+  height: 100%;
+  box-sizing: border-box;
+
+  /* Typography */
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-regular);
+  color: var(--header-search-text-rest);
+}
+
+/* Placeholder */
+.ap-header-search__field::placeholder {
+  color: var(--header-search-text-rest);
+}
+
+
+/* ===========================================
+   ICON
+   =========================================== */
+.ap-header-search__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  flex-shrink: 0;
+  pointer-events: none;
+  color: var(--header-search-icon-rest);
+}
+
+.ap-header-search__icon svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+/* Adjust field padding when icon present */
+.ap-header-search:has(.ap-header-search__icon) .ap-header-search__field {
+  padding-left: 0;
+}
+
+
+/* ===========================================
+   STATES
+   =========================================== */
+
+/* --- Focus state (input is focused) --- */
+.ap-header-search:focus-within {
+  background-color: var(--header-search-bg-focus);
+  box-shadow: inset 0 0 0 1px var(--header-search-border-focus);
+}
+
+.ap-header-search:focus-within .ap-header-search__field {
+  color: var(--header-search-text-focus);
+}
+
+.ap-header-search:focus-within .ap-header-search__field::placeholder {
+  color: var(--header-search-text-focus);
+}
+
+.ap-header-search:focus-within .ap-header-search__icon {
+  color: var(--header-search-icon-focus);
+}
+
+/* --- Open state (dropdown menu shown, input may not be focused) --- */
+.ap-header-search--open {
+  background-color: var(--header-search-bg-open);
+  box-shadow: none;
+}
+
+.ap-header-search--open .ap-header-search__field {
+  color: var(--header-search-text-focus);
+}
+
+.ap-header-search--open .ap-header-search__field::placeholder {
+  color: var(--header-search-text-focus);
+}
+
+.ap-header-search--open .ap-header-search__icon {
+  color: var(--header-search-icon-focus);
+}
+
+/* Open + Focus should still not show border */
+.ap-header-search--open:focus-within {
+  box-shadow: none;
+}

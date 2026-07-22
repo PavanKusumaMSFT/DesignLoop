@@ -1,0 +1,163 @@
+/* ===========================================
+   Query Tabs
+   Tab bar for query windows (e.g., Log Analytics)
+   =========================================== */
+
+/* --- Query Tab Bar Container --- */
+.ap-query-tab-bar {
+  display: flex;
+  align-items: flex-end;
+  font-family: var(--font-family);
+  background-color: var(--neutral-0);
+  height: 36px;
+}
+
+.ap-query-tab-bar__tabs {
+  display: flex;
+  align-items: flex-end;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ap-query-tab-bar__toolbar {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* --- New Tab Button --- */
+.ap-query-tab-bar__new-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-left: 1px solid var(--neutral-70);
+  background-color: transparent;
+  cursor: pointer;
+  color: var(--text-primary);
+  flex-shrink: 0;
+
+}
+
+.ap-query-tab-bar__new-tab:hover {
+  background-color: var(--control-bg-hover);
+}
+
+.ap-query-tab-bar__new-tab:active {
+  background-color: var(--control-bg-pressed);
+}
+
+.ap-query-tab-bar__new-tab:focus-visible {
+  outline: 1px solid var(--neutral-160);
+  outline-offset: -1px;
+}
+
+.ap-query-tab-bar__new-tab svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* --- Individual Query Tab --- */
+.ap-query-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 172px;
+  height: 36px;
+  padding: 0 var(--spacing-sm);
+  border: 1px solid var(--neutral-70);
+  background-color: var(--neutral-0);
+  cursor: pointer;
+  font-family: inherit;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  margin-right: -1px; /* Overlap borders */
+}
+
+.ap-query-tab:hover {
+  background-color: var(--control-bg-hover);
+}
+
+.ap-query-tab:active {
+  background-color: var(--control-bg-pressed);
+}
+
+.ap-query-tab:focus-visible {
+  outline: 1px solid var(--neutral-160);
+  outline-offset: -1px;
+  z-index: 1;
+}
+
+/* --- Selected State --- */
+.ap-query-tab--selected {
+  background-color: var(--neutral-0);
+  border-bottom-color: transparent;
+  z-index: 1;
+}
+
+.ap-query-tab--selected:hover {
+  background-color: var(--neutral-0);
+}
+
+/* --- Tab Icon --- */
+.ap-query-tab__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.ap-query-tab__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* --- Tab Title --- */
+.ap-query-tab__title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--body-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+/* --- Tab Close Button --- */
+.ap-query-tab__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+}
+
+.ap-query-tab__close:hover {
+  background-color: var(--neutral-30);
+  color: var(--text-primary);
+}
+
+.ap-query-tab__close:active {
+  background-color: var(--neutral-40);
+}
+
+.ap-query-tab__close svg {
+  width: 8px;
+  height: 8px;
+}

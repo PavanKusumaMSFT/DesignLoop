@@ -1,0 +1,253 @@
+.ap-button {
+  /* Layout */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  height: 24px;
+  padding: 0 var(--spacing-lg);
+  box-sizing: border-box;
+
+  /* Typography */
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-semibold);
+
+  /* Appearance */
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  position: relative;
+  transition: background-color var(--transition-fast), 
+              border-color var(--transition-fast),
+              color var(--transition-fast);
+}
+
+.ap-button:focus-visible {
+  outline: none;
+}
+
+.ap-button:disabled {
+  cursor: not-allowed;
+}
+
+/* Icon */
+.ap-button__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.ap-button__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Text label */
+.ap-button__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Has-icon modifier (structural hook for icon+text buttons) */
+.ap-button--has-icon { }
+
+/* Icon colors per variant - only override fill, SVGs from Figma use fill-based paths */
+.ap-button--primary .ap-button__icon svg path {
+  fill: var(--neutral-0);
+}
+
+.ap-button--secondary .ap-button__icon svg path {
+  fill: var(--neutral-160);
+}
+
+.ap-button--destructive .ap-button__icon svg path {
+  fill: var(--neutral-0);
+}
+
+/* Disabled icon colors */
+.ap-button:disabled .ap-button__icon svg path {
+  fill: var(--neutral-90);
+}
+
+/* ===========================================
+   PRIMARY VARIANT
+   =========================================== */
+.ap-button--primary {
+  background-color: var(--button-primary-bg-rest);
+  color: var(--button-primary-fg-rest);
+}
+
+.ap-button--primary:hover:not(:disabled) {
+  background-color: var(--button-primary-bg-hover);
+  color: var(--button-primary-fg-hover);
+}
+
+.ap-button--primary:active:not(:disabled) {
+  background-color: var(--button-primary-bg-pressed);
+  color: var(--button-primary-fg-pressed);
+}
+
+.ap-button--primary:focus-visible {
+  background-color: var(--button-primary-bg-focus);
+  color: var(--button-primary-fg-focus);
+  border-color: var(--button-primary-bg-focus);
+  box-shadow: 
+    0 0 0 1px var(--button-primary-focus-inner),
+    inset 0 0 0 1px var(--button-primary-focus-inner);
+}
+
+.ap-button--primary:disabled {
+  background-color: var(--button-primary-bg-disabled);
+  color: var(--button-primary-fg-disabled);
+}
+
+/* ===========================================
+   SECONDARY VARIANT
+   =========================================== */
+.ap-button--secondary {
+  background-color: var(--button-secondary-bg-rest);
+  color: var(--button-secondary-fg-rest);
+  border-color: var(--button-secondary-border-rest);
+}
+
+.ap-button--secondary:hover:not(:disabled) {
+  background-color: var(--button-secondary-bg-hover);
+  color: var(--button-secondary-fg-hover);
+  border-color: var(--button-secondary-border-hover);
+}
+
+.ap-button--secondary:active:not(:disabled) {
+  background-color: var(--button-secondary-bg-pressed);
+  color: var(--button-secondary-fg-pressed);
+  border-color: var(--button-secondary-border-pressed);
+}
+
+.ap-button--secondary:focus-visible {
+  background-color: var(--button-secondary-bg-focus);
+  color: var(--button-secondary-fg-focus);
+  border-color: var(--button-secondary-border-focus);
+  box-shadow: 
+    inset 0 0 0 1px var(--neutral-0),
+    inset 0 0 0 2px var(--button-secondary-focus-inner);
+}
+
+.ap-button--secondary:disabled {
+  background-color: var(--button-secondary-bg-disabled);
+  color: var(--button-secondary-fg-disabled);
+  border-color: transparent;
+}
+
+/* ===========================================
+   DESTRUCTIVE VARIANT
+   =========================================== */
+.ap-button--destructive {
+  background-color: var(--button-destructive-bg-rest);
+  color: var(--button-destructive-fg-rest);
+}
+
+.ap-button--destructive:hover:not(:disabled) {
+  background-color: var(--button-destructive-bg-hover);
+  color: var(--button-destructive-fg-hover);
+}
+
+.ap-button--destructive:active:not(:disabled) {
+  background-color: var(--button-destructive-bg-pressed);
+  color: var(--button-destructive-fg-pressed);
+}
+
+.ap-button--destructive:focus-visible {
+  background-color: var(--button-destructive-bg-focus);
+  color: var(--button-destructive-fg-focus);
+  border-color: var(--button-destructive-bg-focus);
+  box-shadow: 
+    0 0 0 1px var(--button-destructive-focus-inner),
+    inset 0 0 0 1px var(--button-destructive-focus-inner);
+}
+
+.ap-button--destructive:disabled {
+  background-color: var(--button-destructive-bg-disabled);
+  color: var(--button-destructive-fg-disabled);
+}
+
+/* ===========================================
+   ICON VARIANT (header toolbar style)
+   Icon-only button for headers and toolbars on blue background
+   =========================================== */
+.ap-button--icon {
+  background-color: var(--button-icon-bg-rest);
+  border-color: transparent;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  color: var(--button-icon-fg-rest);
+}
+
+.ap-button--icon .ap-button__icon {
+  color: var(--button-icon-fg-rest);
+}
+
+.ap-button--icon .ap-button__icon svg path {
+  fill: var(--button-icon-fg-rest);
+}
+
+.ap-button--icon:hover:not(:disabled) {
+  background-color: var(--button-icon-bg-hover);
+  color: var(--button-icon-fg-hover);
+}
+
+.ap-button--icon:hover:not(:disabled) .ap-button__icon {
+  color: var(--button-icon-fg-hover);
+}
+
+.ap-button--icon:hover:not(:disabled) .ap-button__icon svg path {
+  fill: var(--button-icon-fg-hover);
+}
+
+.ap-button--icon:active:not(:disabled) {
+  background-color: var(--button-icon-bg-pressed);
+  color: var(--button-icon-fg-pressed);
+}
+
+.ap-button--icon:active:not(:disabled) .ap-button__icon {
+  color: var(--button-icon-fg-pressed);
+}
+
+.ap-button--icon:active:not(:disabled) .ap-button__icon svg path {
+  fill: var(--button-icon-fg-pressed);
+}
+
+.ap-button--icon:focus-visible {
+  background-color: var(--button-icon-bg-focus);
+  color: var(--button-icon-fg-focus);
+  box-shadow: inset 0 0 0 1px var(--button-icon-focus-border);
+}
+
+.ap-button--icon:disabled {
+  background-color: var(--button-icon-bg-disabled);
+  color: var(--button-icon-fg-disabled);
+  opacity: 0.5;
+}
+
+.ap-button--icon:disabled .ap-button__icon svg path {
+  fill: var(--button-icon-fg-disabled);
+}
+
+/* Selected state (toggle on) */
+.ap-button--icon.ap-button--selected {
+  background-color: var(--button-icon-bg-selected);
+  color: var(--button-icon-fg-selected);
+}
+
+.ap-button--icon.ap-button--selected .ap-button__icon {
+  color: var(--button-icon-fg-selected);
+}
+
+.ap-button--icon.ap-button--selected .ap-button__icon svg path {
+  fill: var(--button-icon-fg-selected);
+}

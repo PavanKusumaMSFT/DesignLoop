@@ -1,0 +1,1 @@
+This document appears to be Microsoft Rights Management / sensitivity-label protected. The uploaded file content is encrypted and cannot be extracted directly by the local bridge. Open the file in Microsoft Word with the authorized account and export an unprotected copy, or attach readable source text instead.

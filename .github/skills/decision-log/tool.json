@@ -1,0 +1,16 @@
+{
+  "id": "decision-log",
+  "name": "Decision Log",
+  "description": "Record key design decisions, the rationale behind each, alternatives considered, and the risks accepted.",
+  "stages": ["ideate"],
+  "agent": "decision-log",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "concept-evaluation", "required": true }
+  ],
+  "outputs": [
+    "ideation/decision-log.md"
+  ],
+  "dependencies": ["concept-evaluation"],
+  "required": false
+}

@@ -1,0 +1,1 @@
+{"error":"Session expired for provider \"microsoft\". Call /api/sessions/login to re-authenticate.","code":"SESSION_EXPIRED","hint":"POST /api/sessions/login with {\"provider\":\"microsoft\",\"targetUrl\":\"https://hits.microsoft.com/study/6047768\"} to re-authenticate."}

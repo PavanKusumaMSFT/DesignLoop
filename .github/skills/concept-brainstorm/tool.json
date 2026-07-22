@@ -1,0 +1,16 @@
+{
+  "id": "concept-brainstorm",
+  "name": "Concept Brainstorm",
+  "description": "Generate a wide, divergent set of solution concepts for each HMW question, spanning conventional and speculative approaches.",
+  "stages": ["ideate"],
+  "agent": "concept-brainstorm",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "hmw-reframing", "required": true }
+  ],
+  "outputs": [
+    "ideation/concepts.md"
+  ],
+  "dependencies": ["hmw-reframing"],
+  "required": true
+}

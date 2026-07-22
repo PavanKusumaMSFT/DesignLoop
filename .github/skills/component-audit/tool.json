@@ -1,0 +1,23 @@
+{
+  "id": "component-audit",
+  "name": "Component Audit",
+  "description": "Audit a Fluent prototype page or component for design system violations, missed shared component reuse, and Fluent Copilot misuse without modifying code.",
+  "stages": [
+    "prototype"
+  ],
+  "agent": "component-audit",
+  "inputs": [
+    {
+      "type": "target-reference",
+      "required": true,
+      "description": "Target file or component under prototype-workspace/ to audit"
+    }
+  ],
+  "outputs": [
+    "tasks/{taskId}/prototypes/audit-{component}.md"
+  ],
+  "dependencies": [
+    "design-to-code"
+  ],
+  "required": false
+}

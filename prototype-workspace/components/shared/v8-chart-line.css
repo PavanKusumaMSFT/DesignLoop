@@ -1,0 +1,20 @@
+.ap-line-chart__svg {
+  width: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.ap-line-chart__line {
+  vector-effect: non-scaling-stroke;
+}
+
+.ap-line-chart__dot {
+  cursor: pointer;
+  stroke: var(--neutral-0);
+  stroke-width: 2;
+  transition: r var(--transition-fast);
+}
+
+.ap-line-chart__dot:hover {
+  r: 6;
+}

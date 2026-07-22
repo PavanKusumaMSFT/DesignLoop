@@ -1,0 +1,16 @@
+{
+  "tests": [
+    {
+      "project": "all-services",
+      "password": "portal7kx",
+      "branch": "usertest/all-services",
+      "prNumber": 63,
+      "slotUrl": "https://black-meadow-0b77efc10-63.centralus.7.azurestaticapps.net/all-services/",
+      "label": "User Test: all-services",
+      "active": true,
+      "expiresAt": "2026-05-01T00:00:00Z",
+      "createdAt": "2026-04-22T05:34:00Z"
+    }
+  ],
+  "generatedAt": "2026-04-22T06:55:00Z"
+}

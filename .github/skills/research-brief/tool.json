@@ -1,0 +1,15 @@
+{
+  "id": "research-brief",
+  "name": "Research Brief",
+  "description": "Write a structured research brief scoping goals, questions, methods, and success criteria for a design research effort.",
+  "stages": ["discover"],
+  "agent": "research-brief",
+  "inputs": [
+    { "type": "task-description", "required": true }
+  ],
+  "outputs": [
+    "research/research-brief.md"
+  ],
+  "dependencies": [],
+  "required": true
+}

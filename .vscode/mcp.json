@@ -47,18 +47,21 @@
     {
       "id": "microsoftTenantId",
       "type": "promptString",
-      "description": "Microsoft 365 Tenant ID for Graph API"
+      "description": "Microsoft 365 Tenant ID for Graph API",
+      "default": "e097a1a8-9530-459c-8a0d-223079a3e176"
     },
     {
       "id": "microsoftClientId",
       "type": "promptString",
-      "description": "Microsoft 365 App Client ID for Graph API"
+      "description": "Microsoft 365 App Client ID for Graph API",
+      "default": "5P58Q~yst4ji5Ejq2MWFayeoFUi~xY4FW0T-KbYb"
     },
     {
       "id": "microsoftClientSecret",
       "type": "promptString",
       "description": "Microsoft 365 App Client Secret for Graph API",
-      "password": true
+      "password": true,
+      "default": "5a3754a0-1e0e-4011-b06f-76acfb04b68e"
     },
     {
       "id": "storybookUrl",

@@ -1,0 +1,157 @@
+/* Critical CSS to prevent FOUC */
+/* v8 (classic blade) design system — CSS custom properties used by every v8-* component.
+   Each v8 component TSX imports its own sibling .css, so no per-component @imports needed. */
+@import "../styles/v8-tokens.css";
+
+html {
+  background: #ffffff;
+  min-height: 100vh;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: inherit;
+  font-family:
+    "Segoe UI",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+}
+
+/* Reset form elements to inherit body font (replaces Tailwind preflight) */
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+}
+
+/* Embedded popup mode — override full-height defaults */
+html.embedded-popup,
+html.embedded-popup body {
+  min-height: 0 !important;
+  height: auto !important;
+  background: none !important;
+}
+
+/* Loading state for initial page load */
+.loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  transition: opacity 0.3s ease-out;
+}
+
+.loading-screen-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e2e8f0;
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Hide content until styles are loaded */
+.content-hidden {
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.content-visible {
+  opacity: 1;
+}
+
+:root {
+  --nav-docked-offset: 0px;
+}
+
+/* Nav docked offset */
+body {
+  margin-left: var(--nav-docked-offset, 0px);
+  transition: margin-left 0.2s ease;
+}
+
+/* Error boundary styles — must be global CSS (renders outside FluentProvider) */
+.error-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  text-align: center;
+}
+
+.error-page-inline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: 24px;
+  text-align: center;
+}
+
+.error-page h2 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.error-page-inline h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.error-page p,
+.error-page-inline p {
+  color: #616161;
+  margin-bottom: 24px;
+}
+
+.error-page button,
+.error-page-inline button {
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.error-page button {
+  background-color: #0078d4;
+  color: white;
+  border: none;
+}
+
+.error-page-inline button {
+  background-color: white;
+  border: 1px solid #d1d1d1;
+}

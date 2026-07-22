@@ -1,0 +1,16 @@
+{
+  "id": "implementation-guide",
+  "name": "Implementation Guide",
+  "description": "Write the step-by-step developer implementation guide: setup, component integration, token application, and common patterns.",
+  "stages": ["deliver"],
+  "agent": "implementation-guide",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "component-spec", "required": true }
+  ],
+  "outputs": [
+    "handoff/implementation-guide.md"
+  ],
+  "dependencies": ["component-spec"],
+  "required": true
+}

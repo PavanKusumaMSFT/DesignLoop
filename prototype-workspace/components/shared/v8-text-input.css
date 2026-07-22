@@ -1,0 +1,163 @@
+/* ===========================================
+   TEXT INPUT COMPONENT
+   Standard and multiline text inputs with icon support
+   =========================================== */
+
+.ap-text-input {
+  /* Layout - wrapper creates the visual border/background */
+  display: inline-flex;
+  align-items: flex-start;
+  position: relative;
+  box-sizing: border-box;
+
+  /* Appearance */
+  background-color: var(--input-bg-rest);
+  border: 1px solid var(--input-border-rest);
+  border-radius: var(--radius-sm);
+  transition: 
+    border-color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+/* Standard variant - fixed height */
+.ap-text-input--standard {
+  height: 24px;
+  align-items: center;
+  padding: 0 0 1px 0;
+}
+
+/* Multiline variant - flexible height */
+.ap-text-input--multiline {
+  min-height: 60px;
+  padding: 2px 0;
+}
+
+
+/* ===========================================
+   INPUT FIELD
+   =========================================== */
+.ap-text-input__field {
+  /* Reset */
+  border: none;
+  background: transparent;
+  outline: none;
+  margin: 0;
+  
+  /* Layout */
+  flex: 1;
+  min-width: 0;
+  padding: 0 var(--spacing-sm);
+  box-sizing: border-box;
+
+  /* Typography */
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+}
+
+/* Standard variant field */
+.ap-text-input--standard .ap-text-input__field {
+  height: 100%;
+}
+
+/* Multiline variant field */
+.ap-text-input--multiline .ap-text-input__field {
+  resize: vertical;
+  min-height: 44px;
+}
+
+/* Placeholder */
+.ap-text-input__field::placeholder {
+  color: var(--text-secondary);
+}
+
+
+/* ===========================================
+   ICONS
+   =========================================== */
+.ap-text-input__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 24px;
+  flex-shrink: 0;
+  pointer-events: none;
+  color: var(--input-icon-rest);
+}
+
+/* Multiline icon alignment - top aligned */
+.ap-text-input--multiline .ap-text-input__icon {
+  height: auto;
+  padding-top: 1px;
+}
+
+/* Default icon size - !important to override SVG width/height attributes */
+.ap-text-input__icon svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+/* Icon position modifiers (semantic hooks) */
+.ap-text-input__icon--start { }
+.ap-text-input__icon--end { }
+
+/* Adjust padding when icons present */
+.ap-text-input--has-icon-start .ap-text-input__field {
+  padding-left: 0;
+}
+
+.ap-text-input--has-icon-end .ap-text-input__field {
+  padding-right: 0;
+}
+
+
+/* ===========================================
+   STATES
+   =========================================== */
+
+/* --- Hover --- */
+.ap-text-input:hover:not(.ap-text-input--disabled):not(.ap-text-input--error) {
+  border-color: var(--input-border-hover);
+}
+
+/* --- Focus --- */
+.ap-text-input:focus-within:not(.ap-text-input--disabled):not(.ap-text-input--error) {
+  border-color: var(--input-border-focus);
+  box-shadow: inset 0 0 0 1px var(--input-border-focus);
+}
+
+/* --- Disabled --- */
+.ap-text-input--disabled {
+  background-color: var(--input-bg-disabled);
+  border-color: var(--input-border-disabled);
+  cursor: not-allowed;
+}
+
+.ap-text-input--disabled .ap-text-input__field {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+.ap-text-input--disabled .ap-text-input__field::placeholder {
+  color: var(--text-disabled);
+}
+
+.ap-text-input--disabled .ap-text-input__icon {
+  color: var(--text-disabled);
+}
+
+/* --- Error --- */
+.ap-text-input--error {
+  border-color: var(--input-border-error);
+}
+
+.ap-text-input--error:hover {
+  border-color: var(--input-border-error);
+}
+
+.ap-text-input--error:focus-within {
+  border-color: var(--input-border-error);
+}

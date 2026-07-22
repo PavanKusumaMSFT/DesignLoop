@@ -1,0 +1,15 @@
+{
+  "id": "web-fetch",
+  "name": "Web Fetch",
+  "description": "Fetch and read web content from any URL — public pages or authenticated Microsoft portals. Returns clean markdown suitable for analysis.",
+  "stages": ["discover", "define", "ideate", "design", "prototype", "test", "deliver"],
+  "agent": "web-fetch",
+  "inputs": [
+    { "type": "user-prompt", "required": true, "description": "URL(s) to fetch" }
+  ],
+  "outputs": [
+    "research/web/{slug}.md"
+  ],
+  "dependencies": [],
+  "required": false
+}

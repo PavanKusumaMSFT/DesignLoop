@@ -1,0 +1,123 @@
+/* ===========================================
+   Copilot Toast Stack — Styles
+   Positioned container + collapsed / expanded
+   =========================================== */
+
+/* ---- Fixed container ---- */
+
+.ap-copilot-toast-stack {
+  position: fixed;
+  top: 48px;
+  right: var(--spacing-xl);
+  z-index: 1000;
+  width: var(--copilot-toast-width);
+  pointer-events: none;
+}
+
+.ap-copilot-toast-stack--has-toasts {
+  pointer-events: auto;
+}
+
+/* ---- Contained mode (absolute within positioned ancestor) ---- */
+
+.ap-copilot-toast-stack--contained {
+  position: absolute;
+}
+
+/* ---- Collapsed stack ---- */
+
+.ap-copilot-toast-stack__cards--collapsed {
+  position: relative;
+  cursor: pointer;
+}
+
+/* Stacked card positioning via inline styles in component. */
+
+.ap-copilot-toast-stack__item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  transition-property: transform, width, margin;
+  transition-duration:
+    var(--copilot-toast-stack-slide-duration),
+    var(--copilot-toast-stack-narrow-duration),
+    var(--copilot-toast-stack-narrow-duration);
+  transition-timing-function: ease-in-out;
+  transition-delay:
+    0ms,
+    var(--copilot-toast-stack-narrow-delay),
+    var(--copilot-toast-stack-narrow-delay);
+}
+
+/* The top card is relative so the container has height */
+.ap-copilot-toast-stack__item--top {
+  position: relative;
+}
+
+/* ---- Hover spread effect ---- */
+.ap-copilot-toast-stack__cards--collapsed:hover .ap-copilot-toast-stack__item--1 {
+  transform: translateY(12px) !important;
+}
+.ap-copilot-toast-stack__cards--collapsed:hover .ap-copilot-toast-stack__item--2 {
+  transform: translateY(24px) !important;
+}
+
+/* ---- Expanded list ---- */
+
+.ap-copilot-toast-stack__cards--expanded {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  max-height: calc(100vh - 72px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* Padding gives glow room to breathe; negative margin keeps cards aligned */
+  padding: var(--spacing-md) var(--spacing-md) var(--spacing-md) 26px;
+  margin: calc(-1 * var(--spacing-md));
+  padding-bottom: var(--spacing-md);
+  /* Thin scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: var(--neutral-60) transparent;
+}
+
+.ap-copilot-toast-stack__cards--expanded::-webkit-scrollbar {
+  width: 4px;
+}
+
+.ap-copilot-toast-stack__cards--expanded::-webkit-scrollbar-thumb {
+  background: var(--neutral-60);
+  border-radius: var(--radius-sm);
+}
+
+.ap-copilot-toast-stack__cards--expanded .ap-copilot-toast-stack__item {
+  position: relative;
+  width: 100%;
+  transform: none;
+  margin-left: 0;
+}
+
+.ap-copilot-toast-stack__cards--expanded .ap-copilot-toast {
+  width: 100%;
+}
+
+/* ---- Stack count badge ---- */
+
+.ap-copilot-toast-stack__count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  z-index: 1;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  padding: 0 5px;
+  background: var(--copilot-toast-gradient-end);
+  color: var(--neutral-0);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}

@@ -1,0 +1,83 @@
+/* ===========================================
+   COPILOT BUTTON
+   
+   Follows Button component patterns for potential extraction.
+   If merged into Button, these styles would become:
+   .ap-button--copilot { ... }
+   =========================================== */
+
+.ap-copilot-button {
+  /* Layout */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  height: 26px;
+  padding: 0 var(--spacing-sm);
+  box-sizing: border-box;
+
+  /* Typography */
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-semibold);
+
+  /* Appearance */
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--button-copilot-border-rest);
+  background-color: var(--button-copilot-bg-rest);
+  color: var(--button-copilot-fg-rest);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), 
+              border-color var(--transition-fast),
+              color var(--transition-fast);
+}
+
+.ap-copilot-button:hover:not(:disabled) {
+  background-color: var(--button-copilot-bg-hover);
+  border-color: var(--button-copilot-border-hover);
+  color: var(--button-copilot-fg-hover);
+}
+
+.ap-copilot-button:active:not(:disabled) {
+  background-color: var(--button-copilot-bg-pressed);
+  border-color: var(--button-copilot-border-pressed);
+  color: var(--button-copilot-fg-pressed);
+}
+
+.ap-copilot-button:focus-visible {
+  outline: none;
+  background-color: var(--button-copilot-bg-focus);
+  border-color: var(--button-copilot-border-focus);
+  color: var(--button-copilot-fg-focus);
+  box-shadow: 
+    inset 0 0 0 1px var(--neutral-0),
+    inset 0 0 0 2px var(--button-copilot-focus-inner);
+}
+
+.ap-copilot-button:disabled {
+  cursor: not-allowed;
+  background-color: var(--button-copilot-bg-disabled);
+  color: var(--button-copilot-fg-disabled);
+  border-color: transparent;
+}
+
+/* Icon */
+.ap-copilot-button__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.ap-copilot-button__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Text */
+.ap-copilot-button__text {
+  /* Inherits font styles from parent */
+}

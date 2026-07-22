@@ -1,0 +1,18 @@
+{
+  "id": "storybook-stories",
+  "name": "Storybook Stories",
+  "description": "Write Fluent UI React v9 CSF3 stories in the prototype workspace covering all component variants, states, and accessibility annotations.",
+  "stages": ["prototype"],
+  "agent": "storybook-stories",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "design-to-code", "required": true }
+  ],
+  "outputs": [
+    "prototype-workspace/components/projects/{taskId}/*.stories.tsx",
+    "prototype-workspace/components/shared/*.stories.tsx",
+    "tasks/{taskId}/prototypes/manifest.md"
+  ],
+  "dependencies": ["design-to-code"],
+  "required": false
+}

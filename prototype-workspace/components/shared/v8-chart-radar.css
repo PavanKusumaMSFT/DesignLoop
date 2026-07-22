@@ -1,0 +1,40 @@
+.ap-radar-chart__svg {
+  width: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.ap-radar-chart__grid {
+  fill: none;
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+
+.ap-radar-chart__spoke {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+
+.ap-radar-chart__polygon {
+  transition: opacity var(--transition-fast);
+}
+
+.ap-radar-chart__dot {
+  cursor: pointer;
+  transition: r var(--transition-fast);
+}
+
+.ap-radar-chart__dot:hover {
+  r: 6;
+}
+
+.ap-radar-chart__axis-icon {
+  overflow: visible;
+  cursor: default;
+}
+
+.ap-radar-chart__axis-icon svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}

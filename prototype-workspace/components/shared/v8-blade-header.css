@@ -1,0 +1,167 @@
+/* ===========================================
+   BladeHeader
+   Header bar for Azure portal blades/panels
+   =========================================== */
+
+.ap-blade-header {
+  display: flex;
+  align-items: center;
+  height: 64px;
+  width: 100%;
+  padding: 0 var(--spacing-md);
+  box-sizing: border-box;
+  font-family: var(--font-family);
+  background-color: var(--neutral-0);
+}
+
+/* --- Icon --- */
+.ap-blade-header__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  margin-right: var(--spacing-sm);
+}
+
+.ap-blade-header__icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+/* --- Content Stack (title row + subtitle) --- */
+.ap-blade-header__content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  flex: 1;
+}
+
+/* --- Title Row --- */
+.ap-blade-header__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+/* --- Title --- */
+.ap-blade-header__title {
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line-height);
+  font-weight: var(--text-xl-weight);
+  color: var(--text-primary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Divider --- */
+.ap-blade-header__divider {
+  width: 1px;
+  height: 24px;
+  background-color: var(--neutral-110);
+  flex-shrink: 0;
+}
+
+/* --- Menu Item Name --- */
+.ap-blade-header__menu-name {
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line-height);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Action Icons (pin, star, ellipsis) --- */
+.ap-blade-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-left: var(--spacing-sm);
+}
+
+.ap-blade-header__action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}
+
+.ap-blade-header__action:hover {
+  background-color: var(--neutral-20);
+}
+
+.ap-blade-header__action:focus-visible {
+  outline: 1px solid var(--focus-outline);
+  outline-offset: 1px;
+}
+
+.ap-blade-header__action svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ap-blade-header__action svg path {
+  fill: var(--text-primary);
+}
+
+/* --- Subtitle (always rendered to keep title position consistent) --- */
+.ap-blade-header__subtitle {
+  font-size: var(--text-s-size);
+  line-height: var(--text-s-line-height);
+  font-weight: var(--text-s-weight);
+  color: var(--text-secondary);
+  margin: 0;
+  min-height: var(--text-s-line-height);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Close Button (far right) --- */
+.ap-blade-header__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.ap-blade-header__close:hover {
+  background-color: var(--neutral-20);
+}
+
+.ap-blade-header__close:focus-visible {
+  outline: 1px solid var(--focus-outline);
+  outline-offset: 1px;
+}
+
+.ap-blade-header__close svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ap-blade-header__close svg path {
+  fill: var(--text-primary);
+}

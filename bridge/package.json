@@ -1,0 +1,22 @@
+{
+  "name": "designloop-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local bridge that serves the DesignLoop site and runs the GitHub Copilot CLI headlessly so agent work can be triggered and watched from the website.",
+  "main": "server.js",
+  "type": "commonjs",
+  "dependencies": {
+    "fast-xml-parser": "^4.5.0",
+    "jszip": "^3.10.1",
+    "mammoth": "^1.8.0",
+    "pdf-parse": "^1.1.1",
+    "word-extractor": "^1.0.4",
+    "xlsx": "^0.18.5"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

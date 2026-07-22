@@ -46,7 +46,7 @@ if [[ -f "$FILE_PATH" ]]; then
 fi
 
 # Check if the file is in an expected output directory
-ALLOWED_DIRS="research/|strategy/|ideation/|designs/|prototypes/|tests/|handoff/"
+ALLOWED_DIRS="research/|strategy/|ideation/|designs/|prototypes/|tests/|handoff/|prototype-workspace/"
 
 if echo "$FILE_PATH" | grep -qE "($ALLOWED_DIRS)"; then
   exit 0

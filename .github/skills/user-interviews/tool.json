@@ -1,0 +1,17 @@
+{
+  "id": "user-interviews",
+  "name": "User Interviews",
+  "description": "Plan, script, and synthesise user interview findings including a discussion guide and thematic synthesis.",
+  "stages": ["discover"],
+  "agent": "user-interviews",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "research-brief", "required": true }
+  ],
+  "outputs": [
+    "research/user-interviews/guide.md",
+    "research/user-interviews/synthesis.md"
+  ],
+  "dependencies": ["research-brief"],
+  "required": false
+}

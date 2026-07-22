@@ -125,27 +125,57 @@ const TASKS = [
       },
     ]
   },
+  {
+    id: 'design-loop-landing-page',
+    dir: 'tasks',
+    title: 'Design Loop Landing Page',
+    description: 'Usability and accessibility evaluation of the Design Loop marketing landing page.',
+    source: 'design-loop-landing-page-tenets-traps-r1-v2.md',
+    phases: [
+      { id: 'discover', label: 'Discover', files: [] },
+      { id: 'define', label: 'Define', files: [] },
+      { id: 'ideate', label: 'Ideate', files: [] },
+      { id: 'design', label: 'Design', files: [] },
+      { id: 'prototype', label: 'Prototype', files: [], components: [] },
+      {
+        id: 'test',
+        label: 'Test',
+        files: [
+          { path: 'design-loop-landing-page-tenets-traps-r1.md', label: 'Tenets & Traps Evaluation (R1 — prior)' },
+          { path: 'design-loop-landing-page-tenets-traps-r1-v2.md', label: 'Tenets & Traps Evaluation (R1)' },
+          { path: 'design-loop-landing-page-accessibility-audit.md', label: 'Accessibility Audit (prior)' },
+          { path: 'design-loop-landing-page-accessibility-audit-v2.md', label: 'Accessibility Audit' },
+          { path: 'design-loop-landing-page-usability-test-plan.md', label: 'Usability Test Plan' },
+        ]
+      },
+      { id: 'deliver', label: 'Deliver', files: [] },
+    ]
+  },
   // ────────────────────────────────────────────────────────────────
   // ADD NEW TASKS HERE:
-  //
-  // {
-  //   id: 'my-new-project',
-  //   dir: 'tasks/my-new-project',
-  //   title: 'My New Project',
-  //   description: 'Short description of the project.',
-  //   source: 'research/my-research-brief.md',
-  //   phases: [
-  //     {
-  //       id: 'discover',
-  //       label: 'Discover',
-  //       files: [
-  //         { path: 'research/my-research-brief.md', label: 'Research Brief' },
-  //       ]
-  //     },
-  //     ...
-  //   ]
-  // },
   // ────────────────────────────────────────────────────────────────
+  {
+    id: 'cli-walkthrough',
+    dir: 'tasks/cli-walkthrough',
+    title: 'CLI Walkthrough',
+    description: 'Tenets & Traps usability evaluation of the Project Cirrus AI-assisted Azure CLI walkthrough (Figma prototype).',
+    source: 'tests/usability/tenets-traps-evaluation-r1.md',
+    phases: [
+      { id: 'discover', label: 'Discover', files: [] },
+      { id: 'define', label: 'Define', files: [] },
+      { id: 'ideate', label: 'Ideate', files: [] },
+      { id: 'design', label: 'Design', files: [] },
+      { id: 'prototype', label: 'Prototype', files: [], components: [] },
+      {
+        id: 'test',
+        label: 'Test',
+        files: [
+          { path: 'tests/usability/tenets-traps-evaluation-r1.md', label: 'Tenets & Traps Evaluation (R1)' },
+        ]
+      },
+      { id: 'deliver', label: 'Deliver', files: [] },
+    ]
+  },
 ];
 
 /* =================================================================
@@ -155,6 +185,19 @@ let activeFile = null;
 let collapsedPhases = {};
 let currentTaskId = null;
 let ROUTING = false; // true while rendering from a URL route (suppresses pushState)
+const TASK_SOURCE_ARTIFACTS_KEY = 'dl-task-source-artifacts-v1';
+
+function loadTaskSourceArtifacts() {
+  try {
+    const raw = localStorage.getItem(TASK_SOURCE_ARTIFACTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+let TASK_SOURCE_ARTIFACTS = loadTaskSourceArtifacts();
 
 /* =================================================================
    HELPERS
@@ -164,6 +207,70 @@ function getTask(taskId) {
 }
 function fullPath(task, p) {
   return task && task.dir ? task.dir + '/' + p : p;
+}
+
+function normalizeSourceArtifact(item) {
+  if (!item || typeof item !== 'object') return null;
+  const label = String(item.label || '').trim();
+  const value = String(item.value || '').trim();
+  const type = String(item.type || 'document').trim().toLowerCase();
+  if (!label && !value) return null;
+  return { type, label: label || 'Source', value };
+}
+
+function sourceArtifactsForTask(task) {
+  if (!task) return [];
+  const merged = [];
+  const seen = new Set();
+  const fromTask = Array.isArray(task.sourceArtifacts) ? task.sourceArtifacts : [];
+  const fromStore = Array.isArray(TASK_SOURCE_ARTIFACTS[task.id]) ? TASK_SOURCE_ARTIFACTS[task.id] : [];
+  for (const raw of [...fromTask, ...fromStore]) {
+    const n = normalizeSourceArtifact(raw);
+    if (!n) continue;
+    const key = `${n.type}|${n.label}|${n.value}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(n);
+  }
+  return merged;
+}
+
+function persistTaskSourceArtifacts(taskId, sourceArtifacts) {
+  if (!taskId || !Array.isArray(sourceArtifacts) || !sourceArtifacts.length) return;
+  const cleaned = sourceArtifacts.map(normalizeSourceArtifact).filter(Boolean);
+  if (!cleaned.length) return;
+  TASK_SOURCE_ARTIFACTS[taskId] = cleaned;
+  try { localStorage.setItem(TASK_SOURCE_ARTIFACTS_KEY, JSON.stringify(TASK_SOURCE_ARTIFACTS)); } catch { /* ignore */ }
+  const task = getTask(taskId);
+  if (task) task.sourceArtifacts = cleaned;
+}
+
+function captureComposerSourceArtifacts() {
+  return HOME_SOURCES.map((s) => {
+    if (s.type === 'link') {
+      return { type: 'link', label: 'Link / URL', value: String(s.value || '').trim() };
+    }
+    // For uploaded files, show the file name as the source value (not inline file contents).
+    return { type: 'file', label: 'Uploaded file', value: String(s.label || '').trim() || String(s.value || '').trim() };
+  }).filter(x => x.value);
+}
+
+function runtimeComposerSourceArtifacts() {
+  return HOME_SOURCES.map((s) => {
+    if (s.type === 'link') {
+      const value = String(s.value || '').trim();
+      if (!value) return null;
+      return { type: 'link', label: String(s.label || 'Link / URL'), value };
+    }
+    const label = String(s.label || '').trim() || 'attachment';
+    const item = { type: 'file', label, value: label };
+    if (s.content && s.encoding) {
+      item.content = s.content;
+      item.encoding = s.encoding;
+      item.mime = s.mime || 'application/octet-stream';
+    }
+    return item;
+  }).filter(Boolean);
 }
 
 /* Monochrome inline SVG icon set (stroke = currentColor) */
@@ -205,10 +312,85 @@ const TOOLS = [
     id: 'security-audit',
     name: 'Security Audit',
     icon: 'shield',
-    status: 'soon',
+    status: 'active',
     agent: '@Security Auditor',
     blurb: 'Audit designs and prototypes against the Microsoft Secure Future Initiative (SFI) framework, with supporting SBD pattern detection and OWASP design-phase checks.',
-    skill: '',
+    skill: '.github/agents/security-auditor.agent.md',
+    inputLabel: 'Security audit target',
+    inputPlaceholder: 'e.g. Review the authentication flow in prototypes/demos/account.html',
+    outputs: ['tests/security/audit-{target}-{date}.md'],
+  },
+  {
+    id: 'research-brief',
+    name: 'Research Brief',
+    icon: 'book',
+    status: 'active',
+    agent: '@Research Brief',
+    blurb: 'Scope the goals, questions, methods, participant profile, and success criteria for a design research effort.',
+    skill: '.github/skills/research-brief/SKILL.md',
+    outputs: ['research/research-brief.md'],
+  },
+  {
+    id: 'competitive-analysis',
+    name: 'Competitive Analysis',
+    icon: 'evaluate',
+    status: 'active',
+    agent: '@Competitive Analysis',
+    blurb: 'Compare products across experience, features, pricing, and positioning to identify gaps and opportunities.',
+    skill: '.github/skills/competitive-analysis/SKILL.md',
+    outputs: ['research/competitive/{category}-matrix.md', 'research/competitive/{category}-brief.md'],
+  },
+  {
+    id: 'web-fetch',
+    name: 'Web Fetch',
+    icon: 'send',
+    status: 'active',
+    agent: '@Web Fetch',
+    blurb: 'Fetch public or Microsoft-internal source material and save clean markdown for research and analysis.',
+    skill: '.github/skills/web-fetch/SKILL.md',
+    inputLabel: 'URL or URLs to fetch',
+    inputPlaceholder: 'https://example.com/research-report',
+    outputs: ['research/web/{slug}.md'],
+  },
+  {
+    id: 'design-system-setup',
+    name: 'Design System Setup',
+    icon: 'css',
+    status: 'active',
+    agent: '@Design System Setup',
+    blurb: 'Create a complete, token-based foundation for color, type, spacing, elevation, and motion.',
+    skill: '.github/skills/design-system-setup/SKILL.md',
+    outputs: ['designs/tokens/tokens.css', 'designs/tokens/README.md'],
+  },
+  {
+    id: 'design-to-code',
+    name: 'Design to Code',
+    icon: 'code',
+    status: 'active',
+    agent: '@Design to Code',
+    blurb: 'Convert a design specification, wireframe, or Figma reference into React, TypeScript, styles, and stories.',
+    skill: '.github/skills/design-to-code/SKILL.md',
+    outputs: ['prototypes/components/{ComponentName}/{ComponentName}.tsx', 'prototypes/components/{ComponentName}/{ComponentName}.module.css', 'prototypes/components/{ComponentName}/{ComponentName}.stories.tsx'],
+  },
+  {
+    id: 'usability-test-plan',
+    name: 'Usability Test Plan',
+    icon: 'evaluate',
+    status: 'active',
+    agent: '@Usability Test Plan',
+    blurb: 'Create research objectives, test tasks, moderator guidance, success measures, and observation sheets.',
+    skill: '.github/skills/usability-test-plan/SKILL.md',
+    outputs: ['tests/usability/{feature}-test-plan.md', 'tests/usability/{feature}-task-scripts.md', 'tests/usability/{feature}-observation-sheet.md'],
+  },
+  {
+    id: 'component-spec',
+    name: 'Component Specification',
+    icon: 'cube',
+    status: 'active',
+    agent: '@Component Spec',
+    blurb: 'Document a component API, variants, states, accessibility requirements, and design-token dependencies.',
+    skill: '.github/skills/component-spec/SKILL.md',
+    outputs: ['handoff/components/{ComponentName}.md'],
   },
 ];
 
@@ -292,6 +474,169 @@ function togglePhase(phaseKey) {
 /* =================================================================
    TASK OVERVIEW (browse one task's full lifecycle)
    ================================================================= */
+
+/* Phase accent colors — mirror the .phase-dot / --p-* tokens in styles.css. */
+const PHASE_COLORS = {
+  discover: '#5E5CE6', define: '#FF2D92', ideate: '#FF9F0A', design: '#34C759',
+  prototype: '#0A84FF', test: '#FF6B35', deliver: '#AF52DE',
+};
+
+function fmtTimelineDate(s) {
+  if (!s) return '';
+  const d = new Date(String(s).length <= 10 ? s + 'T00:00:00' : s);
+  if (isNaN(d)) return String(s);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/* Build the interactive process-timeline block for a task. Returns '' when the
+   task has no phases. Nodes carry their metadata in data-* attributes; hover
+   cards are wired up separately by wireTaskTimeline(). */
+function renderTaskTimeline(task) {
+  const phases = (task.phases || []).filter(p => (p.files && p.files.length) || (p.components && p.components.length));
+  if (!phases.length) return '';
+
+  const segW = 100 / phases.length;
+  const legend = phases.map(p =>
+    `<span><i style="background:${PHASE_COLORS[p.id] || '#86868B'}"></i>${escapeHtml(p.label)}</span>`
+  ).join('');
+
+  let nodesHtml = '';
+  phases.forEach((phase, pi) => {
+    const color = PHASE_COLORS[phase.id] || '#86868B';
+    const items = [];
+    (phase.files || []).forEach(f => {
+      const m = f.meta || {};
+      items.push({
+        kind: 'file', path: f.path,
+        title: m.title || f.label, label: f.label,
+        status: m.status || '', created: m.created || '', updated: m.updated || '',
+        author: m.author || '', excerpt: m.excerpt || '',
+      });
+    });
+    (phase.components || []).forEach(c => {
+      items.push({
+        kind: 'component', name: c.name, demo: c.demo || '',
+        sources: c.sources || [], title: c.name, label: c.name,
+        status: '', created: '', updated: '', author: '',
+        excerpt: 'Live React prototype with a runnable demo.',
+      });
+    });
+
+    items.forEach((it, ii) => {
+      const within = (ii + 1) / (items.length + 1);
+      const raw = (pi * segW) + (within * segW);
+      const leftPct = 3 + raw * 0.94; // inset so edge chips don't clip
+      const level = ii % 4;
+      const stemH = 30 + level * 28;
+      const onclick = it.kind === 'file'
+        ? `loadFile('${task.id}', '${it.path}', '${phase.id}')`
+        : `loadComponent('${task.id}', '${it.name}', '${it.demo}', ${JSON.stringify(it.sources).replace(/"/g, '&quot;')})`;
+      nodesHtml += `
+        <div class="tl-node" role="button" tabindex="0"
+          style="left:${leftPct.toFixed(3)}%;color:${color}"
+          aria-label="${escapeHtml(it.title)} — ${escapeHtml(phase.label)}"
+          data-phase="${escapeHtml(phase.label)}" data-color="${color}"
+          data-title="${escapeHtml(it.title)}" data-status="${escapeHtml(it.status)}"
+          data-created="${escapeHtml(it.created)}" data-updated="${escapeHtml(it.updated)}"
+          data-author="${escapeHtml(it.author)}" data-excerpt="${escapeHtml(it.excerpt)}"
+          onclick="${onclick}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+          <span class="chip">${escapeHtml(it.label)}</span>
+          <span class="dot"></span>
+          <span class="stem" style="height:${stemH}px"></span>
+        </div>`;
+    });
+  });
+
+  const segments = phases.map(p =>
+    `<div class="tl-seg ${p.id}"><span class="seg-label">${escapeHtml(p.label)}</span></div>`
+  ).join('');
+
+  return `
+    <div class="task-timeline" aria-label="Design process timeline">
+      <div class="tl-head">
+        <div class="tl-title"><span class="spark">✦</span> Process Timeline</div>
+        <div class="tl-legend">${legend}</div>
+      </div>
+      <div class="tl-scroll">
+        <div class="tl-lane">
+          <div class="tl-nodes">${nodesHtml}</div>
+          <div class="tl-track">${segments}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* Wire hover/focus cards for the timeline. Uses one shared floating card. */
+function wireTaskTimeline() {
+  const timeline = document.querySelector('.task-timeline');
+  if (!timeline) return;
+
+  let card = document.getElementById('tlCard');
+  if (!card) {
+    card = document.createElement('div');
+    card.className = 'tl-card';
+    card.id = 'tlCard';
+    card.setAttribute('role', 'tooltip');
+    card.innerHTML = `
+      <div class="accent"></div>
+      <div class="c-body">
+        <div class="c-top"><span class="c-badge"></span><span class="c-status"></span></div>
+        <h4></h4>
+        <p class="c-desc"></p>
+        <div class="c-meta"></div>
+        <div class="c-open">Open artifact
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M17 7H8M17 7v9"/></svg>
+        </div>
+      </div>`;
+    document.body.appendChild(card);
+  }
+
+  const accent = card.querySelector('.accent');
+  const badge = card.querySelector('.c-badge');
+  const status = card.querySelector('.c-status');
+  const h4 = card.querySelector('h4');
+  const desc = card.querySelector('.c-desc');
+  const meta = card.querySelector('.c-meta');
+
+  function show(node) {
+    const d = node.dataset;
+    accent.style.background = d.color;
+    badge.textContent = d.phase;
+    badge.style.background = d.color;
+    if (d.status) { status.textContent = d.status; status.style.display = ''; }
+    else { status.style.display = 'none'; }
+    h4.textContent = d.title;
+    if (d.excerpt) { desc.textContent = d.excerpt; desc.style.display = ''; }
+    else { desc.style.display = 'none'; }
+    const rows = [];
+    if (d.created) rows.push(`<div class="c-row"><b>Created</b> <span>${escapeHtml(fmtTimelineDate(d.created))}</span></div>`);
+    if (d.updated) rows.push(`<div class="c-row"><b>Updated</b> <span>${escapeHtml(fmtTimelineDate(d.updated))}</span></div>`);
+    if (d.author) rows.push(`<div class="c-row"><b>Author</b> <span>${escapeHtml(d.author)}</span></div>`);
+    meta.innerHTML = rows.join('');
+    meta.style.display = rows.length ? '' : 'none';
+
+    card.classList.add('show');
+    const r = node.getBoundingClientRect();
+    const cw = card.offsetWidth || 288;
+    const ch = card.offsetHeight || 220;
+    let left = r.left + r.width / 2 - cw / 2;
+    left = Math.max(12, Math.min(left, window.innerWidth - cw - 12));
+    let top = r.top - ch - 14;
+    if (top < 12) top = r.bottom + 14;
+    card.style.left = left + 'px';
+    card.style.top = top + 'px';
+  }
+  function hide() { card.classList.remove('show'); }
+
+  timeline.querySelectorAll('.tl-node').forEach(node => {
+    node.addEventListener('mouseenter', () => show(node));
+    node.addEventListener('mouseleave', hide);
+    node.addEventListener('focus', () => show(node));
+    node.addEventListener('blur', hide);
+  });
+  timeline.querySelector('.tl-scroll')?.addEventListener('scroll', hide, { passive: true });
+}
+
 function loadTask(taskId) {
   const task = getTask(taskId);
   if (!task) return;
@@ -314,8 +659,9 @@ function loadTask(taskId) {
       <div class="task-overview-header">
         <h1>${task.title}</h1>
         <p>${task.description}</p>
-        ${task.source ? `<span class="task-overview-source" onclick="loadFile('${task.id}', '${task.source}', 'discover')" style="cursor:pointer">${ICONS.doc} Source research report</span>` : ''}
+        ${sourceArtifactsForTask(task).length ? `<button type="button" class="task-overview-source" onclick="openArtifactsDialog('${task.id}')">${ICONS.folder} Artifacts</button>` : ''}
       </div>
+      ${renderTaskTimeline(task)}
       ${task.phases.map(phase => `
         <div class="phase-section">
           <div class="phase-section-head">
@@ -335,6 +681,20 @@ function loadTask(taskId) {
               </div>
             `).join('')}
           </div>
+          ${(phase.fluentPreviewRoute || phase.fluentPreview) ? (() => {
+            const src = prototypePreviewSrc(phase);
+            return src ? `
+            <div class="phase-live-preview">
+              <div class="phase-live-preview-head">
+                <span class="proto-badge">Live prototype</span>
+                <a class="preview-open-new" href="${src}" target="_blank" rel="noopener">Open in new tab ↗</a>
+              </div>
+              <div class="preview-iframe-wrapper">
+                <iframe class="preview-iframe preview-iframe--app" src="${src}" title="${task.title} — live prototype" loading="lazy" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+              </div>
+            </div>
+          ` : '';
+          })() : ''}
         </div>
       `).join('')}
     </div>
@@ -344,145 +704,70 @@ function loadTask(taskId) {
     <span>›</span>
     <span class="crumb-active">${task.title}</span>
   `;
+  wireTaskTimeline();
 }
 
 /* =================================================================
-   NEW TASK MODAL
+   ARTIFACTS DIALOG (uploaded source artifacts only)
    ================================================================= */
-const SOURCE_TYPES = [
-  { value: 'link',       label: 'Link / URL',  placeholder: 'https://example.com/research-report', input: 'text' },
-  { value: 'document',   label: 'Document',    placeholder: 'Path or name, e.g. interview-notes.pdf', input: 'text' },
-  { value: 'image',      label: 'Image',       placeholder: 'Path or URL to image, e.g. whiteboard.png', input: 'text' },
-  { value: 'transcript', label: 'Transcript',  placeholder: 'Paste transcript text…', input: 'textarea' },
-  { value: 'note',       label: 'Note / Text', placeholder: 'Paste any notes or raw text…', input: 'textarea' },
-];
+function sourceIcon(type) {
+  if (type === 'link' || type === 'url') return ICONS.send;
+  if (type === 'file' || type === 'document') return ICONS.doc;
+  return ICONS.folder;
+}
 
-function sourceRowHtml() {
-  const options = SOURCE_TYPES.map(t => `<option value="${t.value}">${t.label}</option>`).join('');
-  return `
-    <div class="source-row">
-      <select onchange="onSourceTypeChange(this)">${options}</select>
-      <input type="text" class="source-value" placeholder="${SOURCE_TYPES[0].placeholder}" />
-      <button type="button" class="source-remove" title="Remove" onclick="removeSourceRow(this)">×</button>
+function openArtifactsDialog(taskId) {
+  const task = getTask(taskId);
+  if (!task) return;
+  const items = sourceArtifactsForTask(task);
+  closeArtifactsDialog();
+
+  const rows = items.map((it) => {
+    const value = escapeHtml(it.value || '');
+    const isUrl = /^https?:\/\//i.test(it.value || '');
+    const action = isUrl
+      ? `<a class="artifacts-row-open" href="${escapeHtml(it.value)}" target="_blank" rel="noopener">Open</a>`
+      : `<span class="artifacts-row-type">${escapeHtml(it.type)}</span>`;
+    return `
+      <div class="artifacts-row">
+        <span class="artifacts-row-ico">${sourceIcon(it.type)}</span>
+        <span class="artifacts-row-main">
+          <span class="artifacts-row-name">${escapeHtml(it.label || 'Source')}</span>
+          <small class="artifacts-row-value">${value}</small>
+        </span>
+        ${action}
+      </div>`;
+  }).join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'artifactsDialog';
+  overlay.innerHTML = `
+    <div class="modal artifacts-modal" role="dialog" aria-modal="true" aria-label="Task artifacts">
+      <div class="artifacts-modal-head">
+        <div>
+          <h2>Artifacts</h2>
+          <p class="modal-sub">${items.length} uploaded item${items.length === 1 ? '' : 's'} for ${escapeHtml(task.title)}</p>
+        </div>
+        <button type="button" class="artifacts-close" aria-label="Close" onclick="closeArtifactsDialog()">&times;</button>
+      </div>
+      <div class="artifacts-list">${rows || '<p class="modal-sub">No uploaded artifacts yet for this task.</p>'}</div>
     </div>`;
-}
-
-function onSourceTypeChange(select) {
-  const type = SOURCE_TYPES.find(t => t.value === select.value) || SOURCE_TYPES[0];
-  const row = select.closest('.source-row');
-  const old = row.querySelector('.source-value');
-  const val = old.value;
-  let replacement;
-  if (type.input === 'textarea') {
-    replacement = document.createElement('textarea');
-    replacement.rows = 3;
-  } else {
-    replacement = document.createElement('input');
-    replacement.type = 'text';
-  }
-  replacement.className = 'source-value';
-  replacement.placeholder = type.placeholder;
-  replacement.value = val;
-  old.replaceWith(replacement);
-}
-
-function addSourceRow() {
-  const list = document.getElementById('sourcesList');
-  list.insertAdjacentHTML('beforeend', sourceRowHtml());
-  updateRemoveButtons();
-}
-
-function removeSourceRow(btn) {
-  btn.closest('.source-row').remove();
-  updateRemoveButtons();
-}
-
-function updateRemoveButtons() {
-  const rows = document.querySelectorAll('#sourcesList .source-row');
-  rows.forEach(r => {
-    r.querySelector('.source-remove').style.visibility = rows.length > 1 ? 'visible' : 'hidden';
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeArtifactsDialog();
   });
+  document.body.appendChild(overlay);
+  document.addEventListener('keydown', artifactsEscHandler);
 }
 
-function openNewTaskModal() {
-  document.getElementById('promptOutput').innerHTML = '';
-  document.getElementById('newTaskName').value = '';
-  document.getElementById('sourcesList').innerHTML = sourceRowHtml();
-  updateRemoveButtons();
-  document.getElementById('newTaskModal').classList.add('open');
-}
-function closeNewTaskModal() {
-  document.getElementById('newTaskModal').classList.remove('open');
-}
-function slugify(str) {
-  return str.toLowerCase().trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'new-task';
+function artifactsEscHandler(e) {
+  if (e.key === 'Escape') closeArtifactsDialog();
 }
 
-function collectSources() {
-  const rows = document.querySelectorAll('#sourcesList .source-row');
-  const sources = [];
-  rows.forEach(row => {
-    const type = row.querySelector('select').value;
-    const value = row.querySelector('.source-value').value.trim();
-    if (value) {
-      const meta = SOURCE_TYPES.find(t => t.value === type) || SOURCE_TYPES[0];
-      sources.push({ type, label: meta.label, value });
-    }
-  });
-  return sources;
-}
-
-function buildTaskPromptStr() {
-  const name = document.getElementById('newTaskName').value.trim();
-  const sources = collectSources();
-  if (!name || sources.length === 0) {
-    return { error: 'Please enter a task name and at least one source artifact.' };
-  }
-  const slug = slugify(name);
-  const sourcesBlock = sources
-    .map((s, i) => `${i + 1}. [${s.label}] ${s.value}`)
-    .join('\n');
-  const prompt =
-`@Design Lead Run the full design lifecycle for a new task named "${name}".
-
-Source artifacts:
-${sourcesBlock}
-
-Use all of the above artifacts as input. Create all output under tasks/${slug}/ using the standard phase structure (research, strategy, ideation, designs, prototypes, tests, handoff). When complete, register the task in index.html's TASKS array (id: "${slug}", dir: "tasks/${slug}") so it appears on the Home page.`;
-  return { prompt, agent: 'design-lead', taskId: slug, kind: 'new-task' };
-}
-
-function generateTaskPrompt() {
-  const built = buildTaskPromptStr();
-  const out = document.getElementById('promptOutput');
-  if (built.error) {
-    out.innerHTML = `<p style="color:var(--color-error-500,#dc2626);font-size:0.8rem;margin-top:8px">${built.error}</p>`;
-    return;
-  }
-  renderCopyFallback(out, built.prompt, 'Copy this prompt to your agent');
-}
-
-function runTaskAgent() {
-  const built = buildTaskPromptStr();
-  const out = document.getElementById('promptOutput');
-  if (built.error) {
-    out.innerHTML = `<p style="color:var(--color-error-500,#dc2626);font-size:0.8rem;margin-top:8px">${built.error}</p>`;
-    return;
-  }
-  if (BRIDGE.online) {
-    runAgent({ kind: built.kind, prompt: built.prompt, agent: built.agent, taskId: built.taskId, mountEl: out, label: 'Starting Design Lead…' });
-  } else {
-    renderCopyFallback(out, built.prompt);
-  }
-}
-function copyPrompt(btn) {
-  const text = document.getElementById('generatedPrompt').innerText;
-  navigator.clipboard.writeText(text).then(() => {
-    btn.textContent = 'Copied!';
-    setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
-  });
+function closeArtifactsDialog() {
+  const el = document.getElementById('artifactsDialog');
+  if (el) el.remove();
+  document.removeEventListener('keydown', artifactsEscHandler);
 }
 
 /* =================================================================
@@ -530,6 +815,61 @@ function generateEvalPrompt() {
     return;
   }
   renderCopyFallback(out, built.prompt, 'Copy this prompt to your agent');
+}
+
+function buildToolRunPrompt(tool) {
+  const taskId = document.getElementById('toolTaskId')?.value.trim();
+  const input = document.getElementById('toolInput')?.value.trim();
+  if (!taskId || !/^[a-z0-9][a-z0-9-]*$/.test(taskId)) {
+    return { error: 'Enter a task id using lowercase letters, numbers, and hyphens.' };
+  }
+  if (!input) {
+    return { error: `Describe the target for ${tool.name}.` };
+  }
+
+  const outputPaths = tool.outputs || [];
+  const outputs = outputPaths.length
+    ? outputPaths.map(path => `- tasks/${taskId}/${path}`).join('\n')
+    : '- Use the output path specified by the tool contract.';
+  const prompt =
+`@${tool.agent.replace(/^@/, '')} ${input}
+
+Run the "${tool.name}" workflow using \`${tool.skill}\`.
+Work only in \`tasks/${taskId}/\`. Create the task and required phase directory if they do not exist. Do not write to another task.
+
+Save outputs to:
+${outputs}
+
+State any unavailable prerequisite or external dependency clearly instead of inventing results.`;
+  return { prompt, agent: tool.agent, taskId, kind: `tool:${tool.id}` };
+}
+
+function generateToolPrompt(toolId) {
+  const tool = getTool(toolId);
+  const out = document.getElementById('toolPromptOutput');
+  if (!tool || !out) return;
+  const built = buildToolRunPrompt(tool);
+  if (built.error) {
+    out.innerHTML = `<p style="color:var(--color-error-500,#dc2626);font-size:0.8rem;margin-top:8px">${built.error}</p>`;
+    return;
+  }
+  renderCopyFallback(out, built.prompt, 'Copy this prompt to your agent');
+}
+
+function runToolAgent(toolId) {
+  const tool = getTool(toolId);
+  const out = document.getElementById('toolPromptOutput');
+  if (!tool || !out) return;
+  const built = buildToolRunPrompt(tool);
+  if (built.error) {
+    out.innerHTML = `<p style="color:var(--color-error-500,#dc2626);font-size:0.8rem;margin-top:8px">${built.error}</p>`;
+    return;
+  }
+  if (BRIDGE.online) {
+    runAgent({ kind: built.kind, prompt: built.prompt, agent: built.agent, taskId: built.taskId, mountEl: out, label: `Starting ${tool.name}…`, toolId: tool.id });
+  } else {
+    renderCopyFallback(out, built.prompt);
+  }
 }
 
 function runEvalAgent() {
@@ -947,6 +1287,45 @@ async function loadComponent(taskId, name, demoPath, sources) {
   });
 }
 
+/* Render the built Fluent prototype static export inside the task page. The
+   preview URL points at prototype-workspace/out/<taskId>/index.html, served by
+   the bridge (with its export-asset fallback). Full app page → give it a tall
+   fixed-height frame with its own scroll rather than auto-resizing. */
+function loadFluentPreview(taskId, previewUrl) {
+  const task = getTask(taskId);
+  activeFile = previewUrl;
+  currentTaskId = taskId;
+  if (!ROUTING) pushTaskRoute({ task: taskId, component: 'fluent-prototype' });
+  renderSidebar(taskId);
+  closeSidebar();
+
+  document.getElementById('breadcrumb').innerHTML = `
+    <span style="cursor:pointer" onclick="goHome()">Home</span>
+    <span>›</span>
+    <span style="cursor:pointer" onclick="loadTask('${task.id}')">${task.title}</span>
+    <span>›</span>
+    <span class="badge-phase prototype">Prototype</span>
+    <span>›</span>
+    <span class="crumb-active">Fluent prototype</span>
+  `;
+
+  const area = document.getElementById('contentArea');
+  area.innerHTML = `
+    <div class="component-preview">
+      <div class="component-preview-header">
+        <h2>Fluent prototype</h2>
+        <span class="proto-badge">Live preview</span>
+        <a class="preview-open-new" href="${previewUrl}" target="_blank" rel="noopener" style="margin-left:auto;font-size:0.8rem">Open in new tab ↗</a>
+      </div>
+      <div class="preview-source-pane active">
+        <div class="preview-iframe-wrapper">
+          <iframe class="preview-iframe preview-iframe--app" src="${previewUrl}" title="Fluent prototype for ${task.title}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function switchPreviewTab(btn, paneId) {
   // Deactivate all tabs
   btn.parentElement.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
@@ -1009,40 +1388,31 @@ function openToolPage(toolId) { location.href = `tool.html?tool=${encodeURICompo
 /* ---- Global sidebar (Home + Tool pages): Tools above Tasks ---- */
 function railCollapsed() { return localStorage.getItem('dl-rail-collapsed') === '1'; }
 
+let CURRENT_SCOPE = null;
+function rebuildSidebar() {
+  if (document.getElementById('globalNav')) buildGlobalSidebar(CURRENT_SCOPE || { type: 'home' });
+}
+function titleCaseId(id) {
+  return String(id).replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 function buildGlobalSidebar(active) {
+  CURRENT_SCOPE = active || CURRENT_SCOPE;
   const sb = document.getElementById('sidebar');
   const nav = document.getElementById('globalNav');
   if (!sb || !nav) return;
   if (railCollapsed()) sb.classList.add('rail-collapsed');
-
-  const toolItems = TOOLS.map(tool => {
-    const isActive = active && active.type === 'tool' && active.id === tool.id;
-    const disabled = tool.status === 'soon';
-    const onclick = disabled ? '' : `onclick="openToolPage('${tool.id}')"`;
-    return `
-      <a class="nav-item ${isActive ? 'active' : ''} ${disabled ? 'disabled' : ''}"
-         ${onclick} title="${tool.name}${disabled ? ' (coming soon)' : ''}">
-        <span class="nav-ico">${ICONS[tool.icon] || ICONS.evaluate}</span>
-        <span class="nav-item-label">${tool.name}</span>
-        ${disabled ? '<span class="soon-tag">Soon</span>' : ''}
-      </a>`;
-  }).join('');
 
   const taskItems = TASKS.map(task => {
     const isActive = active && active.type === 'task' && active.id === task.id;
     return `
       <a class="nav-item ${isActive ? 'active' : ''}"
          onclick="openTaskPage('${task.id}')" title="${task.title}">
-        <span class="nav-ico">${ICONS.folder}</span>
         <span class="nav-item-label">${task.title}</span>
       </a>`;
   }).join('');
 
   nav.innerHTML = `
-    <div class="nav-section">
-      <div class="nav-section-label">Tools</div>
-      ${toolItems}
-    </div>
     <div class="nav-section">
       <div class="nav-section-label">Tasks</div>
       ${taskItems || '<div class="nav-empty">No tasks yet</div>'}
@@ -1105,6 +1475,49 @@ async function initTaskPage() {
 /* =================================================================
    HOME PAGE (index.html) — command box
    ================================================================= */
+/* ---- Lifecycle stages → owning agent + output dir ---- */
+const STAGES = [
+  { id: 'discover',  label: 'Discover',  dir: 'research',    agent: 'researcher', desc: 'Research & competitive analysis' },
+  { id: 'define',    label: 'Define',    dir: 'strategy',    agent: 'strategist', desc: 'Problem framing, personas, PRD' },
+  { id: 'ideate',    label: 'Ideate',    dir: 'ideation',    agent: 'ideator',    desc: 'Concepts & prioritization' },
+  { id: 'design',    label: 'Design',    dir: 'designs',     agent: 'designer',   desc: 'Wireframes, tokens, specs' },
+  { id: 'prototype', label: 'Prototype', dir: 'prototypes',  agent: 'prototyper', desc: 'React components & demos' },
+  { id: 'test',      label: 'Test',      dir: 'tests',       agent: 'tester',     desc: 'Usability & accessibility' },
+  { id: 'deliver',   label: 'Deliver',   dir: 'handoff',     agent: 'handoff',    desc: 'Implementation specs & handoff' },
+];
+
+const AGENT_DISPLAY = {
+  'design-lead': 'Design Lead', researcher: 'Researcher', strategist: 'Strategist',
+  ideator: 'Ideator', designer: 'Designer', prototyper: 'Prototyper',
+  tester: 'Tester', handoff: 'Handoff', 'security-auditor': 'Security Auditor',
+};
+function agentDisplayName(slug) { return AGENT_DISPLAY[slug] || 'Design Lead'; }
+
+/* =================================================================
+   TOOL REGISTRY — loaded dynamically from /api/tools. Bridge scans
+   .github/skills/ for tool.json files. Falls back to empty offline.
+   ================================================================= */
+let TOOL_REGISTRY = [];
+
+async function loadToolRegistry() {
+  try {
+    const res = await fetch('/api/tools');
+    if (!res.ok) return;
+    const { tools } = await res.json();
+    TOOL_REGISTRY = Array.isArray(tools) ? tools : [];
+  } catch { /* bridge offline — registry stays empty */ }
+}
+
+function getToolsForStage(stageId) {
+  return TOOL_REGISTRY.filter(t => Array.isArray(t.stages) && t.stages.includes(stageId));
+}
+
+/* ---- Composer source artifacts (attached via + menu) ---- */
+let HOME_SOURCES = []; // { type:'link'|'file', label, value, inline?, mime?, encoding?, content? }
+const MAX_INLINE_BYTES = 100 * 1024;
+const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+let HOME_SOURCE_PENDING = 0;
+
 function commandText() {
   const box = document.getElementById('commandInput');
   return box ? box.value.trim() : '';
@@ -1115,54 +1528,917 @@ function fillCommand(text) {
   if (box) { box.value = text; box.focus(); }
 }
 
-function buildCommandPromptStr() {
-  const text = commandText();
-  if (!text) return { error: "Type what you'd like the agent to do first." };
-  const prompt =
-`@Design Lead ${text}
-
-If this requires creating new artifacts, place all output under tasks/<task-id>/ using the standard phase structure (research, strategy, ideation, designs, prototypes, tests, handoff), and register any new task in index.html's TASKS array so it appears on the Home page.`;
-  return { prompt, agent: 'design-lead', kind: 'command' };
+/* ---------- Source CTAs ---------- */
+function closeComposerMenus() {
+  const runMenu = document.getElementById('runMenu');
+  if (runMenu) runMenu.hidden = true;
+  const caret = document.querySelector('.run-split .cmd-primary[aria-haspopup]');
+  if (caret) caret.setAttribute('aria-expanded', 'false');
 }
 
-function runCommandPrompt() {
-  const out = document.getElementById('commandOutput');
-  if (!out) return;
-  const built = buildCommandPromptStr();
-  if (built.error) {
-    out.innerHTML = `<p class="command-hint-error">${built.error}</p>`;
+function pickDocumentArtifact() {
+  const input = document.getElementById('artifactFileInput');
+  if (input) input.click();
+}
+
+function openLinkSourceModal() {
+  const modal = document.getElementById('linkSourceModal');
+  const input = document.getElementById('linkSourceInput');
+  if (!modal || !input) return;
+  input.value = '';
+  modal.classList.add('open');
+  setTimeout(() => input.focus(), 0);
+}
+
+function closeLinkSourceModal() {
+  const modal = document.getElementById('linkSourceModal');
+  if (modal) modal.classList.remove('open');
+}
+
+function submitLinkSource() {
+  const input = document.getElementById('linkSourceInput');
+  if (!input) return;
+  const trimmed = input.value.trim();
+  if (!trimmed) return;
+  HOME_SOURCES.push({ type: 'link', label: trimmed, value: trimmed, inline: false });
+  renderHomeSources();
+  closeLinkSourceModal();
+}
+
+function onArtifactFiles(e) {
+  const files = Array.from(e.target.files || []);
+  files.forEach(file => {
+    const isText = /\.(md|markdown|txt|json|csv|tsx?|jsx?|css|html?|ya?ml)$/i.test(file.name) || file.type.startsWith('text/');
+    const source = {
+      type: 'file',
+      label: file.name,
+      inline: false,
+      mime: file.type || 'application/octet-stream',
+      value: '',
+      encoding: null,
+      content: null,
+    };
+
+    if (isText && file.size <= MAX_INLINE_BYTES) {
+      HOME_SOURCE_PENDING += 1;
+      const reader = new FileReader();
+      reader.onload = () => {
+        source.inline = true;
+        source.value = String(reader.result || '');
+        source.encoding = 'utf8';
+        source.content = source.value;
+        HOME_SOURCE_PENDING = Math.max(0, HOME_SOURCE_PENDING - 1);
+        renderHomeSources();
+      };
+      reader.onerror = () => {
+        source.value = `(file could not be read: ${file.name})`;
+        HOME_SOURCE_PENDING = Math.max(0, HOME_SOURCE_PENDING - 1);
+        renderHomeSources();
+      };
+      HOME_SOURCES.push(source);
+      reader.readAsText(file);
+    } else {
+      source.value = `(${isText ? 'large' : 'binary'} file, ${Math.round(file.size / 1024)} KB)`;
+      HOME_SOURCES.push(source);
+      renderHomeSources();
+
+      if (file.size <= MAX_UPLOAD_BYTES) {
+        HOME_SOURCE_PENDING += 1;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = String(reader.result || '');
+          const comma = dataUrl.indexOf(',');
+          if (comma !== -1) {
+            source.encoding = 'base64';
+            source.content = dataUrl.slice(comma + 1);
+            source.value = `${source.value} ready to feed`;
+          }
+          HOME_SOURCE_PENDING = Math.max(0, HOME_SOURCE_PENDING - 1);
+          renderHomeSources();
+        };
+        reader.onerror = () => {
+          source.value = `${source.value} (could not encode)`;
+          HOME_SOURCE_PENDING = Math.max(0, HOME_SOURCE_PENDING - 1);
+          renderHomeSources();
+        };
+        reader.readAsDataURL(file);
+      } else {
+        source.value = `${source.value} (too large to upload inline)`;
+        renderHomeSources();
+      }
+    }
+  });
+  e.target.value = '';
+}
+
+function pickLinkArtifact() {
+  openLinkSourceModal();
+}
+
+function removeHomeSource(i) {
+  HOME_SOURCES.splice(i, 1);
+  renderHomeSources();
+}
+
+function renderHomeSources() {
+  const wrap = document.getElementById('composerSources');
+  if (!wrap) return;
+  if (!HOME_SOURCES.length) { wrap.hidden = true; wrap.innerHTML = ''; return; }
+  wrap.hidden = false;
+  const chips = HOME_SOURCES.map((s, i) => `
+    <span class="source-chip" title="${escapeHtml(s.label)}">
+      <span class="source-chip-ico">${s.type === 'file' ? ICONS.doc : ICONS.send}</span>
+      <span class="source-chip-name">${escapeHtml(s.label)}</span>
+      <button type="button" class="source-chip-x" aria-label="Remove" onclick="removeHomeSource(${i})">&times;</button>
+    </span>`).join('');
+
+  wrap.innerHTML = chips;
+}
+
+function composerSourcesBlock() {
+  if (!HOME_SOURCES.length) return '';
+  const lines = HOME_SOURCES.map((s, i) => {
+    if (s.type === 'file' && s.inline) {
+      return `${i + 1}. [file: ${s.label}]\n"""\n${s.value}\n"""`;
+    }
+    return `${i + 1}. [${s.type}] ${s.value}`;
+  });
+  return `\n\nSource artifacts:\n${lines.join('\n')}`;
+}
+
+/**
+ * Derive a stable task slug from a URL so the coordinator works in a
+ * predictable, URL-specific directory instead of guessing from disk.
+ * e.g. https://hits.microsoft.com/study/6047768 → "hits-study-6047768"
+ */
+function slugFromUrl(raw) {
+  try {
+    const u = new URL(raw);
+    const parts = u.pathname.split('/').filter(Boolean);
+    const last  = parts[parts.length - 1] || '';
+    const domain = u.hostname.split('.').find(p => p !== 'www' && p.length > 1) || u.hostname.split('.')[0];
+    const prefix = parts.length > 1 ? parts[parts.length - 2] : domain;
+    return `${domain}-${prefix}-${last}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
+           || null;
+  } catch { return null; }
+}
+
+function slugFromText(raw) {
+  const slug = String(raw || '')
+    .toLowerCase()
+    .replace(/\.[a-z0-9]{1,6}$/i, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+  return slug || null;
+}
+
+/** Find the first URL in a string of text or attached sources. */
+function extractTaskId() {
+  // Prefer an explicitly attached link source.
+  const link = HOME_SOURCES.find(s => s.type === 'link');
+  if (link) return slugFromUrl(link.value);
+  // Fall back to the first attached file name.
+  const file = HOME_SOURCES.find(s => s.type === 'file' && s.label);
+  if (file) return slugFromText(file.label);
+  // Fall back to the first URL found anywhere in the command text.
+  const text = commandText();
+  const match = text.match(/https?:\/\/\S+/);
+  return match ? slugFromUrl(match[0]) : null;
+}
+
+function ensureComposerSourcesReady(out) {
+  if (HOME_SOURCE_PENDING > 0) {
+    if (out) out.innerHTML = '<p class="command-hint-error">Finishing attachment processing. Please run again in a second.</p>';
+    return false;
+  }
+  return true;
+}
+
+/* ---------- Run menu (lifecycle / stage / tool) ---------- */
+
+/* Per-stage glyphs for the rich run popover (stroke style, 24×24). */
+const STAGE_GLYPHS = {
+  discover: '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  define: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.6"/>',
+  ideate: '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1h6c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"/>',
+  design: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  prototype: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+  test: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+  deliver: '<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>',
+};
+function stageGlyph(id) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${STAGE_GLYPHS[id] || STAGE_GLYPHS.discover}</svg>`;
+}
+
+const STAGE_COLORS = {
+  discover: '#5E5CE6', define: '#FF2D92', ideate: '#FF9F0A', design: '#34C759',
+  prototype: '#0A84FF', test: '#FF6B35', deliver: '#AF52DE',
+};
+/* Deepened, high-contrast variants for icon glyphs / badge text on light tinted chips (WCAG AA). */
+const STAGE_COLORS_DEEP = {
+  discover: '#3B39AD', define: '#B10E63', ideate: '#8A5200', design: '#167A36',
+  prototype: '#0A5FC0', test: '#B23C17', deliver: '#7E2AAB',
+};
+function stageColor(id) { return STAGE_COLORS[id] || '#0071E3'; }
+function stageColorDeep(id) { return STAGE_COLORS_DEEP[id] || '#0057B8'; }
+
+let RUN_TOOL_QUERY = '';
+let RUN_TOOL_STAGE = 'all';
+/* Multi-select sets for sequential runs (insertion order preserved). */
+const RUN_STAGE_SELECTED = new Set();
+const RUN_TOOL_SELECTED = new Set();
+
+function toggleRunMenu(e) {
+  if (e) e.stopPropagation();
+  const m = document.getElementById('runMenu');
+  const wasOpen = m && !m.hidden;
+  closeComposerMenus();
+  if (m && !wasOpen) {
+    renderRunMenuRoot();
+    m.hidden = false;
+    const btn = document.querySelector('.run-split .cmd-primary');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+  }
+}
+
+/* Render a popover view with a directional slide transition. */
+function setRunView(view, dir, html) {
+  const m = document.getElementById('runMenu');
+  if (!m) return;
+  m.classList.remove('run-view-root', 'run-view-stages', 'run-view-tools');
+  m.classList.add('run-view-' + view);
+  m.innerHTML = `<div class="run-pop-view" data-dir="${dir || 'fwd'}">${html}</div>`;
+}
+
+function renderRunMenuRoot() {
+  const steps = ['discover', 'define', 'ideate', 'design', 'test', 'deliver'];
+  const stepper = steps.map((id, i) => {
+    const s = STAGES.find(x => x.id === id);
+    return `<span class="run-step"><i class="run-step-dot" style="--sc:${stageColor(id)}"></i><em>${s ? s.label : id}</em></span>${i < steps.length - 1 ? '<span class="run-step-line"></span>' : ''}`;
+  }).join('');
+
+  const html = `
+    <div class="run-pop-head">
+      <h3>Choose how to run</h3>
+      <p>Select the level of guidance for this task</p>
+    </div>
+    <button type="button" class="run-card run-card--hero is-recommended" role="menuitem" onclick="runComposer('lifecycle')">
+      <span class="run-card-ico">${ICONS.loop}</span>
+      <span class="run-card-main">
+        <span class="run-card-title">Run end-to-end <span class="run-badge">Recommended</span></span>
+        <span class="run-card-sub">Guided through every stage</span>
+        <span class="run-stepper">${stepper}</span>
+      </span>
+    </button>
+    <button type="button" class="run-card" role="menuitem" onclick="renderRunMenuStages()">
+      <span class="run-card-ico">${stageGlyph('define')}</span>
+      <span class="run-card-main">
+        <span class="run-card-title">Run stage(s)</span>
+        <span class="run-card-sub">Focus on a specific phase</span>
+      </span>
+      <span class="run-card-chev">${ICONS.chevronRight || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>'}</span>
+    </button>
+    <button type="button" class="run-card" role="menuitem" onclick="renderRunMenuTools()">
+      <span class="run-card-ico">${ICONS.cube}</span>
+      <span class="run-card-main">
+        <span class="run-card-title">Run tool(s) or framework(s)</span>
+        <span class="run-card-sub">Jump directly into a design method</span>
+      </span>
+      <span class="run-card-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+    </button>`;
+  setRunView('root', 'back', html);
+}
+
+function renderRunMenuStages() {
+  RUN_STAGE_SELECTED.clear();
+  const cards = STAGES.map((s, i) => {
+    const count = getToolsForStage(s.id).length;
+    return `
+      <button type="button" class="run-stage-card" role="menuitemcheckbox" aria-checked="false" onclick="toggleStageSelect('${s.id}', this)">
+        <span class="run-stage-num">${i + 1}</span>
+        <span class="run-stage-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+        <span class="run-stage-ico" style="--sc:${stageColor(s.id)};--scd:${stageColorDeep(s.id)}">${stageGlyph(s.id)}</span>
+        <span class="run-stage-label">${s.label}</span>
+        <span class="run-stage-desc">${s.desc}</span>
+        ${count ? `<span class="run-stage-count">${count} tool${count === 1 ? '' : 's'}</span>` : ''}
+      </button>`;
+  }).join('');
+
+  const html = `
+    <div class="run-pop-head run-pop-head--nav">
+      <button type="button" class="run-back" onclick="renderRunMenuRoot()" aria-label="Back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div><h3>Choose stages</h3><p>Select one or more to run in sequence</p></div>
+    </div>
+    <div class="run-stage-grid">${cards}</div>
+    <div class="run-seq-bar">
+      <span class="run-seq-count" id="runStageCount">None selected</span>
+      <button type="button" class="run-seq-run" id="runStageRun" disabled onclick="runSelectedStages()">Run</button>
+    </div>`;
+  setRunView('stages', 'fwd', html);
+}
+
+function toggleStageSelect(id, el) {
+  if (RUN_STAGE_SELECTED.has(id)) RUN_STAGE_SELECTED.delete(id);
+  else RUN_STAGE_SELECTED.add(id);
+  const on = RUN_STAGE_SELECTED.has(id);
+  if (el) { el.classList.toggle('is-selected', on); el.setAttribute('aria-checked', on ? 'true' : 'false'); }
+  const n = RUN_STAGE_SELECTED.size;
+  const countEl = document.getElementById('runStageCount');
+  const runEl = document.getElementById('runStageRun');
+  if (countEl) countEl.textContent = n ? `${n} stage${n === 1 ? '' : 's'} selected` : 'None selected';
+  if (runEl) { runEl.disabled = n === 0; runEl.textContent = n > 1 ? `Run ${n} in sequence` : 'Run'; }
+}
+
+function runSelectedStages() {
+  const ids = STAGES.filter(s => RUN_STAGE_SELECTED.has(s.id)).map(s => s.id);
+  if (!ids.length) return;
+  closeComposerMenus();
+  runSequence('stage', ids);
+}
+
+function renderRunMenuTools() {
+  RUN_TOOL_QUERY = '';
+  RUN_TOOL_STAGE = 'all';
+  RUN_TOOL_SELECTED.clear();
+  const tabs = [{ id: 'all', label: 'All stages' }, ...STAGES.map(s => ({ id: s.id, label: s.label }))]
+    .map(t => `<button type="button" class="run-tool-tab ${t.id === 'all' ? 'active' : ''}" data-stage="${t.id}" onclick="setRunToolStage('${t.id}')">${t.label}</button>`)
+    .join('');
+
+  const html = `
+    <div class="run-pop-head run-pop-head--nav">
+      <button type="button" class="run-back" onclick="renderRunMenuRoot()" aria-label="Back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div><h3>Choose tools or frameworks</h3><p>Select one or more to run in sequence</p></div>
+    </div>
+    <div class="run-tool-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="runToolSearch" placeholder="Search tools or frameworks" oninput="setRunToolQuery(this.value)" autocomplete="off">
+    </div>
+    <div class="run-tool-tabs">${tabs}</div>
+    <div class="run-tool-results" id="runToolResults"></div>
+    <div class="run-seq-bar">
+      <span class="run-seq-count" id="runToolCount">None selected</span>
+      <button type="button" class="run-seq-run" id="runToolRun" disabled onclick="runSelectedTools()">Run</button>
+    </div>`;
+  setRunView('tools', 'fwd', html);
+  updateRunToolResults();
+}
+
+function toggleToolSelect(id, el) {
+  if (RUN_TOOL_SELECTED.has(id)) RUN_TOOL_SELECTED.delete(id);
+  else RUN_TOOL_SELECTED.add(id);
+  const on = RUN_TOOL_SELECTED.has(id);
+  if (el) { el.classList.toggle('is-selected', on); el.setAttribute('aria-checked', on ? 'true' : 'false'); }
+  updateRunToolSelCount();
+}
+
+function updateRunToolSelCount() {
+  const n = RUN_TOOL_SELECTED.size;
+  const countEl = document.getElementById('runToolCount');
+  const runEl = document.getElementById('runToolRun');
+  if (countEl) countEl.textContent = n ? `${n} tool${n === 1 ? '' : 's'} selected` : 'None selected';
+  if (runEl) { runEl.disabled = n === 0; runEl.textContent = n > 1 ? `Run ${n} in sequence` : 'Run'; }
+}
+
+function runSelectedTools() {
+  const ids = [...RUN_TOOL_SELECTED];
+  if (!ids.length) return;
+  closeComposerMenus();
+  runSequence('tool', ids);
+}
+
+function setRunToolStage(stage) {
+  RUN_TOOL_STAGE = stage;
+  document.querySelectorAll('.run-tool-tab').forEach(t => t.classList.toggle('active', t.dataset.stage === stage));
+  updateRunToolResults();
+}
+
+function setRunToolQuery(q) {
+  RUN_TOOL_QUERY = String(q || '').toLowerCase().trim();
+  updateRunToolResults();
+}
+
+function updateRunToolResults() {
+  const box = document.getElementById('runToolResults');
+  if (!box) return;
+
+  let tools = TOOL_REGISTRY.slice();
+  if (RUN_TOOL_STAGE !== 'all') tools = tools.filter(t => Array.isArray(t.stages) && t.stages.includes(RUN_TOOL_STAGE));
+  if (RUN_TOOL_QUERY) {
+    tools = tools.filter(t =>
+      (t.name || '').toLowerCase().includes(RUN_TOOL_QUERY) ||
+      (t.description || '').toLowerCase().includes(RUN_TOOL_QUERY));
+  }
+
+  if (!TOOL_REGISTRY.length) {
+    box.innerHTML = `<div class="run-tool-empty">Tools load when the bridge is running.</div>`;
     return;
   }
+  if (!tools.length) {
+    box.innerHTML = `<div class="run-tool-empty">No tools match your search.</div>`;
+    return;
+  }
+
+  box.innerHTML = tools.map(t => {
+    const stage = (t.stages && t.stages[0]) || 'discover';
+    const stageLabel = (STAGES.find(s => s.id === stage) || {}).label || stage;
+    const sel = RUN_TOOL_SELECTED.has(t.id);
+    return `
+      <button type="button" class="run-tool-card${sel ? ' is-selected' : ''}" role="menuitemcheckbox" aria-checked="${sel ? 'true' : 'false'}" onclick="toggleToolSelect('${t.id}', this)">
+        <span class="run-tool-ico" style="--sc:${stageColor(stage)};--scd:${stageColorDeep(stage)}">${stageGlyph(stage)}</span>
+        <span class="run-tool-main">
+          <span class="run-tool-title">${escapeHtml(t.name)}<span class="run-tool-badge" style="--sc:${stageColor(stage)};--scd:${stageColorDeep(stage)}">${escapeHtml(stageLabel)}</span></span>
+          <span class="run-tool-desc">${escapeHtml(t.description || '')}</span>
+        </span>
+        <span class="run-tool-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+      </button>`;
+  }).join('');
+}
+
+/* ---------- Prompt building ---------- */
+function buildComposerPrompt(mode, stageId) {
+  const text = commandText();
+  if (!text && !HOME_SOURCES.length) {
+    return { error: "Describe what you'd like to do, or attach a source artifact." };
+  }
+  const sources = composerSourcesBlock();
+  const taskId  = extractTaskId();
+  const taskDir = taskId ? `tasks/${taskId}` : 'tasks/<new-task-slug>';
+
+  if (mode === 'stage') {
+    const stage = STAGES.find(s => s.id === stageId) || STAGES[0];
+    const prompt =
+`@${agentDisplayName(stage.agent)} ${text || 'Use the attached source artifacts.'}${sources}
+
+Run only the ${stage.label} stage. Work ONLY in \`${taskDir}/${stage.dir}/\`. Do NOT use any other task directory on disk. If the directory does not exist, create it.`;
+    return {
+      prompt,
+      agent: stage.agent,
+      taskId,
+      kind: `stage:${stage.id}`,
+      label: `Starting ${agentDisplayName(stage.agent)}…`,
+      sourceArtifacts: captureComposerSourceArtifacts(),
+    };
+  }
+
+  // lifecycle (default)
+  const prompt =
+`@Design Lead ${text || 'Use the attached source artifacts to start a new design task.'}${sources}
+
+Run the full design lifecycle. Work ONLY in \`${taskDir}/\` using the standard phase structure (research, strategy, ideation, designs, prototypes, tests, handoff). Do NOT use any other existing task directory on disk. If the directory does not exist, create it.`;
+  return {
+    prompt,
+    agent: 'design-lead',
+    taskId,
+    kind: 'lifecycle',
+    label: 'Starting Design Lead…',
+    sourceArtifacts: captureComposerSourceArtifacts(),
+  };
+}
+
+function runComposer(mode, stageId) {
+  closeComposerMenus();
+  const out = document.getElementById('commandOutput');
+  if (!out) return;
+  if (!ensureComposerSourcesReady(out)) return;
+  const built = buildComposerPrompt(mode, stageId);
+  if (built.error) { out.innerHTML = `<p class="command-hint-error">${built.error}</p>`; return; }
   if (BRIDGE.online) {
-    runAgent({ kind: built.kind, prompt: built.prompt, agent: built.agent, mountEl: out, label: 'Starting Design Lead…' });
+    runAgent({
+      kind: built.kind,
+      prompt: built.prompt,
+      agent: built.agent,
+      taskId: built.taskId,
+      mountEl: out,
+      label: built.label,
+      sourceArtifacts: built.sourceArtifacts,
+      runtimeSourceArtifacts: runtimeComposerSourceArtifacts(),
+    });
   } else {
     renderCopyFallback(out, built.prompt);
   }
 }
 
-function copyCommandPrompt(btn) {
-  const text = document.getElementById('generatedCommandPrompt').innerText;
-  navigator.clipboard.writeText(text).then(() => {
-    btn.textContent = 'Copied!';
-    setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+function runComposerTool(toolId) {
+  closeComposerMenus();
+  // Carry the current description into the tool page so it isn't lost.
+  const text = commandText();
+  if (text) { try { sessionStorage.setItem('dl-tool-seed', text); } catch {} }
+  openToolPage(toolId);
+}
+
+function runTool(toolId) {
+  closeComposerMenus();
+  const tool = TOOL_REGISTRY.find(t => t.id === toolId);
+  if (!tool) return;
+  const text  = commandText();
+  const out   = document.getElementById('commandOutput');
+  if (!out) return;
+  if (!ensureComposerSourcesReady(out)) return;
+  const prompt = `@${tool.agent} ${text || 'Use the attached source artifacts.'}${composerSourcesBlock()}
+
+Run the "${tool.name}" tool. Save output to the paths defined in the tool spec.`;
+  if (BRIDGE.online) {
+    runAgent({
+      kind: `tool:${toolId}`,
+      prompt,
+      agent: tool.agent,
+      taskId: null,
+      mountEl: out,
+      label: `Running ${tool.name}…`,
+      toolId,
+      sourceArtifacts: captureComposerSourceArtifacts(),
+      runtimeSourceArtifacts: runtimeComposerSourceArtifacts(),
+    });
+  } else {
+    renderCopyFallback(out, prompt);
+  }
+}
+
+async function runStage(stageId) {
+  closeComposerMenus();
+  const stage = STAGES.find(s => s.id === stageId);
+  if (!stage) return;
+  const text = commandText();
+  const out  = document.getElementById('commandOutput');
+  if (!out) return;
+  if (!ensureComposerSourcesReady(out)) return;
+  if (!BRIDGE.online) {
+    renderCopyFallback(out, `Run the ${stage.label} stage for: ${text || '(your task)'}`);
+    return;
+  }
+  const sourcesBlock = composerSourcesBlock();
+  const prompt = (text || '') + sourcesBlock;
+
+  const taskId = extractTaskId();
+  const sourceArtifacts = runtimeComposerSourceArtifacts();
+
+  out.innerHTML = processingPanelHtml(`Starting ${stage.label} stage…`);
+  const statusEl   = out.querySelector('.run-status-text');
+  const cancelBtn  = out.querySelector('.run-cancel');
+  try {
+    const res = await fetch('/api/run-stage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stageId, prompt, taskId, sourceArtifacts }),
+    });
+
+    let data = null;
+    try { data = await res.json(); } catch { data = null; }
+
+    if (!res.ok) {
+      throw new Error((data && data.error) || `Bridge responded ${res.status}`);
+    }
+
+    if (!data || !data.jobId) {
+      finishRun(out, { ok: false, error: (data && data.error) || 'Bridge did not return a job ID.' });
+      return;
+    }
+
+    const initLogEl = out.querySelector('.run-log');
+    if (initLogEl && data.sourceContext) {
+      logSourceContext(initLogEl, data.sourceContext);
+    }
+
+    if (statusEl) statusEl.textContent = `${stage.label} coordinator running…`;
+    if (cancelBtn) cancelBtn.onclick = () => cancelJob(data.jobId);
+    CURRENT_JOB = data.jobId;
+    const es = new EventSource(`/api/jobs/${data.jobId}/stream`);
+    es.addEventListener('status', (e) => {
+      let d; try { d = JSON.parse(e.data); } catch { return; }
+      if (d.status === 'done') { es.close(); finishRun(out, { ok: true, artifacts: d.artifacts || [], sourceArtifacts: captureComposerSourceArtifacts(), taskId }); }
+      else if (d.status === 'error') { es.close(); finishRun(out, { ok: false, error: d.error }); }
+      else if (d.status === 'cancelled') { es.close(); finishRun(out, { cancelled: true, sourceArtifacts: captureComposerSourceArtifacts(), taskId }); }
+    });
+    es.addEventListener('log', (e) => {
+      let d; try { d = JSON.parse(e.data); } catch { return; }
+      const logEl = out.querySelector('.run-log');
+      if (logEl) appendLogLine(logEl, d.stream, d.line);
+      if (isMeaningfulStep(d.line)) {
+        const stepsEl = out.querySelector('.run-steps');
+        const step = humanizeLogLine(d.line);
+        if (step && stepsEl) makeStepTracker(stepsEl).add(step);
+      }
+    });
+  } catch (err) {
+    finishRun(out, { ok: false, error: err.message });
+  }
+}
+
+/* ---------- Sequential multi-step runner (stages / tools) ---------- */
+let SEQ_STATE = null;
+
+function runSequence(mode, ids) {
+  const out = document.getElementById('commandOutput');
+  if (!out) return;
+  if (!ensureComposerSourcesReady(out)) return;
+
+  const text = commandText();
+  const sourcesBlock = composerSourcesBlock();
+
+  if (!BRIDGE.online) {
+    const names = ids.map(id => mode === 'stage'
+      ? ((STAGES.find(s => s.id === id) || {}).label || id)
+      : ((TOOL_REGISTRY.find(t => t.id === id) || {}).name || id));
+    renderCopyFallback(out, `Run these ${mode === 'stage' ? 'stages' : 'tools'} in sequence:\n- ${names.join('\n- ')}\n\nFor: ${text || '(your task)'}`);
+    return;
+  }
+
+  const steps = ids.map(id => {
+    if (mode === 'stage') {
+      const s = STAGES.find(x => x.id === id) || { id, label: id };
+      return { id, mode, label: s.label, stageId: id };
+    }
+    const t = TOOL_REGISTRY.find(x => x.id === id) || { id, name: id, agent: null, stages: ['discover'] };
+    return { id, mode, label: t.name, tool: t, stage: (t.stages && t.stages[0]) || 'discover' };
+  });
+
+  const state = {
+    mode, steps, text, sourcesBlock,
+    runtimeSources: runtimeComposerSourceArtifacts(),
+    sourceSnapshot: captureComposerSourceArtifacts(),
+    taskId: extractTaskId(),
+    statuses: steps.map(() => 'pending'),
+    allArtifacts: [],
+    aborted: false,
+    jobId: null,
+    index: 0,
+  };
+  SEQ_STATE = state;
+  out.innerHTML = renderSeqPanel(state);
+  const cancelBtn = out.querySelector('.run-seq-cancel');
+  if (cancelBtn) cancelBtn.onclick = () => seqCancel(state);
+  runSeqFrom(out, state, 0);
+}
+
+function renderSeqPanel(state) {
+  const rows = state.steps.map((step, i) => {
+    const glyph = step.mode === 'stage' ? stageGlyph(step.id) : stageGlyph(step.stage);
+    const c = step.mode === 'stage' ? stageColor(step.id) : stageColor(step.stage);
+    const cd = step.mode === 'stage' ? stageColorDeep(step.id) : stageColorDeep(step.stage);
+    return `
+      <li class="seq-step status-${state.statuses[i]}" data-i="${i}">
+        <span class="seq-ico" style="--sc:${c};--scd:${cd}">${glyph}</span>
+        <span class="seq-name">${escapeHtml(step.label)}</span>
+        <span class="seq-state" aria-live="polite">${SEQ_STATE_LABELS[state.statuses[i]] || ''}</span>
+      </li>`;
+  }).join('');
+  const n = state.steps.length;
+  return `
+    <div class="run-seq">
+      <div class="run-seq-head">
+        <strong class="run-seq-title">Running ${n} ${state.mode === 'stage' ? 'stage' : 'tool'}${n === 1 ? '' : 's'} in sequence</strong>
+        <button class="run-seq-cancel" type="button">Cancel</button>
+      </div>
+      <ol class="run-seq-steps">${rows}</ol>
+      <div class="run-seq-controls"></div>
+      <div class="run-seq-active"></div>
+    </div>`;
+}
+
+const SEQ_STATE_LABELS = { pending: 'Queued', running: 'Running…', done: 'Done', error: 'Failed', skipped: 'Skipped' };
+
+function setSeqStatus(out, state, i, status) {
+  state.statuses[i] = status;
+  const row = out.querySelector(`.seq-step[data-i="${i}"]`);
+  if (!row) return;
+  row.className = `seq-step status-${status}`;
+  const st = row.querySelector('.seq-state');
+  if (st) st.textContent = SEQ_STATE_LABELS[status] || '';
+}
+
+async function runSeqFrom(out, state, startIndex) {
+  for (let j = startIndex; j < state.steps.length; j++) {
+    if (state.statuses[j] === 'skipped') setSeqStatus(out, state, j, 'pending');
+  }
+  const controls = out.querySelector('.run-seq-controls');
+  if (controls) controls.innerHTML = '';
+
+  for (let i = startIndex; i < state.steps.length; i++) {
+    if (state.aborted) return;
+    state.index = i;
+    setSeqStatus(out, state, i, 'running');
+    const activeEl = out.querySelector('.run-seq-active');
+    try {
+      const result = await runSequenceStep(state.steps[i], state, activeEl);
+      if (result && result.taskId && !state.taskId) state.taskId = result.taskId;
+      if (result && Array.isArray(result.artifacts)) state.allArtifacts.push(...result.artifacts);
+      setSeqStatus(out, state, i, 'done');
+    } catch (err) {
+      if (state.aborted) return;
+      setSeqStatus(out, state, i, 'error');
+      for (let j = i + 1; j < state.steps.length; j++) setSeqStatus(out, state, j, 'skipped');
+      showSeqFailControls(out, state, i, err);
+      return;
+    }
+  }
+  finishSeq(out, state);
+}
+
+function buildSeqStepRequest(step, state) {
+  if (step.mode === 'stage') {
+    return {
+      url: '/api/run-stage',
+      body: {
+        stageId: step.stageId,
+        prompt: (state.text || '') + state.sourcesBlock,
+        taskId: state.taskId,
+        sourceArtifacts: state.runtimeSources || [],
+      },
+    };
+  }
+  const t = step.tool;
+  const prompt = stripAgentPrefix(`@${t.agent} ${state.text || 'Use the attached source artifacts.'}${state.sourcesBlock}
+
+Run the "${t.name}" tool. Save output to the paths defined in the tool spec.`);
+  return {
+    url: '/api/run',
+    body: {
+      prompt,
+      agent: t.agent,
+      taskId: state.taskId,
+      kind: `tool:${step.id}`,
+      toolId: step.id,
+      sourceArtifacts: state.runtimeSources || [],
+    },
+  };
+}
+
+function runSequenceStep(step, state, mountEl) {
+  return new Promise((resolve, reject) => {
+    if (!mountEl) { reject(new Error('No mount element')); return; }
+    mountEl.innerHTML = processingPanelHtml(`Starting ${step.label}…`);
+    const logEl = mountEl.querySelector('.run-log');
+    const stepsEl = mountEl.querySelector('.run-steps');
+    const statusEl = mountEl.querySelector('.run-status-text');
+    const cancelBtn = mountEl.querySelector('.run-cancel');
+    const tracker = makeStepTracker(stepsEl);
+    if (cancelBtn) cancelBtn.onclick = () => seqCancel(state);
+
+    const req = buildSeqStepRequest(step, state);
+    fetch(req.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body),
+    })
+      .then(async (res) => {
+        let data = null;
+        try { data = await res.json(); } catch { data = null; }
+        if (!res.ok) throw new Error((data && data.error) || `Bridge responded ${res.status}`);
+        if (!data || !data.jobId) throw new Error((data && data.error) || 'Bridge did not return a job ID.');
+        if (data.sourceContext && logEl) logSourceContext(logEl, data.sourceContext);
+
+        const jobId = data.jobId;
+        state.jobId = jobId;
+        CURRENT_JOB = jobId;
+
+        const es = new EventSource(`/api/jobs/${jobId}/stream`);
+        es.addEventListener('log', (e) => {
+          let d; try { d = JSON.parse(e.data); } catch { return; }
+          appendLogLine(logEl, d.stream, d.line);
+          if (d.stream !== 'stderr' && isMeaningfulStep(d.line)) {
+            const s = humanizeLogLine(d.line);
+            if (s) tracker.add(s);
+          }
+        });
+        es.addEventListener('status', (e) => {
+          let d; try { d = JSON.parse(e.data); } catch { return; }
+          if (d.status === 'running') { if (statusEl) statusEl.textContent = `${step.label} running…`; }
+          else if (d.status === 'verifying') { if (statusEl) statusEl.textContent = `Verifying ${step.label} (round ${d.round || 1})…`; }
+          else if (d.status === 'rerunning') { if (statusEl) statusEl.textContent = `Re-running ${step.label} (round ${d.round || 2})…`; }
+          else if (d.status === 'done' || d.status === 'flagged') { es.close(); resolve({ taskId: data.taskId || null, artifacts: d.artifacts || [] }); }
+          else if (d.status === 'error') { es.close(); reject(new Error(d.error || `${step.label} failed`)); }
+          else if (d.status === 'cancelled') { es.close(); reject(new Error('cancelled')); }
+        });
+        es.onerror = () => { /* browser auto-reconnects; server replays buffered log */ };
+      })
+      .catch((err) => reject(err));
   });
 }
 
+function showSeqFailControls(out, state, i, err) {
+  const controls = out.querySelector('.run-seq-controls');
+  if (!controls) return;
+  const msg = (err && err.message) || 'Step failed.';
+  const hasMore = i + 1 < state.steps.length;
+  controls.innerHTML = `
+    <div class="run-seq-fail">
+      <span class="run-seq-fail-msg">${escapeHtml(state.steps[i].label)} failed: ${escapeHtml(msg)}</span>
+      <span class="run-seq-fail-actions">
+        <button type="button" class="run-seq-retry">Retry step</button>
+        ${hasMore ? '<button type="button" class="run-seq-continue">Skip &amp; continue</button>' : ''}
+      </span>
+    </div>`;
+  const retry = controls.querySelector('.run-seq-retry');
+  if (retry) retry.onclick = () => { state.aborted = false; runSeqFrom(out, state, i); };
+  const cont = controls.querySelector('.run-seq-continue');
+  if (cont) cont.onclick = () => { state.aborted = false; runSeqFrom(out, state, i + 1); };
+}
+
+function finishSeq(out, state) {
+  const title = out.querySelector('.run-seq-title');
+  const cancel = out.querySelector('.run-seq-cancel');
+  const n = state.steps.length;
+  if (title) title.textContent = `Sequence complete — ${n} ${state.mode === 'stage' ? 'stage' : 'tool'}${n === 1 ? '' : 's'} run`;
+  if (cancel) cancel.remove();
+  const activeEl = out.querySelector('.run-seq-active');
+  if (activeEl) {
+    finishRun(activeEl, {
+      ok: true,
+      artifacts: state.allArtifacts,
+      taskId: state.taskId,
+      sourceArtifacts: state.sourceSnapshot || [],
+    });
+  }
+}
+
+function seqCancel(state) {
+  if (!state) return;
+  state.aborted = true;
+  if (state.jobId) cancelJob(state.jobId);
+  const out = document.getElementById('commandOutput');
+  if (!out) return;
+  const i = state.index;
+  setSeqStatus(out, state, i, 'error');
+  const row = out.querySelector(`.seq-step[data-i="${i}"] .seq-state`);
+  if (row) row.textContent = 'Cancelled';
+  for (let j = i + 1; j < state.steps.length; j++) setSeqStatus(out, state, j, 'skipped');
+  const title = out.querySelector('.run-seq-title');
+  if (title) title.textContent = 'Sequence cancelled';
+  const cancel = out.querySelector('.run-seq-cancel');
+  if (cancel) cancel.remove();
+}
+
+/* Back-compat shim: keep old entry points working. */
+function runCommandPrompt() { runComposer('lifecycle'); }
+
 function createTaskFromCommand() {
-  openNewTaskModal();
-  const nameField = document.getElementById('newTaskName');
-  if (nameField) nameField.value = commandText().slice(0, 100);
+  const seed = commandText().slice(0, 100);
+  if (seed) fillCommand(seed);
 }
 
 function initHomePage() {
   buildGlobalSidebar({ type: 'home' });
+  loadToolRegistry();
+  const linkInput = document.getElementById('linkSourceInput');
+  if (linkInput) {
+    linkInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitLinkSource();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeLinkSourceModal();
+      }
+    });
+  }
   const box = document.getElementById('commandInput');
   if (box) {
     box.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); runCommandPrompt(); }
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); runComposer('lifecycle'); }
     });
   }
-  bridgeBoot({ type: 'home' });
+  // Close composer menus on outside click / Escape.
+  // Use composedPath() (frozen at dispatch) so submenu navigation that
+  // re-renders innerHTML — detaching the clicked node — is still treated as
+  // an inside click rather than closing the menu.
+  document.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'linkSourceModal') {
+      closeLinkSourceModal();
+      return;
+    }
+    const path = (typeof e.composedPath === 'function') ? e.composedPath() : [];
+    const inside = path.some(el => el && el.classList && el.classList.contains('composer-bar'));
+    if (!inside) closeComposerMenus();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeComposerMenus();
+    }
+  });
+  bridgeBoot({ type: 'home' }).then(updatePrototypesLink);
+}
+
+/* Show/hide and target the home "Prototypes" link based on the live workspace. */
+function updatePrototypesLink() {
+  const link = document.getElementById('prototypesLink');
+  if (!link) return;
+  if (!PROTO.enabled) { link.hidden = true; return; }
+  link.hidden = false;
+  link.href = prototypeWorkspaceUrl();
+  const dot = document.getElementById('prototypesLinkStatus');
+  if (dot) {
+    dot.classList.toggle('is-ready', PROTO.ready);
+    dot.classList.toggle('is-starting', !PROTO.ready);
+    link.title = PROTO.ready
+      ? 'Open the prototype workspace'
+      : 'Prototype workspace is starting… (opens when ready)';
+  }
 }
 
 /* =================================================================
@@ -1210,7 +2486,45 @@ function renderToolPage(tool) {
     return;
   }
 
-  // Active tool: Tenets &amp; Traps run form (reuses generateEvalPrompt)
+  if (tool.id !== 'tenets-traps') {
+    const inputLabel = tool.inputLabel || 'What should this tool work on?';
+    const inputPlaceholder = tool.inputPlaceholder || 'Describe the problem, artifact, or outcome to work on';
+    const outputs = (tool.outputs || []).length
+      ? `<p class="tool-run-hint">Outputs: ${(tool.outputs || []).map(path => `<code>${path}</code>`).join(', ')}</p>`
+      : '';
+    area.innerHTML = `
+      <div class="tool-hero">
+        ${header}
+        <div class="command-box tool-run">
+          <div class="tool-run-row">
+            <label for="toolTaskId">Task id</label>
+            <input id="toolTaskId" type="text" placeholder="e.g. azure-deployment-agent" autocomplete="off">
+          </div>
+          <div class="tool-run-row">
+            <label for="toolInput">${inputLabel}</label>
+            <textarea id="toolInput" rows="5" placeholder="${inputPlaceholder}"></textarea>
+          </div>
+          ${outputs}
+          <div class="command-actions">
+            <button class="cmd-primary" onclick="runToolAgent('${tool.id}')">${ICONS.send} Run tool</button>
+            <button class="cmd-secondary" onclick="generateToolPrompt('${tool.id}')">${ICONS.copy} Copy prompt</button>
+          </div>
+          <div id="toolPromptOutput"></div>
+        </div>
+      </div>`;
+
+    try {
+      const seed = sessionStorage.getItem('dl-tool-seed');
+      if (seed) {
+        const inputEl = document.getElementById('toolInput');
+        if (inputEl) inputEl.value = seed;
+        sessionStorage.removeItem('dl-tool-seed');
+      }
+    } catch { /* ignore */ }
+    return;
+  }
+
+  // Tenets &amp; Traps has a specialized target form.
   area.innerHTML = `
     <div class="tool-hero">
       ${header}
@@ -1241,6 +2555,16 @@ function renderToolPage(tool) {
         <div id="evalPromptOutput"></div>
       </div>
     </div>`;
+
+  // Seed the name field if a description was carried over from the Home composer.
+  try {
+    const seed = sessionStorage.getItem('dl-tool-seed');
+    if (seed) {
+      const nameEl = document.getElementById('evalName');
+      if (nameEl) nameEl.value = seed;
+      sessionStorage.removeItem('dl-tool-seed');
+    }
+  } catch { /* ignore */ }
 }
 
 /* =================================================================
@@ -1250,6 +2574,45 @@ function renderToolPage(tool) {
    Gracefully degrades to "copy prompt" when the bridge is offline.
    ================================================================= */
 const BRIDGE = { online: false, copilot: null, checked: false };
+
+/* Auto-managed Fluent prototype dev server (see bridge GET /api/prototypes). */
+const PROTO = { enabled: false, port: 3100, ready: false, starting: false };
+
+async function loadPrototypeInfo() {
+  try {
+    const r = await fetch('/api/prototypes', { cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    PROTO.enabled = !!d.enabled;
+    PROTO.port = d.port || PROTO.port;
+    PROTO.ready = !!d.ready;
+    PROTO.starting = !!d.starting;
+  } catch { /* bridge offline */ }
+}
+
+/* Normalize the host for the prototype workspace. Azure AD only allows
+   `http://localhost` (not 127.0.0.1) as an SPA redirect URI, so MSAL sign-in
+   must run on the localhost origin. */
+function prototypeHost() {
+  const h = location.hostname;
+  return (h === '127.0.0.1' || h === '::1' || h === '0.0.0.0') ? 'localhost' : h;
+}
+
+/* Absolute URL to the running prototype workspace list. Requires Microsoft
+   sign-in (no bypass) — opens the real authenticated workspace. */
+function prototypeWorkspaceUrl() {
+  return `http://${prototypeHost()}:${PROTO.port}/`;
+}
+
+/* Best available preview URL for a prototype phase: prefer the live dev-server
+   route (hot-reloading, no build), fall back to the static export path. */
+function prototypePreviewSrc(phase) {
+  if (phase.fluentPreviewRoute) {
+    const route = phase.fluentPreviewRoute.replace(/\/+$/, '');
+    return `http://${prototypeHost()}:${PROTO.port}${route}/?auditBridge=1`;
+  }
+  return phase.fluentPreview || null;
+}
 
 async function bridgeHealth() {
   try {
@@ -1267,6 +2630,7 @@ async function bridgeHealth() {
   BRIDGE.checked = true;
   document.body.classList.toggle('bridge-online', BRIDGE.online);
   document.body.classList.toggle('bridge-offline', !BRIDGE.online);
+  if (BRIDGE.online) { await loadPrototypeInfo(); }
   return BRIDGE.online;
 }
 
@@ -1288,8 +2652,32 @@ async function refreshTasks() {
     const known = new Set(TASKS.map(t => t.id));
     for (const t of (data.tasks || [])) {
       if (!known.has(t.id)) { TASKS.push(t); known.add(t.id); }
+      const existing = getTask(t.id);
+      if (existing) {
+        mergeTaskMeta(existing, t);
+        if (Array.isArray(TASK_SOURCE_ARTIFACTS[t.id])) {
+          existing.sourceArtifacts = TASK_SOURCE_ARTIFACTS[t.id];
+        }
+      }
     }
   } catch { /* offline / no tasks */ }
+}
+
+/* Merge freshly-discovered artifact metadata (frontmatter title/status/dates/
+   author/excerpt from the bridge) into a curated task, matching files by path so
+   the curated human labels are preserved. */
+function mergeTaskMeta(existing, fresh) {
+  const metaByPath = {};
+  for (const ph of (fresh.phases || [])) {
+    for (const f of (ph.files || [])) {
+      if (f && f.path && f.meta) metaByPath[f.path] = f.meta;
+    }
+  }
+  for (const ph of (existing.phases || [])) {
+    for (const f of (ph.files || [])) {
+      if (f && f.path && metaByPath[f.path] && !f.meta) f.meta = metaByPath[f.path];
+    }
+  }
 }
 
 /* Strip a leading "@Agent Name " mention so the CLI doesn't read "@" as a file ref.
@@ -1321,7 +2709,8 @@ function artifactLink(relPath) {
 }
 
 function escapeHtml(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 /* Offline / copy-prompt fallback UI. */
@@ -1355,9 +2744,22 @@ function processingPanelHtml(label) {
         <span class="run-status-text">${escapeHtml(label || 'Working…')}</span>
         <button class="run-cancel" type="button">Cancel</button>
       </div>
-      <pre class="run-log" aria-label="Agent output log"></pre>
-      <div class="run-artifacts"></div>
+      <div class="run-steps" aria-label="Progress"></div>
+      <details class="run-rawwrap">
+        <summary>Show full log</summary>
+        <pre class="run-log" aria-label="Agent output log"></pre>
+      </details>
+      <div class="run-result"></div>
     </div>`;
+}
+
+/* Returns true only for actions worth surfacing in the minimal step view. */
+function isMeaningfulStep(raw) {
+  const s = String(raw).replace(/\x1b\[[0-9;]*m/g, '').trim();
+  // Skill use and file writes are meaningful; reads/explores/commands are noise.
+  if (/^skill\(/i.test(s)) return true;
+  if (/^(?:Write|Writing|Creat(?:e|ed|ing)|Edit|Editing|Updat(?:e|ed|ing))\s/i.test(s)) return true;
+  return false;
 }
 
 function appendLogLine(logEl, stream, line) {
@@ -1369,29 +2771,144 @@ function appendLogLine(logEl, stream, line) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
+function logSourceContext(logEl, sourceContext) {
+  if (!logEl || !sourceContext) return;
+  const files = Array.isArray(sourceContext.files) ? sourceContext.files : [];
+  const extracted = Array.isArray(sourceContext.extractedFiles) ? sourceContext.extractedFiles : [];
+  const links = Array.isArray(sourceContext.links) ? sourceContext.links : [];
+  const fetchedLinks = Array.isArray(sourceContext.fetchedLinks) ? sourceContext.fetchedLinks : [];
+
+  const fetchedCount = fetchedLinks.filter((l) => l && l.fetchedPath).length;
+  appendLogLine(logEl, 'system', `Sources prepared: files=${files.length}, links=${links.length}, extracted=${extracted.length}, fetchedLinks=${fetchedCount}`);
+
+  files.forEach((f) => {
+    appendLogLine(logEl, 'system', `  file: ${f.label || 'source'} -> ${f.path || 'n/a'}${f.wrote ? '' : ' (unavailable)'}`);
+  });
+  extracted.forEach((f) => {
+    appendLogLine(logEl, 'system', `  extracted: ${f.label || 'source'} -> ${f.extractedPath || 'n/a'}${f.truncated ? ' (truncated)' : ''}`);
+  });
+  fetchedLinks.forEach((l) => {
+    appendLogLine(logEl, 'system', `  fetched link: ${l.label || l.url || 'link'} -> ${l.fetchedPath || `unavailable (${l.note || 'failed'})`}`);
+  });
+}
+
+function baseName(p) {
+  return String(p).trim().replace(/[`"']/g, '').split('/').pop();
+}
+
+const PHASE_OF_DIR = {
+  research: 'discover', strategy: 'define', ideation: 'ideate',
+  designs: 'design', prototypes: 'prototype', tests: 'test', handoff: 'deliver',
+};
+function phaseOf(relPath) {
+  const within = String(relPath).replace(/^tasks\/[^/]+\//, '');
+  return PHASE_OF_DIR[within.split('/')[0]] || 'discover';
+}
+function taskIdFromArtifacts(artifacts) {
+  for (const a of (artifacts || [])) {
+    const m = String(a.path).match(/^tasks\/([^/]+)\//);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+/* Turn a raw CLI log line into a clean, subtle "chain of thought" step
+   (Copilot-chat style). Returns { icon, text } or null to skip noise. */
+function humanizeLogLine(raw) {
+  let s = String(raw).replace(/\x1b\[[0-9;]*m/g, ''); // strip ANSI
+  const hadBullet = /^\s*[●○•]/.test(s);
+  s = s.replace(/^\s*[●○•▶✔✖■\u2514\u2502|>\-]+\s*/, '').trim();
+  if (!s) return null;
+
+  // Skip sub-detail / noise lines.
+  if (/^\d+\s+(lines?|files?|results?|matches?)\b/i.test(s)) return null;
+  if (/^L\d+(:\d+)?/.test(s)) return null;
+  if (/^\(.*\)$/.test(s)) return null;
+
+  let m;
+  if ((m = s.match(/^skill\(([^)]+)\)/i)))
+    return { icon: ICONS.book, text: `Using skill <strong>${escapeHtml(m[1])}</strong>` };
+  if ((m = s.match(/^(?:Read|Reading)(?:\s+file)?\s+(.+)$/i)))
+    return { icon: ICONS.doc, text: `Reading <strong>${escapeHtml(baseName(m[1]))}</strong>` };
+  if ((m = s.match(/^(?:List directory|Listing|Explored?|Exploring)\s+(.+)$/i)))
+    return { icon: ICONS.folder, text: `Exploring <strong>${escapeHtml(m[1])}</strong>` };
+  if ((m = s.match(/^(?:Write|Writing|Creat(?:e|ed|ing)|Edit|Editing|Updat(?:e|ed|ing))\s+(?:file\s+)?(.+)$/i))) {
+    const name = baseName(m[1]);
+    const label = /\.md$/i.test(name) ? `Generating <strong>${escapeHtml(name)}</strong>` : `Writing <strong>${escapeHtml(name)}</strong>`;
+    return { icon: ICONS.sparkle, text: label };
+  }
+  if (/^(?:Bash|Run|Running|\$)/i.test(s)) return { icon: ICONS.code, text: 'Running a command' };
+  if ((m = s.match(/^(?:Fetch|Fetching)\s+(.+)$/i)))
+    return { icon: ICONS.send, text: `Fetching <strong>${escapeHtml(m[1].slice(0, 60))}</strong>` };
+  if ((m = s.match(/^(?:Search|Searching|Grep)\s+(.+)$/i)))
+    return { icon: ICONS.evaluate, text: `Searching <strong>${escapeHtml(m[1].slice(0, 60))}</strong>` };
+
+  // Our own system markers.
+  if (/^Running Copilot CLI/i.test(s)) return { icon: ICONS.sparkle, text: 'Starting up' };
+  if (/^Cancel/i.test(s) || /^Done\b/i.test(s) || /^Exited\b/i.test(s)) return null;
+
+  // Generic short bulleted action → show as a subtle thought.
+  if (hadBullet && s.length <= 100) return { icon: ICONS.loop, text: escapeHtml(s) };
+  return null;
+}
+
+function makeStepTracker(stepsEl) {
+  return {
+    add(step) {
+      if (!stepsEl) return;
+      // Replace the single active step in-place — no growing list.
+      stepsEl.innerHTML = `<div class="run-step active"><span class="step-ico"><span class="step-spin"></span></span><span class="step-text">${step.text}</span></div>`;
+    },
+    finalize() { if (stepsEl) stepsEl.innerHTML = ''; },
+  };
+}
+
+function finalizeSteps(mountEl) {
+  mountEl.querySelectorAll('.run-step.active').forEach(el => {
+    el.classList.remove('active');
+    el.classList.add('done');
+    const ico = el.querySelector('.step-ico');
+    if (ico) ico.innerHTML = ICONS.check;
+  });
+}
+
 let CURRENT_JOB = null;
 
-async function runAgent({ kind, prompt, agent, taskId, mountEl, label }) {
+async function runAgent({ kind, prompt, agent, taskId, mountEl, label, sourceArtifacts, runtimeSourceArtifacts, toolId }) {
   if (!mountEl) return;
   const cleanPrompt = stripAgentPrefix(prompt);
   mountEl.innerHTML = processingPanelHtml(label || 'Starting…');
   const logEl = mountEl.querySelector('.run-log');
+  const stepsEl = mountEl.querySelector('.run-steps');
   const statusEl = mountEl.querySelector('.run-status-text');
   const cancelBtn = mountEl.querySelector('.run-cancel');
+  const steps = makeStepTracker(stepsEl);
 
   let jobId = null;
   try {
     const res = await fetch('/api/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: cleanPrompt, agent, taskId, kind }),
+      body: JSON.stringify({
+        prompt: cleanPrompt,
+        agent,
+        taskId,
+        kind,
+        toolId: toolId || null,
+        sourceArtifacts: runtimeSourceArtifacts || [],
+      }),
     });
     if (!res.ok) {
-      const txt = await res.text().catch(() => '');
+      let payload = null;
+      try { payload = await res.json(); } catch { payload = null; }
+      const txt = payload ? JSON.stringify(payload) : await res.text().catch(() => '');
       throw new Error(`Bridge responded ${res.status} ${txt}`);
     }
     const data = await res.json();
     jobId = data.jobId;
+    if (data && data.sourceContext) {
+      logSourceContext(logEl, data.sourceContext);
+    }
   } catch (err) {
     statusEl.textContent = 'Could not reach the bridge.';
     appendLogLine(logEl, 'stderr', String(err.message || err));
@@ -1402,39 +2919,70 @@ async function runAgent({ kind, prompt, agent, taskId, mountEl, label }) {
   }
 
   CURRENT_JOB = jobId;
-  cancelBtn.onclick = () => cancelJob(jobId);
+  cancelBtn.onclick = () => {
+    cancelBtn.disabled = true;
+    cancelBtn.textContent = 'Cancelling…';
+    statusEl.textContent = 'Cancelling…';
+    cancelJob(jobId);
+  };
 
   const es = new EventSource(`/api/jobs/${jobId}/stream`);
   es.addEventListener('log', (e) => {
-    try { const d = JSON.parse(e.data); appendLogLine(logEl, d.stream, d.line); } catch {}
+    let d; try { d = JSON.parse(e.data); } catch { return; }
+    appendLogLine(logEl, d.stream, d.line);
+    if (d.stream === 'stderr') return; // keep errors in raw log only
+    // Only surface meaningful milestones — skill use and file writes.
+    if (isMeaningfulStep(d.line)) {
+      const step = humanizeLogLine(d.line);
+      if (step) steps.add(step);
+    }
   });
+  let lastVerifyResult = null;
+
   es.addEventListener('status', (e) => {
     let d; try { d = JSON.parse(e.data); } catch { return; }
     if (d.status === 'running') {
-      statusEl.textContent = 'Processing…';
+      statusEl.textContent = `${agentDisplayName(agent)} is working…`;
+    } else if (d.status === 'verifying') {
+      statusEl.textContent = `Verifying quality (round ${d.round || 1})…`;
+      steps.add({ icon: ICONS.evaluate, text: 'Checking output against quality gate' });
+    } else if (d.status === 'rerunning') {
+      statusEl.textContent = `Quality gate failed — re-running (round ${d.round || 2})…`;
+      steps.add({ icon: ICONS.loop, text: `Re-running with targeted fixes (round ${d.round || 2})` });
     } else if (d.status === 'done') {
       es.close();
-      finishRun(mountEl, { ok: true, artifacts: d.artifacts || [], taskId });
+      finishRun(mountEl, { ok: true, artifacts: d.artifacts || [], taskId, verifyResult: d.verifyResult || lastVerifyResult, sourceArtifacts });
+    } else if (d.status === 'flagged') {
+      es.close();
+      finishRun(mountEl, { flagged: true, artifacts: d.artifacts || [], taskId, verifyResult: d.verifyResult || lastVerifyResult, sourceArtifacts });
     } else if (d.status === 'error') {
       es.close();
-      finishRun(mountEl, { ok: false, artifacts: d.artifacts || [], error: d.error, taskId, prompt, agent, kind, label });
+      finishRun(mountEl, { ok: false, artifacts: d.artifacts || [], error: d.error, taskId, prompt, agent, kind, label, sourceArtifacts });
     } else if (d.status === 'cancelled') {
       es.close();
-      finishRun(mountEl, { cancelled: true, taskId });
+      finishRun(mountEl, { cancelled: true, taskId, sourceArtifacts });
     }
   });
+
+  es.addEventListener('verify-result', (e) => {
+    let d; try { d = JSON.parse(e.data); } catch { return; }
+    lastVerifyResult = d;
+  });
+
   es.onerror = () => { /* browser auto-reconnects; server replays buffered log */ };
 }
 
-async function finishRun(mountEl, { ok, cancelled, artifacts = [], error, taskId, prompt, agent, kind, label }) {
+async function finishRun(mountEl, { ok, flagged, cancelled, artifacts = [], error, taskId, prompt, agent, kind, label, verifyResult, sourceArtifacts = [] }) {
   CURRENT_JOB = null;
   const panel = mountEl.querySelector('.processing-panel');
   const spinner = mountEl.querySelector('.run-spinner');
   const statusEl = mountEl.querySelector('.run-status-text');
   const cancelBtn = mountEl.querySelector('.run-cancel');
-  const artifactsEl = mountEl.querySelector('.run-artifacts');
+  const resultEl = mountEl.querySelector('.run-result');
+  finalizeSteps(mountEl);
   if (spinner) spinner.classList.add('stopped');
-  if (panel) panel.classList.add(ok ? 'is-done' : (cancelled ? 'is-cancelled' : 'is-error'));
+  if (panel) panel.classList.add(ok ? 'is-done' : (flagged ? 'is-flagged' : (cancelled ? 'is-cancelled' : 'is-error')));
+  if (cancelBtn) cancelBtn.disabled = false;
 
   if (cancelled) {
     if (statusEl) statusEl.textContent = 'Run cancelled.';
@@ -1442,40 +2990,144 @@ async function finishRun(mountEl, { ok, cancelled, artifacts = [], error, taskId
     return;
   }
 
+  if (flagged) {
+    if (statusEl) statusEl.textContent = 'Quality gate failed after 2 rounds — review needed.';
+    if (cancelBtn) { cancelBtn.textContent = 'Dismiss'; cancelBtn.onclick = () => { mountEl.innerHTML = ''; }; }
+    if (resultEl) resultEl.innerHTML = renderVerifyPanel(verifyResult, artifacts, taskId);
+    return;
+  }
+
   if (!ok) {
     if (statusEl) statusEl.textContent = error ? `Run failed: ${error}` : 'Run failed.';
     if (cancelBtn) {
       cancelBtn.textContent = 'Retry';
-      cancelBtn.onclick = () => runAgent({ kind, prompt, agent, taskId, mountEl, label });
+      cancelBtn.onclick = () => runAgent({
+        kind,
+        prompt,
+        agent,
+        taskId,
+        mountEl,
+        label,
+        sourceArtifacts,
+        runtimeSourceArtifacts: runtimeComposerSourceArtifacts(),
+      });
     }
-  } else {
-    if (statusEl) {
-      statusEl.textContent = artifacts.length
-        ? `Done — ${artifacts.length} artifact${artifacts.length === 1 ? '' : 's'} created.`
-        : 'Done — no file changes detected.';
-    }
-    if (cancelBtn) { cancelBtn.textContent = 'Done'; cancelBtn.onclick = () => { mountEl.innerHTML = ''; }; }
+    return;
   }
 
+  // Make the new/updated task show up in the sidebar.
   await refreshTasks();
+  rebuildSidebar();
 
-  if (artifactsEl && artifacts.length) {
+  const tid = taskId || taskIdFromArtifacts(artifacts);
+  if (tid && Array.isArray(sourceArtifacts) && sourceArtifacts.length) {
+    persistTaskSourceArtifacts(tid, sourceArtifacts);
+  }
+  const task = tid ? getTask(tid) : null;
+  const taskTitle = task ? task.title : (tid ? titleCaseId(tid) : null);
+
+  if (statusEl) {
+    statusEl.textContent = artifacts.length
+      ? `Done — ${artifacts.length} artifact${artifacts.length === 1 ? '' : 's'} ready.`
+      : 'Done.';
+  }
+  if (cancelBtn) { cancelBtn.textContent = 'Done'; cancelBtn.onclick = () => { mountEl.innerHTML = ''; }; }
+
+  if (!resultEl) return;
+  let html = '';
+
+  if (tid) {
+    const primary = artifacts.find(a => a.isMarkdown) || artifacts[0];
+    let taskHref = `task.html?task=${encodeURIComponent(tid)}`;
+    if (primary) {
+      const within = primary.path.replace(/^tasks\/[^/]+\//, '');
+      taskHref += `&file=${encodeURIComponent(within)}&phase=${phaseOf(primary.path)}`;
+    }
+    html += `
+      <a class="run-open-task" href="${taskHref}">
+        <span class="run-open-ico">${ICONS.folder}</span>
+        <span class="run-open-text">
+          <strong>Open ${escapeHtml(taskTitle || 'task')}</strong>
+          <small>Browse everything generated for this task</small>
+        </span>
+        <span class="run-open-arrow">→</span>
+      </a>`;
+  }
+
+  if (artifacts.length) {
     const items = artifacts.map(a => {
       const href = artifactLink(a.path);
-      const name = a.path.split('/').pop();
-      if (href) {
-        return `<a class="run-artifact" href="${href}">
-          <span class="run-artifact-ico">${a.isMarkdown ? ICONS.doc : ICONS.code}</span>
-          <span class="run-artifact-name">${escapeHtml(name)}</span>
-          <small>${escapeHtml(a.path)}</small></a>`;
-      }
-      return `<div class="run-artifact">
-        <span class="run-artifact-ico">${ICONS.doc}</span>
+      const name = baseName(a.path);
+      const inner = `
+        <span class="run-artifact-ico">${a.isMarkdown ? ICONS.doc : ICONS.code}</span>
         <span class="run-artifact-name">${escapeHtml(name)}</span>
-        <small>${escapeHtml(a.path)}</small></div>`;
+        <small>${escapeHtml(a.path)}</small>`;
+      return href
+        ? `<a class="run-artifact" href="${href}">${inner}</a>`
+        : `<div class="run-artifact">${inner}</div>`;
     }).join('');
-    artifactsEl.innerHTML = `<div class="run-artifacts-head">Generated artifacts</div>${items}`;
+    html += `<div class="run-artifacts-head">Generated artifacts</div>${items}`;
   }
+
+  resultEl.innerHTML = html;
+}
+
+function renderVerifyPanel(verifyResult, artifacts = [], taskId) {
+  const scoreColor = (s) => s >= 80 ? 'var(--color-success-500)' : s >= 60 ? 'var(--color-warning-500)' : 'var(--color-error-500)';
+
+  let dimensionRows = '';
+  if (verifyResult && verifyResult.scores) {
+    dimensionRows = Object.entries(verifyResult.scores).map(([dim, score]) => {
+      const failed = verifyResult.failedDimensions && verifyResult.failedDimensions.some(d => d.dimension === dim);
+      return `
+        <div class="verify-dimension ${failed ? 'verify-dimension-fail' : 'verify-dimension-pass'}">
+          <span class="verify-dim-name">${escapeHtml(dim)}</span>
+          <span class="verify-dim-score" style="color:${scoreColor(score)}">${score}/100</span>
+          ${failed ? `<span class="verify-dim-tag">${ICONS.warn} Below threshold</span>` : `<span class="verify-dim-tag verify-dim-ok">${ICONS.check} Passed</span>`}
+        </div>`;
+    }).join('');
+  }
+
+  let failureInstructions = '';
+  if (verifyResult && verifyResult.failedDimensions && verifyResult.failedDimensions.length) {
+    failureInstructions = `
+      <div class="verify-failures">
+        <div class="verify-failures-label">What to fix:</div>
+        ${verifyResult.failedDimensions.map(d => `
+          <div class="verify-failure-item">
+            <strong>${escapeHtml(d.dimension)}</strong>
+            <p>${escapeHtml(d.instruction || '')}</p>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  let artifactLinks = '';
+  if (artifacts.length) {
+    artifactLinks = artifacts.map(a => {
+      const href = artifactLink(a.path);
+      const name = baseName(a.path);
+      return href
+        ? `<a class="run-artifact" href="${href}"><span class="run-artifact-ico">${ICONS.doc}</span><span class="run-artifact-name">${escapeHtml(name)}</span><small>${escapeHtml(a.path)}</small></a>`
+        : '';
+    }).join('');
+  }
+
+  const score = verifyResult ? verifyResult.composite : 0;
+
+  return `
+    <div class="verify-panel">
+      <div class="verify-panel-head">
+        <span class="verify-flag-ico">${ICONS.warn}</span>
+        <div>
+          <strong>Quality gate failed</strong>
+          <small>Output did not meet the quality bar after 2 rounds. Review and fix manually, or adjust the tool's VERIFY.md.</small>
+        </div>
+        <span class="verify-score-badge" style="background:${scoreColor(score)}">${score}/100</span>
+      </div>
+      ${dimensionRows ? `<div class="verify-dimensions">${dimensionRows}</div>` : ''}
+      ${failureInstructions}
+      ${artifactLinks ? `<div class="run-artifacts-head">Best output (round 2)</div>${artifactLinks}` : ''}
+    </div>`;
 }
 
 async function cancelJob(jobId) {

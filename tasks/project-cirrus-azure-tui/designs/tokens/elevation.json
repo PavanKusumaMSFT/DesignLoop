@@ -1,0 +1,16 @@
+{
+  "$description": "Project Cirrus elevation primitives. Overlays (palette, resource list) sit above the terminal line; values are theme-specific because dark surfaces need deeper shadows.",
+  "elevation": {
+    "0": { "dark": "none", "light": "none" },
+    "1": { "dark": "0 1px 2px rgba(0,0,0,0.5)", "light": "0 1px 2px rgba(21,26,33,0.12)" },
+    "2": { "dark": "0 4px 12px rgba(0,0,0,0.55)", "light": "0 4px 12px rgba(21,26,33,0.16)" },
+    "3": { "dark": "0 8px 24px rgba(0,0,0,0.6)", "light": "0 8px 24px rgba(21,26,33,0.2)" }
+  },
+  "usage": {
+    "ghost-text": "0",
+    "hint-line": "0",
+    "parameter-palette": "2",
+    "resource-lookup-list": "2",
+    "peek-detail-panel": "3"
+  }
+}

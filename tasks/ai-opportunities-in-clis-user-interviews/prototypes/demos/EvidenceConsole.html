@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evidence Console Demo</title>
+  <style>
+    :root {
+      --color-neutral-950: #172126;
+      --color-neutral-800: #314047;
+      --color-neutral-300: #c6d0d1;
+      --color-neutral-100: #edf1f0;
+      --color-neutral-50: #f8faf9;
+      --color-teal-600: #006d72;
+      --color-teal-100: #d9f0ee;
+      --color-green-700: #146c35;
+      --color-green-100: #dbf2df;
+      --color-amber-800: #795600;
+      --color-amber-100: #fff1bd;
+      --color-red-700: #a12828;
+      --color-red-100: #fde3e2;
+      --color-focus-500: #005fb8;
+      --spacing-2xs: 0.25rem;
+      --spacing-xs: 0.5rem;
+      --spacing-sm: 0.75rem;
+      --spacing-md: 1rem;
+      --spacing-lg: 1.5rem;
+      --spacing-xl: 2rem;
+      --font-family-ui: Georgia, serif;
+      --font-family-code: "SFMono-Regular", Consolas, monospace;
+      --font-size-sm: 0.875rem;
+      --font-size-md: 1rem;
+      --font-size-lg: 1.25rem;
+      --font-size-xl: 1.75rem;
+      --font-weight-regular: 400;
+      --font-weight-semibold: 600;
+      --font-weight-bold: 700;
+      --line-height-normal: 1.5;
+      --line-height-tight: 1.2;
+      --border-radius-sm: 0.25rem;
+      --border-radius-md: 0.5rem;
+      --elevation-1: 0 0.25rem 0.75rem rgb(23 33 38 / 12%);
+      --motion-duration-fast: 150ms;
+    }
+
+    * { box-sizing: border-box; }
+    body { background: var(--color-neutral-100); color: var(--color-neutral-950); font-family: var(--font-family-ui); font-size: var(--font-size-md); line-height: var(--line-height-normal); margin: 0; }
+    button, input { font: inherit; }
+    button, input[type="checkbox"] { accent-color: var(--color-teal-600); }
+    button:focus-visible, input:focus-visible { outline: 0.1875rem solid var(--color-focus-500); outline-offset: 0.1875rem; }
+    .shell { max-width: 72rem; margin: 0 auto; padding: var(--spacing-lg); }
+    .masthead { border-bottom: 0.25rem solid var(--color-teal-600); display: flex; gap: var(--spacing-lg); justify-content: space-between; padding: var(--spacing-md) 0 var(--spacing-lg); }
+    h1, h2, p { margin: 0; }
+    h1 { font-size: var(--font-size-xl); line-height: var(--line-height-tight); }
+    h2 { font-size: var(--font-size-lg); line-height: var(--line-height-tight); }
+    .eyebrow { color: var(--color-teal-600); font-size: var(--font-size-sm); font-weight: var(--font-weight-bold); letter-spacing: 0; text-transform: uppercase; }
+    .switch { align-items: center; display: flex; font-weight: var(--font-weight-semibold); gap: var(--spacing-xs); }
+    .context { color: var(--color-neutral-800); font-size: var(--font-size-sm); margin-top: var(--spacing-xs); }
+    main { display: grid; gap: var(--spacing-lg); padding-top: var(--spacing-lg); }
+    .panel { background: var(--color-neutral-50); border: 0.0625rem solid var(--color-neutral-300); border-radius: var(--border-radius-md); box-shadow: var(--elevation-1); padding: var(--spacing-lg); }
+    .form-row, .actions { align-items: end; display: flex; flex-wrap: wrap; gap: var(--spacing-sm); }
+    .field { display: grid; flex: 1 1 22rem; gap: var(--spacing-2xs); }
+    label { font-weight: var(--font-weight-semibold); }
+    input[type="text"] { background: var(--color-neutral-50); border: 0.125rem solid var(--color-neutral-800); border-radius: var(--border-radius-sm); min-height: 2.75rem; padding: var(--spacing-xs); }
+    .button { background: var(--color-teal-600); border: 0.125rem solid var(--color-teal-600); border-radius: var(--border-radius-sm); color: var(--color-neutral-50); cursor: pointer; font-weight: var(--font-weight-bold); min-height: 2.75rem; padding: var(--spacing-xs) var(--spacing-md); }
+    .button:hover { background: var(--color-neutral-950); border-color: var(--color-neutral-950); }
+    .button.secondary { background: var(--color-neutral-50); color: var(--color-teal-600); }
+    .button:disabled { cursor: not-allowed; opacity: 0.55; }
+    .message { color: var(--color-red-700); font-size: var(--font-size-sm); min-height: 1.4rem; }
+    .hidden { display: none; }
+    .suggestion { display: grid; gap: var(--spacing-md); }
+    pre { background: var(--color-neutral-950); border-radius: var(--border-radius-sm); color: var(--color-neutral-50); font-family: var(--font-family-code); margin: 0; overflow-x: auto; padding: var(--spacing-md); white-space: pre; }
+    .checks { display: grid; gap: var(--spacing-xs); list-style: none; margin: 0; padding: 0; }
+    .check { align-items: start; border-left: 0.25rem solid var(--color-green-700); display: grid; gap: var(--spacing-2xs); padding: var(--spacing-xs); }
+    .check.warning { border-left-color: var(--color-amber-800); }
+    .state { font-weight: var(--font-weight-bold); }
+    .notice { background: var(--color-amber-100); border-left: 0.25rem solid var(--color-amber-800); padding: var(--spacing-md); }
+    .quiet-issue { background: var(--color-red-100); border-left: 0.25rem solid var(--color-red-700); padding: var(--spacing-md); }
+    .terminal { background: var(--color-neutral-950); color: var(--color-neutral-50); }
+    .terminal label { display: block; margin-bottom: var(--spacing-xs); }
+    .terminal input { background: var(--color-neutral-950); border-color: var(--color-neutral-300); color: var(--color-neutral-50); width: 100%; }
+    .terminal .button { margin-top: var(--spacing-sm); }
+    .live { min-height: 1.5rem; }
+    @media (max-width: 40rem) { .shell { padding: var(--spacing-md); } .masthead { align-items: start; flex-direction: column; gap: var(--spacing-md); } .panel { padding: var(--spacing-md); } .form-row > .button { width: 100%; } }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; transition-duration: 0ms !important; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="masthead">
+      <div><p class="eyebrow">CLI Assistance Prototype</p><h1>Evidence Console</h1><p class="context">Reviewable completion. No command is executed or sent from this demo.</p></div>
+      <label class="switch"><input id="assistant-toggle" type="checkbox"> Enable assistance</label>
+    </header>
+    <main>
+      <section class="panel" aria-labelledby="intent-heading">
+        <h2 id="intent-heading">Describe your goal</h2>
+        <form id="intent-form" class="form-row" novalidate>
+          <div class="field"><label for="intent">CLI intent</label><input id="intent" type="text" aria-describedby="intent-help intent-error" placeholder="Example: create a resource group"><span id="intent-help">Assistance is opt-in. This local demo does not transmit your text.</span><span id="intent-error" class="message" role="alert"></span></div>
+          <button id="generate" class="button" type="submit" disabled>Generate suggestion</button>
+        </form>
+      </section>
+      <section id="results" class="panel hidden" aria-labelledby="suggestion-heading">
+        <div class="suggestion">
+          <div><p class="eyebrow">Suggested command</p><h2 id="suggestion-heading">Review before insertion</h2></div>
+          <pre id="command" tabindex="0">az group create --name &lt;resource-group-name&gt; --location &lt;region&gt;</pre>
+          <div class="actions"><button id="insert" class="button" type="button">Insert into terminal</button><button id="copy" class="button secondary" type="button">Copy command</button></div>
+          <div><p class="eyebrow">Validation evidence</p><ul class="checks"><li class="check"><span class="state">Checked: syntax structure</span><span>Illustrative parameter shape matches the displayed command pattern.</span></li><li class="check"><span class="state">Checked: documentation route</span><span>Review official Azure CLI documentation before execution.</span></li><li class="check warning"><span class="state">Notice: best-practice scope</span><span>Choose names and regions according to your team standards.</span></li></ul></div>
+          <div class="notice" role="note"><strong>Environment-dependent boundary.</strong> Permissions, quota, subscription state, and organizational naming conventions are not validated here.</div>
+          <div class="quiet-issue" role="status"><strong>Quiet issue check:</strong> The sample needs actual values for name and region. <button id="correct" class="button secondary" type="button">Review correction</button></div>
+        </div>
+      </section>
+      <section class="panel terminal" aria-labelledby="terminal-heading">
+        <h2 id="terminal-heading">Terminal preview</h2><label for="terminal-command">Command is editable and will not run in this demo</label><input id="terminal-command" type="text" value="" placeholder="A reviewed command appears here"><button id="run" class="button" type="button">Run command</button>
+      </section>
+      <p id="live" class="live" aria-live="polite" aria-atomic="true"></p>
+    </main>
+  </div>
+  <script>
+    const assistantToggle = document.getElementById('assistant-toggle');
+    const generateButton = document.getElementById('generate');
+    const intent = document.getElementById('intent');
+    const form = document.getElementById('intent-form');
+    const results = document.getElementById('results');
+    const intentError = document.getElementById('intent-error');
+    const terminalCommand = document.getElementById('terminal-command');
+    const command = document.getElementById('command').textContent;
+    const live = document.getElementById('live');
+    assistantToggle.addEventListener('change', () => { generateButton.disabled = !assistantToggle.checked; live.textContent = assistantToggle.checked ? 'Assistance enabled. Your goal remains in this local demo.' : 'Assistance disabled. No suggestion will be generated.'; });
+    form.addEventListener('submit', (event) => { event.preventDefault(); if (!intent.value.trim()) { intentError.textContent = 'Describe a goal before generating a suggestion.'; intent.setAttribute('aria-invalid', 'true'); return; } intentError.textContent = ''; intent.removeAttribute('aria-invalid'); results.classList.remove('hidden'); live.textContent = 'Suggestion ready. Review the command and validation evidence.'; document.getElementById('suggestion-heading').focus?.(); });
+    document.getElementById('insert').addEventListener('click', () => { terminalCommand.value = command; live.textContent = 'Suggested command inserted into the editable terminal preview. It has not run.'; terminalCommand.focus(); });
+    document.getElementById('copy').addEventListener('click', () => { navigator.clipboard?.writeText(command); live.textContent = 'Command copied when browser permissions allow. Review it before use.'; });
+    document.getElementById('correct').addEventListener('click', () => { terminalCommand.value = 'az group create --name my-resource-group --location eastus'; live.textContent = 'Illustrative correction inserted into the terminal preview for review. It has not run.'; terminalCommand.focus(); });
+    document.getElementById('run').addEventListener('click', () => { live.textContent = 'This is a local prototype. No command was executed.'; });
+  </script>
+</body>
+</html>

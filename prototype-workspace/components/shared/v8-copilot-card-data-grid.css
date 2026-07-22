@@ -1,0 +1,25 @@
+/* ===========================================
+   Data Grid Card — Styles
+   =========================================== */
+
+.ap-copilot-datagrid-card {
+  /* Bleed into the parent card padding so the grid is edge-to-edge */
+  margin: calc(-1 * var(--spacing-sm)) calc(-1 * var(--spacing-md));
+  overflow: hidden;
+}
+
+/* Compact the grid rows within a card context */
+.ap-copilot-datagrid-card .ap-datagrid {
+  font-size: var(--text-s-size);
+  border: none;
+}
+
+.ap-copilot-datagrid-card .ap-datagrid__header-cell {
+  font-size: var(--text-s-size);
+}
+
+.ap-copilot-datagrid-card .ap-datagrid__cell {
+  padding-top: var(--spacing-xs);
+  padding-bottom: var(--spacing-xs);
+  font-size: var(--text-s-size);
+}

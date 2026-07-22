@@ -1,0 +1,183 @@
+/* ===========================================
+   RADIO COMPONENT
+   Radio button with optional label and description
+   =========================================== */
+
+.ap-radio {
+  /* Reset */
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font-family: inherit;
+
+  /* Layout */
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+/* When description is present, align circle to top */
+.ap-radio--has-description {
+  align-items: flex-start;
+}
+
+.ap-radio:focus-visible {
+  outline: none;
+  border-radius: var(--radius-sm);
+  box-shadow:
+    0 0 0 1px var(--neutral-0),
+    0 0 0 2px var(--neutral-160);
+}
+
+
+/* ===========================================
+   RADIO CIRCLE
+   =========================================== */
+
+.ap-radio__circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 1px solid var(--input-border-rest);
+  border-radius: 50%;
+  background-color: var(--neutral-0);
+  box-sizing: border-box;
+  transition:
+    border-color var(--transition-fast);
+}
+
+
+/* ===========================================
+   RADIO DOT
+   10px filled circle, hidden by default
+   =========================================== */
+
+.ap-radio__dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: transparent;
+  transition:
+    background-color var(--transition-fast);
+}
+
+
+/* ===========================================
+   CONTENT (label + description)
+   =========================================== */
+
+.ap-radio__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.ap-radio__label {
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+  user-select: none;
+}
+
+.ap-radio__description {
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+
+/* ===========================================
+   STATES
+   =========================================== */
+
+/* --- Hover (unselected) — show ghost dot --- */
+.ap-radio:hover:not(:disabled) .ap-radio__circle {
+  border-color: var(--input-border-hover);
+}
+
+.ap-radio:hover:not(:disabled):not(.ap-radio--checked) .ap-radio__dot {
+  background-color: var(--text-secondary);
+}
+
+/* --- Selected --- */
+.ap-radio--checked .ap-radio__circle {
+  border-color: var(--input-accent);
+}
+
+.ap-radio--checked .ap-radio__dot {
+  background-color: var(--input-accent);
+}
+
+/* --- Selected + Hover --- */
+.ap-radio--checked:hover:not(:disabled) .ap-radio__circle {
+  border-color: var(--blue-60);
+}
+
+.ap-radio--checked:hover:not(:disabled) .ap-radio__dot {
+  background-color: var(--blue-60);
+}
+
+/* --- Focus --- */
+.ap-radio:focus-visible .ap-radio__circle {
+  border-color: var(--input-border-hover);
+}
+
+.ap-radio--checked:focus-visible .ap-radio__circle {
+  border-color: var(--input-accent);
+}
+
+/* --- Disabled --- */
+.ap-radio--disabled {
+  cursor: not-allowed;
+}
+
+.ap-radio--disabled .ap-radio__circle {
+  border-color: var(--input-border-disabled);
+  background-color: var(--input-bg-disabled);
+}
+
+.ap-radio--disabled .ap-radio__label {
+  color: var(--text-disabled);
+}
+
+.ap-radio--disabled .ap-radio__description {
+  color: var(--text-disabled);
+}
+
+/* --- Selected + Disabled --- */
+.ap-radio--checked.ap-radio--disabled .ap-radio__circle {
+  border-color: var(--input-accent-disabled);
+}
+
+.ap-radio--checked.ap-radio--disabled .ap-radio__dot {
+  background-color: var(--neutral-90);
+}
+
+
+/* ===========================================
+   RADIO GROUP
+   Vertically stacked radios
+   =========================================== */
+
+.ap-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+/* First radio matches standard input height so labels align in form fields */
+.ap-radio-group > .ap-radio:first-child {
+  min-height: 24px;
+}

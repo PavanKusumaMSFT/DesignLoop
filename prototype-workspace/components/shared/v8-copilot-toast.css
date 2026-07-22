@@ -1,0 +1,179 @@
+/* ===========================================
+   Copilot Toast — Styles
+   Animated gradient border (::after) + glow (::before)
+   =========================================== */
+
+/* ---- Animated angle shared by border & glow ---- */
+@property --toast-border-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: true;
+}
+
+/* ---- Card container ---- */
+
+.ap-copilot-toast {
+  position: relative;
+  border-radius: var(--radius-lg);
+  isolation: isolate;
+  animation: copilot-border-spin var(--copilot-toast-border-spin-duration) linear infinite;
+  cursor: pointer;
+}
+
+/* Glow — blurred conic gradient extending beyond the card */
+/* Rotating glow — concentrated near the border arc, fades to nothing elsewhere */
+.ap-copilot-toast::before {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  border-radius: calc(var(--radius-lg) + 14px);
+  background: conic-gradient(
+    from var(--toast-border-angle),
+    transparent 0deg,
+    transparent 40deg,
+    var(--copilot-toast-glow-3) 80deg,
+    var(--copilot-toast-glow-4) 160deg,
+    var(--copilot-toast-glow-5) 210deg,
+    transparent 230deg,
+    transparent 360deg
+  );
+  filter: blur(10px);
+  z-index: -1;
+}
+
+/* Border — conic gradient masked to only the 1px edge */
+.ap-copilot-toast::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  padding: 1px;
+  background: conic-gradient(
+    from var(--toast-border-angle),
+    transparent 0deg,
+    transparent 20deg,
+    var(--copilot-toast-border-3) 60deg,
+    var(--copilot-toast-border-4) 140deg,
+    var(--copilot-toast-border-5) 200deg,
+    transparent 240deg,
+    transparent 360deg
+  );
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  pointer-events: none;
+}
+
+@keyframes copilot-border-spin {
+  to { --toast-border-angle: 360deg; }
+}
+
+/* Inner wrapper — card content */
+.ap-copilot-toast__inner {
+  position: relative;
+  z-index: 1;
+  background: var(--copilot-toast-bg);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  /* Subtle static shadow gives the card visible edges even where the glow isn't */
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+/* ---- Header row ---- */
+
+.ap-copilot-toast__header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.ap-copilot-toast__title {
+  flex: 1;
+  font-size: var(--body-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--body-line-height);
+  color: var(--copilot-toast-title-fg);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ap-copilot-toast__close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--copilot-toast-close-fg);
+  padding: 0;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.ap-copilot-toast__close:hover {
+  color: var(--copilot-toast-close-fg-hover);
+  background: var(--neutral-20);
+}
+
+.ap-copilot-toast__close svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ---- Body ---- */
+
+.ap-copilot-toast__body {
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  color: var(--copilot-toast-body-fg);
+}
+
+/* ---- Actions footer ---- */
+
+.ap-copilot-toast__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  justify-content: flex-end;
+  padding-top: var(--spacing-xs);
+}
+
+/* ---- Enter / exit animations ---- */
+
+.ap-copilot-toast--entering {
+  animation:
+    copilot-toast-enter-fade var(--copilot-toast-enter-fade-duration) ease-out both,
+    copilot-toast-enter-slide var(--copilot-toast-enter-slide-duration) ease-out both,
+    copilot-border-spin var(--copilot-toast-border-spin-duration) linear infinite;
+}
+
+.ap-copilot-toast--exiting {
+  animation:
+    copilot-toast-exit var(--copilot-toast-exit-duration) ease-in both,
+    copilot-border-spin var(--copilot-toast-border-spin-duration) linear infinite;
+}
+
+@keyframes copilot-toast-enter-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes copilot-toast-enter-slide {
+  from { transform: translateY(-20px); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes copilot-toast-exit {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-8px); }
+}

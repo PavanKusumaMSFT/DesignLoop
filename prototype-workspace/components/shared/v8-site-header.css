@@ -1,0 +1,164 @@
+/* ===========================================
+   SITE HEADER COMPONENT
+   Azure portal header bar
+   =========================================== */
+
+.ap-site-header {
+  /* Layout */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  padding: 0 var(--spacing-sm);
+  box-sizing: border-box;
+
+  /* Appearance */
+  background-color: var(--blue-50);
+}
+
+
+/* ===========================================
+   LEFT SECTION
+   Navigation + Branding
+   =========================================== */
+.ap-site-header__left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.ap-site-header__brand {
+  font-family: var(--font-family);
+  font-size: var(--site-header-title-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--neutral-0);
+  margin-left: var(--spacing-sm);
+  white-space: nowrap;
+}
+
+
+/* ===========================================
+   CENTER SECTION
+   Search + Copilot
+   =========================================== */
+.ap-site-header__center {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.ap-site-header__center .ap-header-search {
+  width: 520px;
+  max-width: 100%;
+}
+
+
+/* ===========================================
+   RIGHT SECTION
+   Toolbar + User info
+   =========================================== */
+.ap-site-header__right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+.ap-site-header__toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.ap-site-header__user {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-left: var(--spacing-sm);
+}
+
+.ap-site-header__user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.ap-site-header__user-name {
+  font-family: var(--font-family);
+  font-size: var(--h3-size);
+  line-height: var(--h3-line-height);
+  font-weight: var(--h3-weight);
+  color: var(--neutral-0);
+  white-space: nowrap;
+}
+
+.ap-site-header__user-company {
+  font-family: var(--font-family);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line-height);
+  font-weight: var(--font-weight-semibold);
+  color: var(--neutral-0);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+
+/* ===========================================
+   AVATAR
+   =========================================== */
+.ap-site-header__avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.ap-site-header__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ap-site-header__avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background-color: var(--neutral-0);
+  color: var(--blue-50);
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+
+/* ===========================================
+   RESPONSIVE BEHAVIOR
+   =========================================== */
+@media (max-width: 1200px) {
+  .ap-site-header__center .ap-header-search {
+    width: 400px;
+  }
+}
+
+@media (max-width: 900px) {
+  .ap-site-header__center .ap-header-search {
+    width: 300px;
+  }
+  
+  .ap-site-header__user-info {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .ap-site-header__center .ap-header-search {
+    width: 200px;
+  }
+}

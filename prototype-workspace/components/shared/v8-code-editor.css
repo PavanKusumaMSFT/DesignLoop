@@ -1,0 +1,32 @@
+/* ===========================================
+   Code Editor
+   Monaco editor wrapper for code editing
+   =========================================== */
+
+.ap-code-editor {
+  width: 100%;
+  font-family: var(--font-family);
+  border: 1px solid var(--neutral-70);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.ap-code-editor--error {
+  border-color: var(--input-border-error);
+}
+
+.ap-code-editor--focused {
+  border-color: var(--input-border-focus);
+}
+
+/* Loading state */
+.ap-code-editor__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 200px;
+  background-color: var(--neutral-10);
+  color: var(--text-secondary);
+  font-size: var(--body-size);
+}

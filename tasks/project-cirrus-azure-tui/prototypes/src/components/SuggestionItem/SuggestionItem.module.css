@@ -1,0 +1,130 @@
+/* SuggestionItem — shared row primitive. Token-driven only (no literals). */
+
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border-left: 2px solid transparent;
+  border-radius: var(--border-radius-sm);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-snug);
+  color: var(--color-suggestion-idle-text);
+  background: var(--color-suggestion-idle-bg);
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.selected {
+  background: var(--color-suggestion-active-bg);
+  color: var(--color-suggestion-active-text);
+  border-left-color: var(--color-suggestion-active-border);
+}
+
+.primary {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-param-flag);
+}
+
+.selected .primary {
+  color: var(--color-suggestion-active-text);
+}
+
+/* A11Y-1 (WCAG 1.4.3): on the active row every child must clear >= 4.5:1 against
+   the active-row background, not just .primary. Recolour ALL children to the
+   on-active foreground token. Non-colour signalling (glyphs + words) is
+   preserved, so meaning survives the recolour. */
+.selected .match,
+.selected .requiredGlyph,
+.selected .typeHint,
+.selected .secondary,
+.selected .valid,
+.selected .deprecated,
+.selected .required,
+.selected .optional,
+.selected .live,
+.selected .cached {
+  color: var(--color-suggestion-active-text);
+}
+
+.match {
+  color: var(--color-suggestion-match);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.requiredGlyph {
+  color: var(--color-param-required);
+  font-weight: var(--font-weight-bold);
+}
+
+.typeHint {
+  color: var(--color-param-type);
+  font-size: var(--font-size-xs);
+}
+
+.secondary {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  margin-inline-start: auto;
+}
+
+.valid {
+  color: var(--color-enum-valid);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.deprecated {
+  color: var(--color-enum-deprecated);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.required {
+  color: var(--color-param-required);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.optional {
+  color: var(--color-param-optional);
+  font-size: var(--font-size-2xs);
+}
+
+.live {
+  color: var(--color-resource-live);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.cached {
+  color: var(--color-resource-cached);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Push freshness/status badges to the trailing edge when no .secondary present. */
+.valid,
+.deprecated,
+.required,
+.optional,
+.live,
+.cached {
+  margin-inline-start: var(--spacing-sm);
+}
+
+.secondary ~ .live,
+.secondary ~ .cached {
+  margin-inline-start: var(--spacing-sm);
+}
+
+/* Plain variant (State F-1): bare text token, no chrome. */
+.plain {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-suggestion-idle-text);
+}

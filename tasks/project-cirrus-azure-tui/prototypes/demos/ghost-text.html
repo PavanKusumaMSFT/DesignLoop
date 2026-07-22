@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cirrus — Ghost Text (State A)</title>
+  <link rel="stylesheet" href="../../designs/tokens/tokens.css" />
+  <link rel="stylesheet" href="cirrus-demo.css" />
+</head>
+<body>
+  <main class="host" id="host">
+    <div class="line">
+      <span class="prompt">$ </span><span class="command" id="cmd">az storage account cre</span><span class="ghost" id="ghost" aria-hidden="true"></span><span class="caret"></span>
+    </div>
+    <div class="below" id="below"></div>
+    <span class="sr-only" id="live" aria-live="polite"></span>
+  </main>
+
+  <div class="demo-controls" style="margin-top: var(--spacing-lg)">
+    <button id="typeBtn" type="button">Type matching char</button>
+    <button id="divergeBtn" type="button">Type diverging char</button>
+    <button id="tabBtn" type="button">Tab (accept)</button>
+    <button id="escBtn" type="button">Esc (dismiss)</button>
+    <button id="resetBtn" type="button">Reset</button>
+  </div>
+
+  <p class="demo-note">
+    <strong>State A — inline ghost-text completion (FR-1).</strong> The greyed continuation renders
+    <em>after</em> the caret, never covering the command line. The matched segment
+    (<code>ate</code>) is de-emphasised. The ghost span is <code>aria-hidden</code>; an
+    <code>aria-live="polite"</code> companion announces the suggestion so screen readers never read
+    half-typed text as real input. <code>Tab</code>/<code>→</code>-at-EOL accepts;
+    a diverging keystroke clears it; <code>Esc</code> dismisses — never traps.
+    <code>Enter</code> is never hijacked.
+  </p>
+
+  <script src="cirrus-demo.js"></script>
+  <script>
+    CirrusDemo.mount({ title: 'Ghost Text — State A', sub: 'FR-1 · concept C1', current: 'ghost-text.html' });
+
+    const FULL = 'ate --name mydata';
+    const MATCH = 'ate';
+    const cmd = document.getElementById('cmd');
+    const ghost = document.getElementById('ghost');
+    const live = document.getElementById('live');
+    const base = 'az storage account cre';
+    let typed = ''; // chars typed into the ghost region
+
+    function render() {
+      const remainingFull = FULL.slice(typed.length);
+      cmd.textContent = base + typed;
+      if (!remainingFull) { ghost.textContent = ''; live.textContent = ''; return; }
+      // emphasise the still-matched prefix portion of MATCH
+      const emphLen = Math.max(0, MATCH.length - typed.length);
+      const emph = remainingFull.slice(0, emphLen);
+      const rest = remainingFull.slice(emphLen);
+      ghost.innerHTML = (emph ? `<span class="emphasis">${emph}</span>` : '') + rest;
+      live.textContent = 'suggestion: ' + remainingFull + ', press Tab to accept';
+    }
+
+    function typeMatch() {
+      if (typed.length < FULL.length) { typed += FULL[typed.length]; render(); }
+    }
+    function diverge() {
+      // diverging char clears the prediction (never commits stale text)
+      cmd.textContent = base + typed + 'X';
+      ghost.textContent = '';
+      live.textContent = '';
+    }
+    function accept() { typed = FULL; render(); }
+    function dismiss() { ghost.textContent = ''; live.textContent = ''; }
+    function reset() { typed = ''; render(); }
+
+    document.getElementById('typeBtn').onclick = typeMatch;
+    document.getElementById('divergeBtn').onclick = diverge;
+    document.getElementById('tabBtn').onclick = accept;
+    document.getElementById('escBtn').onclick = dismiss;
+    document.getElementById('resetBtn').onclick = reset;
+
+    // Real keyboard: focus host and use Tab/Esc/printable keys.
+    document.getElementById('host').tabIndex = 0;
+    document.getElementById('host').addEventListener('keydown', (e) => {
+      // Only intercept Tab while a ghost suggestion is actually shown (accept it).
+      // Otherwise let Tab move focus normally so the demo never traps keyboard users.
+      if (e.key === 'Tab') { if (ghost.textContent) { e.preventDefault(); accept(); } }
+      else if (e.key === 'Escape') { dismiss(); }
+      else if (e.key === 'Enter') { /* pass through — never hijacked */ }
+      else if (e.key.length === 1) {
+        e.preventDefault();
+        if (FULL[typed.length] === e.key) typeMatch(); else diverge();
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>

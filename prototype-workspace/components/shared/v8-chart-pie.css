@@ -1,0 +1,33 @@
+.ap-pie-chart__body {
+  gap: var(--spacing-md);
+}
+
+.ap-pie-chart__svg {
+  display: block;
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+/* When legend is on the right, constrain the pie width */
+.ap-pie-chart__body[style*="flex"] .ap-pie-chart__svg {
+  width: 50%;
+  min-width: 120px;
+}
+
+/* When legend is not beside, pie fills container */
+.ap-pie-chart__body:not([style*="flex"]) .ap-pie-chart__svg {
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+.ap-pie-chart__slice {
+  cursor: pointer;
+  stroke: var(--neutral-0);
+  stroke-width: 2;
+  transition: opacity var(--transition-fast);
+}
+
+.ap-pie-chart__slice:hover {
+  opacity: 0.8;
+}

@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cirrus — Parameter Palette (State B)</title>
+  <link rel="stylesheet" href="../../designs/tokens/tokens.css" />
+  <link rel="stylesheet" href="cirrus-demo.css" />
+</head>
+<body>
+  <main class="host" id="host" aria-label="Terminal">
+    <div class="line">
+      <span class="prompt">$ </span><span
+        class="command" id="cmd" role="combobox" tabindex="0"
+        aria-label="Azure CLI command" aria-autocomplete="list"
+        aria-expanded="true" aria-controls="pal" aria-activedescendant="pal-opt-0"
+        >az servicebus namespace create --sku </span><span class="caret"></span>
+    </div>
+    <div class="below">
+      <div class="overlay" id="overlay">
+        <div class="overlay-header">
+          <span class="hlabel">parameters · az servicebus namespace create</span>
+          <span class="badge-cached">⚡ cached</span>
+        </div>
+        <ul class="overlay-list" role="listbox" id="pal"
+            aria-label="Parameters for az servicebus namespace create"></ul>
+        <div class="overlay-footer">
+          <span>↑↓ move · Tab accept · Esc dismiss · Ctrl+Space peek</span>
+          <span id="count"></span>
+        </div>
+      </div>
+    </div>
+    <span class="sr-only" id="live" aria-live="polite"></span>
+  </main>
+
+  <div class="demo-controls" style="margin-top: var(--spacing-lg)">
+    <button id="downBtn" type="button">↓</button>
+    <button id="upBtn" type="button">↑</button>
+    <button id="tabBtn" type="button">Tab (insert)</button>
+    <button id="escBtn" type="button">Esc (dismiss)</button>
+    <input id="filter" placeholder="type to filter…" aria-label="Filter parameters"
+           style="font-family: var(--font-family-mono); font-size: var(--font-size-xs); padding: var(--spacing-2xs) var(--spacing-sm); border-radius: var(--border-radius-sm); border: 1px solid var(--color-border-default); background: var(--color-surface-overlay); color: var(--color-text-primary);" />
+  </div>
+
+  <p class="demo-note">
+    <strong>State B — parameter palette (FR-2).</strong> Non-modal popover below the caret line.
+    ARIA <code>listbox</code> with roving <code>aria-activedescendant</code> — the command input keeps
+    DOM focus, so this is a <em>popup, not a focus trap</em> (NG2). Required params surface first and
+    are signalled by <em>red text + <code>*</code> glyph + the word "required"</em> (never color-alone).
+    <code>↑↓</code> wrap; <code>Tab</code> inserts; <code>Esc</code> dismisses; <code>Enter</code> is
+    never consumed (it submits the shell line).
+  </p>
+
+  <script src="cirrus-demo.js"></script>
+  <script>
+    CirrusDemo.mount({ title: 'Parameter Palette — State B', sub: 'FR-2 · concepts C5/C6/C7', current: 'parameter-palette.html' });
+
+    const ITEMS = [
+      { label: '--sku', type: 'enum', desc: 'Pricing tier', req: 'required' },
+      { label: '--location', type: 'string', desc: 'Azure region', req: 'required' },
+      { label: '--resource-group', type: 'lookup', desc: 'Existing RG', req: 'required' },
+      { label: '--tags', type: 'string', desc: 'Key=value pairs', req: 'optional' },
+    ];
+    const list = document.getElementById('pal');
+    const cmd = document.getElementById('cmd');
+    const live = document.getElementById('live');
+    const count = document.getElementById('count');
+    const filterEl = document.getElementById('filter');
+    let active = 0;
+    let filter = '';
+
+    function visible() {
+      const f = filter.toLowerCase();
+      return ITEMS.filter(it => !f || it.label.toLowerCase().includes(f));
+    }
+
+    function render() {
+      const rows = visible();
+      if (active >= rows.length) active = Math.max(0, rows.length - 1);
+      list.innerHTML = rows.map((it, i) => {
+        const id = 'pal-opt-' + i;
+        const sel = i === active ? ' selected' : '';
+        const reqBadge = it.req === 'required'
+          ? '<span class="badge-required">required</span>'
+          : '<span class="badge-optional">optional</span>';
+        const star = it.req === 'required' ? '<span class="requiredGlyph">\u00A0*</span>' : '';
+        const aria = it.label + ', ' + it.req + ', ' + it.desc;
+        const labelHtml = highlight(it.label, f_range(it.label));
+        return `<li id="${id}" role="option" aria-selected="${i===active}" aria-label="${aria}" class="row${sel}">
+          <span class="rprimary" aria-hidden="true">${labelHtml}${star}</span>
+          <span class="typeHint" aria-hidden="true">&lt;${it.type}&gt;</span>
+          <span class="secondary" aria-hidden="true">${it.desc}</span>
+          ${reqBadge}
+        </li>`;
+      }).join('') || '<li class="empty-note" role="note">no bounded values — type freely &lt;free text&gt;</li>';
+      const activeId = rows.length ? 'pal-opt-' + active : '';
+      cmd.setAttribute('aria-activedescendant', activeId);
+      count.textContent = filter ? rows.length + ' of ' + ITEMS.length + ' match' : '';
+      // wire clicks
+      Array.from(list.querySelectorAll('.row')).forEach((el, i) => {
+        el.addEventListener('mousedown', (e) => { e.preventDefault(); active = i; insert(); });
+      });
+    }
+
+    function f_range(label) {
+      if (!filter) return null;
+      const i = label.toLowerCase().indexOf(filter.toLowerCase());
+      return i >= 0 ? [i, i + filter.length] : null;
+    }
+    function highlight(label, range) {
+      if (!range) return label;
+      return label.slice(0, range[0]) + '<span class="match" aria-hidden="true">' +
+        label.slice(range[0], range[1]) + '</span>' + label.slice(range[1]);
+    }
+
+    function move(delta) {
+      const n = visible().length; if (!n) return;
+      active = (active + delta + n) % n; render();
+    }
+    function insert() {
+      const it = visible()[active]; if (!it) return;
+      cmd.textContent = 'az servicebus namespace create ' + it.label + ' ';
+      live.textContent = it.label + ' inserted';
+      document.getElementById('overlay').style.display = 'none';
+    }
+    function dismiss() {
+      document.getElementById('overlay').style.display = 'none';
+      cmd.setAttribute('aria-expanded', 'false');
+      live.textContent = 'palette dismissed';
+    }
+
+    document.getElementById('downBtn').onclick = () => move(1);
+    document.getElementById('upBtn').onclick = () => move(-1);
+    document.getElementById('tabBtn').onclick = insert;
+    document.getElementById('escBtn').onclick = dismiss;
+    filterEl.addEventListener('input', () => { filter = filterEl.value; active = 0; render(); });
+
+    document.getElementById('cmd').addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); move(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
+      else if (e.key === 'Tab') { e.preventDefault(); insert(); }
+      else if (e.key === 'Escape') { e.preventDefault(); dismiss(); }
+      // Enter intentionally NOT handled — passes through to the shell.
+    });
+
+    render();
+  </script>
+</body>
+</html>

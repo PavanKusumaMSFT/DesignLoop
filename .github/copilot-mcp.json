@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest", "--browser", "msedge"],
+      "description": "Playwright browser automation — navigate, click, fill forms, screenshot. Use for JS-rendered pages and authenticated portals.",
+      "env": {}
+    },
+    "desaigns-fetch": {
+      "command": "node",
+      "args": ["bridge/server.js"],
+      "description": "DesAIgns bridge — exposes /api/fetch, /api/browse, and /api/sessions for web content retrieval.",
+      "env": {}
+    }
+  }
+}

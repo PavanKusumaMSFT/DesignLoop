@@ -1,0 +1,18 @@
+{
+  "id": "tenets-traps-evaluation",
+  "name": "Tenets & Traps Evaluation",
+  "description": "Heuristic usability evaluation using Microsoft's UI Tenets & Traps framework (9 Tenets, 26 Traps). Produces a structured report with findings mapped to tenets, severity ratings, and round tracking.",
+  "stages": ["test", "design", "prototype"],
+  "agent": "tenets-traps-evaluation",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "design-to-code", "required": false },
+    { "type": "artifact", "from": "wireframe-spec", "required": false },
+    { "type": "link", "required": false }
+  ],
+  "outputs": [
+    "tests/usability/tenets-traps-evaluation-r1.md"
+  ],
+  "dependencies": [],
+  "required": true
+}

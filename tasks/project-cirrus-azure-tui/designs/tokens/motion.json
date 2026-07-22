@@ -1,0 +1,27 @@
+{
+  "$description": "Project Cirrus motion primitives. Durations respect the p95<=100ms inline feel and collapse to 0 under prefers-reduced-motion (NFR-2). No motion may block the keystroke path (FR-7).",
+  "motion": {
+    "duration": {
+      "instant": "0ms",
+      "fast": "90ms",
+      "base": "150ms",
+      "slow": "240ms"
+    },
+    "easing": {
+      "standard": "cubic-bezier(0.2, 0, 0, 1)",
+      "decelerate": "cubic-bezier(0, 0, 0, 1)",
+      "accelerate": "cubic-bezier(0.3, 0, 1, 1)"
+    },
+    "transition": {
+      "fade": "opacity 90ms cubic-bezier(0.2,0,0,1)",
+      "popover": "opacity 150ms cubic-bezier(0,0,0,1), transform 150ms cubic-bezier(0,0,0,1)"
+    }
+  },
+  "usage": {
+    "ghost-text-fade": "fast",
+    "palette-open": "base",
+    "resource-list-expand": "slow",
+    "loading-shimmer-cycle": "slow"
+  },
+  "reducedMotion": "All durations set to 0ms; fade/popover transitions set to none."
+}

@@ -1,0 +1,30 @@
+{
+  "name": "desaigns",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "start": "node bridge/server.js",
+    "login:microsoft": "curl -X POST http://localhost:8099/api/sessions/login -H 'Content-Type: application/json' -d '{\"provider\":\"microsoft\"}'",
+    "hits:token": "curl -s -X POST http://localhost:8099/api/hits/token",
+    "hits:token:status": "curl -s http://localhost:8099/api/hits/token"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PavanKusumaMSFT/DesignLoop.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/PavanKusumaMSFT/DesignLoop/issues"
+  },
+  "homepage": "https://github.com/PavanKusumaMSFT/DesignLoop#readme",
+  "dependencies": {
+    "playwright": "^1.61.0"
+  }
+}

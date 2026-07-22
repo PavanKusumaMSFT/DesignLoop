@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cirrus — Resource Lookup (State C)</title>
+  <link rel="stylesheet" href="../../designs/tokens/tokens.css" />
+  <link rel="stylesheet" href="cirrus-demo.css" />
+</head>
+<body>
+  <main class="host" id="host" aria-label="Terminal">
+    <div class="line">
+      <span class="prompt">$ </span><span class="command" id="cmd" role="combobox"
+        tabindex="0" aria-label="Azure CLI command"
+        aria-autocomplete="list" aria-expanded="true" aria-controls="res"
+        >az servicebus namespace create --resource-group </span><span class="caret"></span>
+    </div>
+    <div class="below">
+      <div class="overlay" id="overlay">
+        <div class="overlay-header">
+          <span class="hlabel">resource groups · sub: contoso-prod</span>
+          <span id="headBadge" class="badge-cached">looking up…</span>
+        </div>
+        <div id="shimmerRow" class="loading-row" aria-hidden="true">
+          <span class="shimmer"></span>
+          <span class="loading-text">loading live resources (≤ 500 ms)</span>
+        </div>
+        <ul class="overlay-list" role="listbox" id="res" aria-busy="true"
+            aria-label="resource groups in contoso-prod"></ul>
+        <p id="noteLine" class="refresh-note">… refreshing from subscription</p>
+        <div class="overlay-footer">
+          <span>↑↓ move · Tab accept · Esc free text</span>
+          <span id="count"></span>
+        </div>
+      </div>
+    </div>
+    <span class="sr-only" id="live" aria-live="polite"></span>
+  </main>
+
+  <div class="demo-controls" style="margin-top: var(--spacing-lg)">
+    <button id="replayBtn" type="button">▶ Replay loading → resolved</button>
+    <button id="timeoutBtn" type="button">Timeout</button>
+    <button id="unauthBtn" type="button">Unauthenticated</button>
+    <button id="emptyBtn" type="button">Empty</button>
+    <button id="downBtn" type="button">↓</button>
+    <button id="escBtn" type="button">Esc (free text)</button>
+  </div>
+
+  <p class="demo-note">
+    <strong>State C — resource lookup (FR-3, NFR-1).</strong> Cached-first: cached rows are usable
+    immediately (⚡) while live results (●) merge in — the user is <em>never blocked</em>. Freshness is a
+    text badge + glyph + color (never color-alone), announced via <code>aria-live</code>.
+    Loading sets <code>aria-busy</code>; the shimmer becomes static text under reduced motion.
+    Timeout/unauth/empty always fall back to free text — <code>Esc</code> collapses to plain typing
+    (AC-3.3), never traps.
+  </p>
+
+  <script src="cirrus-demo.js"></script>
+  <script>
+    CirrusDemo.mount({ title: 'Resource Lookup — State C', sub: 'FR-3 · NFR-1 · concepts C9/C10', current: 'resource-lookup.html' });
+
+    const CACHED = [
+      { name: 'rg-shared-eastus', meta: 'eastus', fresh: 'cached' },
+      { name: 'rg-staging-westus2', meta: 'westus2', fresh: 'cached' },
+    ];
+    const LIVE = [
+      { name: 'rg-staging-westus2', meta: 'westus2', fresh: 'live' },
+      { name: 'rg-staging-eastus', meta: 'eastus', fresh: 'cached' },
+    ];
+    const res = document.getElementById('res');
+    const cmd = document.getElementById('cmd');
+    const headBadge = document.getElementById('headBadge');
+    const shimmerRow = document.getElementById('shimmerRow');
+    const noteLine = document.getElementById('noteLine');
+    const live = document.getElementById('live');
+    const count = document.getElementById('count');
+    let items = CACHED, status = 'loading', active = 0;
+
+    function badge(fresh) {
+      return fresh === 'live'
+        ? '<span class="badge-live">\u25CF live</span>'
+        : '<span class="badge-cached">\u26A1 cached</span>';
+    }
+    function renderRows() {
+      res.innerHTML = items.map((it, i) => {
+        const sel = i === active ? ' selected' : '';
+        const aria = it.name + ', ' + it.fresh + (it.meta ? ', ' + it.meta : '');
+        return `<li id="res-opt-${i}" role="option" aria-selected="${i===active}" aria-label="${aria}" class="row${sel}">
+          <span class="rprimary" aria-hidden="true">${it.name}</span>
+          <span class="secondary" aria-hidden="true">${it.meta||''}</span>
+          ${badge(it.fresh)}
+        </li>`;
+      }).join('');
+      res.removeAttribute('aria-activedescendant');
+      cmd.setAttribute('aria-activedescendant', items[active] ? 'res-opt-' + active : '');
+    }
+
+    function setStatus(next) {
+      status = next;
+      res.style.display = 'block';
+      shimmerRow.style.display = next === 'loading' ? 'flex' : 'none';
+      noteLine.style.display = 'block';
+      res.setAttribute('aria-busy', String(next === 'loading'));
+      if (next === 'loading') {
+        headBadge.className = 'badge-cached'; headBadge.textContent = 'looking up…';
+        items = CACHED; renderRows();
+        noteLine.className = 'refresh-note'; noteLine.textContent = '… refreshing from subscription';
+      } else if (next === 'resolved') {
+        headBadge.className = 'badge-live'; headBadge.textContent = '\u25CF live';
+        items = LIVE; renderRows();
+        noteLine.style.display = 'none';
+        live.textContent = items.length + ' resources loaded';
+      } else if (next === 'timeout') {
+        headBadge.className = 'badge-cached'; headBadge.textContent = 'cached only';
+        items = CACHED; renderRows();
+        noteLine.className = 'fallback-line';
+        noteLine.textContent = 'showing cached · live lookup timed out — type any value';
+        live.textContent = 'live lookup timed out, showing cached';
+      } else if (next === 'unauthenticated') {
+        headBadge.textContent = ''; res.style.display = 'none';
+        noteLine.className = 'fallback-line';
+        noteLine.textContent = 'sign-in context unavailable — type any value (free text)';
+        live.textContent = 'sign-in unavailable, free text entry';
+      } else if (next === 'empty') {
+        headBadge.textContent = ''; res.style.display = 'none';
+        noteLine.className = 'fallback-line';
+        noteLine.textContent = 'no resource groups found — type a new name';
+        live.textContent = 'no resource groups found';
+      }
+      count.textContent = '';
+    }
+
+    function replay() {
+      setStatus('loading');
+      setTimeout(() => setStatus('resolved'), 900);
+    }
+
+    document.getElementById('replayBtn').onclick = replay;
+    document.getElementById('timeoutBtn').onclick = () => setStatus('timeout');
+    document.getElementById('unauthBtn').onclick = () => setStatus('unauthenticated');
+    document.getElementById('emptyBtn').onclick = () => setStatus('empty');
+    document.getElementById('downBtn').onclick = () => { if (items.length){ active=(active+1)%items.length; renderRows(); } };
+    document.getElementById('escBtn').onclick = () => {
+      document.getElementById('overlay').style.display = 'none';
+      live.textContent = 'collapsed to free-text entry';
+    };
+    document.getElementById('cmd').addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); if(items.length){active=(active+1)%items.length;renderRows();} }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); if(items.length){active=(active-1+items.length)%items.length;renderRows();} }
+      else if (e.key === 'Escape') { e.preventDefault(); document.getElementById('escBtn').click(); }
+    });
+
+    replay();
+  </script>
+</body>
+</html>

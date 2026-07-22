@@ -1,0 +1,16 @@
+{
+  "id": "hmw-reframing",
+  "name": "HMW Reframing",
+  "description": "Reframe problem statements as open-ended How Might We questions that inspire a wide range of solution ideas.",
+  "stages": ["ideate"],
+  "agent": "hmw-reframing",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "problem-statements", "required": true }
+  ],
+  "outputs": [
+    "ideation/hmw-questions.md"
+  ],
+  "dependencies": ["problem-statements"],
+  "required": true
+}

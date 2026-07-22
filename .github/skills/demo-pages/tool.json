@@ -1,0 +1,18 @@
+{
+  "id": "demo-pages",
+  "name": "Demo Pages",
+  "description": "Prepare the runnable prototype workspace route as the demo surface, showing all variants and states with Fluent UI React v9.",
+  "stages": ["prototype"],
+  "agent": "demo-pages",
+  "inputs": [
+    { "type": "task-description", "required": true },
+    { "type": "artifact", "from": "design-to-code", "required": true }
+  ],
+  "outputs": [
+    "prototype-workspace/app/{taskId}/page.tsx",
+    "prototype-workspace/components/projects/{taskId}/**/*.tsx",
+    "tasks/{taskId}/prototypes/manifest.md"
+  ],
+  "dependencies": ["design-to-code"],
+  "required": true
+}

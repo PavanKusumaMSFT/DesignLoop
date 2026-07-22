@@ -1,0 +1,71 @@
+/* ===========================================
+   Tag
+   Metadata label displayed as "Label : Value"
+   States match FilterPill (blue-10 → blue-20 → blue-30)
+   =========================================== */
+
+.ap-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 var(--spacing-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background-color: var(--blue-10);
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+.ap-tag:hover:not(:disabled) {
+  background-color: var(--blue-20);
+}
+
+.ap-tag:active:not(:disabled) {
+  background-color: var(--blue-30);
+}
+
+.ap-tag:focus-visible {
+  outline: none;
+  border-color: var(--neutral-130);
+  background-color: var(--blue-30);
+}
+
+.ap-tag:disabled {
+  background-color: var(--neutral-20);
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+
+/* --- Tag Content --- */
+
+.ap-tag__label {
+  /* Regular weight */
+}
+
+.ap-tag__separator {
+  margin: 0 var(--spacing-xs);
+}
+
+.ap-tag__value {
+  /* Regular weight */
+}
+
+
+/* ===========================================
+   TagGroup
+   Container for multiple tags with spacing
+   =========================================== */
+
+.ap-tag-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  align-items: center;
+}

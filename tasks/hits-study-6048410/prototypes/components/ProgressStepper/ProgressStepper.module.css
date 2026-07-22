@@ -1,0 +1,317 @@
+/* ProgressStepper.module.css */
+
+.container {
+  font-family: var(--font-family);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* Progress Bar */
+.progressBar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.progressTrack {
+  width: 100%;
+  height: 6px;
+  background: var(--color-neutral-200);
+  border-radius: var(--border-radius-full);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-primary-500);
+  border-radius: var(--border-radius-full);
+  transition: width var(--motion-duration-normal) var(--motion-easing-default),
+              height var(--motion-duration-normal) var(--motion-easing-default);
+}
+
+.progressLabel {
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-500);
+  text-align: right;
+}
+
+/* Steps */
+.steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  counter-reset: step;
+}
+
+/* Horizontal variant */
+.variant-horizontal .steps {
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.variant-horizontal .step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.variant-horizontal .connector {
+  position: absolute;
+  top: 16px;
+  left: -50%;
+  right: 50%;
+  height: 2px;
+  background: var(--color-neutral-200);
+  z-index: 0;
+}
+
+.variant-horizontal .connectorActive {
+  background: var(--color-primary-500);
+}
+
+.variant-horizontal .stepContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  position: relative;
+  z-index: 1;
+  cursor: default;
+  outline: none;
+  padding: var(--spacing-xs);
+  border-radius: var(--border-radius-md);
+}
+
+.variant-horizontal .stepContent:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+.variant-horizontal .stepText {
+  text-align: center;
+}
+
+/* Vertical variant */
+.variant-vertical {
+  max-width: 320px;
+}
+
+.variant-vertical .steps {
+  flex-direction: column;
+  gap: 0;
+}
+
+.variant-vertical .step {
+  position: relative;
+  padding-left: var(--spacing-xl);
+  padding-bottom: var(--spacing-lg);
+}
+
+.variant-vertical .step:last-child {
+  padding-bottom: 0;
+}
+
+.variant-vertical .connector {
+  position: absolute;
+  top: 0;
+  left: 15px;
+  width: 2px;
+  height: 100%;
+  background: var(--color-neutral-200);
+  z-index: 0;
+}
+
+.variant-vertical .connectorActive {
+  background: var(--color-primary-500);
+}
+
+.variant-vertical .stepContent {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  position: relative;
+  z-index: 1;
+  cursor: default;
+  outline: none;
+  padding: var(--spacing-xs);
+  border-radius: var(--border-radius-md);
+  margin-left: calc(-1 * var(--spacing-xl));
+}
+
+.variant-vertical .stepContent:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+.variant-vertical .stepText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+}
+
+.variant-vertical .progressBar {
+  display: none;
+}
+
+/* Step Indicator */
+.stepIndicator {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--border-radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  flex-shrink: 0;
+  transition: background var(--motion-duration-fast) var(--motion-easing-default),
+              color var(--motion-duration-fast) var(--motion-easing-default),
+              border-color var(--motion-duration-fast) var(--motion-easing-default);
+  border: 2px solid transparent;
+}
+
+.indicator-active {
+  background: var(--color-primary-500);
+  color: var(--color-neutral-0);
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 4px var(--color-primary-100);
+}
+
+.indicator-completed {
+  background: var(--color-primary-500);
+  color: var(--color-neutral-0);
+  border-color: var(--color-primary-500);
+  cursor: pointer;
+}
+
+.indicator-upcoming {
+  background: var(--color-neutral-0);
+  color: var(--color-neutral-400);
+  border-color: var(--color-neutral-300);
+}
+
+.indicator-error {
+  background: var(--color-error-50);
+  color: var(--color-error-500);
+  border-color: var(--color-error-500);
+}
+
+/* Step Text */
+.stepLabel {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-neutral-800);
+  line-height: var(--line-height-tight);
+}
+
+.step-upcoming .stepLabel {
+  color: var(--color-neutral-400);
+}
+
+.step-active .stepLabel {
+  color: var(--color-primary-700);
+  font-weight: var(--font-weight-semibold);
+}
+
+.step-error .stepLabel {
+  color: var(--color-error-600);
+}
+
+.stepDescription {
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-500);
+  line-height: var(--line-height-normal);
+}
+
+.step-active .stepDescription {
+  color: var(--color-neutral-600);
+}
+
+/* Minimal Variant */
+.minimal {
+  font-family: var(--font-family);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-neutral-0);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--color-neutral-200);
+}
+
+.minimalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.minimalLabel {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-neutral-800);
+}
+
+.minimalPercent {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary-500);
+}
+
+.minimalTrack {
+  width: 100%;
+  height: 8px;
+  background: var(--color-neutral-200);
+  border-radius: var(--border-radius-full);
+  overflow: hidden;
+}
+
+.minimalFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary-500), var(--color-primary-400));
+  border-radius: var(--border-radius-full);
+  transition: width var(--motion-duration-normal) var(--motion-easing-default);
+}
+
+.minimalDots {
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: center;
+}
+
+.minimalDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--border-radius-full);
+  transition: background var(--motion-duration-fast) var(--motion-easing-default);
+}
+
+.dot-completed {
+  background: var(--color-primary-500);
+}
+
+.dot-active {
+  background: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+
+.dot-upcoming {
+  background: var(--color-neutral-300);
+}
+
+.dot-error {
+  background: var(--color-error-500);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill,
+  .minimalFill,
+  .stepIndicator {
+    transition: none;
+  }
+}
