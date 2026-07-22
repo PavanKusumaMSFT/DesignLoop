@@ -792,6 +792,78 @@ function discoverTasks() {
 
 /* ──────────────────────────── API router ─────────────────────────── */
 
+/**
+ * Collect the ids that are part of the LIVE repo baseline — the union of
+ * data/live-prototypes.json entries and the LIVE_PROTOTYPE_IDS set declared in
+ * data/projects.ts. Used to keep discovered LOCAL prototypes from duplicating
+ * prototypes that already ship live.
+ */
+function liveIdSet() {
+  const ids = new Set();
+  try {
+    const arr = JSON.parse(fs.readFileSync(path.join(PROTO_DIR, 'data', 'live-prototypes.json'), 'utf8'));
+    if (Array.isArray(arr)) arr.forEach((e) => e && e.id && ids.add(e.id));
+  } catch { /* no live registry */ }
+  try {
+    const src = fs.readFileSync(path.join(PROTO_DIR, 'data', 'projects.ts'), 'utf8');
+    const m = src.match(/LIVE_PROTOTYPE_IDS\s*=\s*new Set<string>\(\[([\s\S]*?)\]\)/);
+    if (m) {
+      const re = /["'`]([a-z0-9][a-z0-9-_]*)["'`]/g;
+      let x;
+      while ((x = re.exec(m[1]))) ids.add(x[1]);
+    }
+  } catch { /* projects.ts unreadable */ }
+  return ids;
+}
+
+/**
+ * Discover LOCAL prototypes by scanning prototype-workspace/app for route
+ * directories that contain a page file. This is the source of truth for the
+ * workspace listing locally, so ANY prototype an agent creates shows up as soon
+ * as its files exist — no scaffold-script bookkeeping or bridge restart needed.
+ * Metadata (title/author/createdBy) is enriched from public/local-prototypes.json
+ * when present, otherwise derived from the id.
+ */
+function discoverLocalPrototypes() {
+  const appDir = path.join(PROTO_DIR, 'app');
+  const RESERVED = new Set(['workspace']); // framework/redirect routes, not prototypes
+  const live = liveIdSet();
+
+  const meta = {};
+  try {
+    const arr = JSON.parse(fs.readFileSync(path.join(PROTO_DIR, 'public', 'local-prototypes.json'), 'utf8'));
+    if (Array.isArray(arr)) arr.forEach((e) => { if (e && e.id) meta[e.id] = e; });
+  } catch { /* no local registry */ }
+
+  let entries;
+  try { entries = fs.readdirSync(appDir, { withFileTypes: true }); } catch { return []; }
+
+  const items = [];
+  for (const e of entries) {
+    if (!e.isDirectory()) continue;
+    const id = e.name;
+    if (id.startsWith('.') || id.startsWith('_') || RESERVED.has(id) || live.has(id)) continue;
+    const hasPage =
+      fs.existsSync(path.join(appDir, id, 'page.tsx')) ||
+      fs.existsSync(path.join(appDir, id, 'page.jsx'));
+    if (!hasPage) continue;
+    const m = meta[id] || {};
+    items.push({
+      id,
+      title: m.title || titleCase(id),
+      description: m.description,
+      status: m.status || 'in-progress',
+      author: m.author,
+      createdBy: m.createdBy,
+      origin: 'local',
+      route: m.route || `/${id}`,
+    });
+  }
+  // Newest first when a created timestamp is known.
+  items.sort((a, b) => (meta[b.id]?.createdAt || '').localeCompare(meta[a.id]?.createdAt || ''));
+  return items;
+}
+
 async function handleApi(req, res, url) {
   const { pathname } = url;
 
@@ -815,6 +887,12 @@ async function handleApi(req, res, url) {
       ready: protoState.ready,
       starting: protoState.starting,
     });
+  }
+
+  // GET /api/prototypes/list — LOCAL prototypes discovered from the filesystem.
+  // The workspace merges these with the committed LIVE baseline.
+  if (req.method === 'GET' && pathname === '/api/prototypes/list') {
+    return sendJson(res, 200, { items: discoverLocalPrototypes() });
   }
 
   // POST /api/prototypes/make-live — promote a locally-created prototype to the
@@ -847,7 +925,7 @@ async function handleApi(req, res, url) {
         if (Array.isArray(parsed)) localEntries = parsed;
       }
     } catch { localEntries = []; }
-    const entry = localEntries.find((e) => e && e.id === id) || { id, title: id };
+    const entry = localEntries.find((e) => e && e.id === id) || { id, title: titleCase(id) };
 
     // Merge into the committed live registry (upsert by id), dropping the createdBy
     // email so a personal identifier is never committed to the shared repo.

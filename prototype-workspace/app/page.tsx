@@ -123,30 +123,49 @@ const LIVE_ITEMS: CardItem[] = (() => {
   return [...fromRegistry, ...fromPromoted.filter((p) => !seen.has(p.id))];
 })();
 
+/** Normalize a raw local entry (from the bridge or the static file) to a card. */
+function toLocalCard(e: LocalPrototypeEntry): CardItem {
+  return {
+    id: e.id,
+    title: e.title,
+    description: e.description,
+    status: e.status || "in-progress",
+    author: e.author,
+    createdBy: e.createdBy,
+    origin: "local" as const,
+    route: e.route || `/${e.id}`,
+    sourceType: "local",
+  };
+}
+
 /**
- * Fetch locally-created prototypes from public/local-prototypes.json.
- * The file is git-ignored and absent on the hosted site (→ no local items),
- * so everything hosted shows as "Live".
+ * Load locally-created prototypes. Prefers the bridge's filesystem discovery
+ * (GET /api/prototypes/list) so ANY agent-created prototype appears as soon as
+ * its files exist — no scaffold bookkeeping or restart required. Falls back to
+ * the static public/local-prototypes.json (git-ignored, absent when hosted, so
+ * the hosted site shows only Live prototypes).
  */
 async function loadLocalItems(): Promise<CardItem[]> {
+  try {
+    const res = await fetch(`${BRIDGE_URL}/api/prototypes/list`, {
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const entries = Array.isArray(data?.items) ? data.items : [];
+      return entries
+        .filter((e: LocalPrototypeEntry) => e && e.id && e.title)
+        .map(toLocalCard);
+    }
+  } catch {
+    /* bridge unavailable (e.g. hosted) — fall through to the static file */
+  }
   try {
     const res = await fetch("/local-prototypes.json", { cache: "no-store" });
     if (!res.ok) return [];
     const entries = (await res.json()) as LocalPrototypeEntry[];
     if (!Array.isArray(entries)) return [];
-    return entries
-      .filter((e) => e && e.id && e.title)
-      .map((e) => ({
-        id: e.id,
-        title: e.title,
-        description: e.description,
-        status: e.status || "in-progress",
-        author: e.author,
-        createdBy: e.createdBy,
-        origin: "local" as const,
-        route: e.route || `/${e.id}`,
-        sourceType: "local",
-      }));
+    return entries.filter((e) => e && e.id && e.title).map(toLocalCard);
   } catch {
     return [];
   }

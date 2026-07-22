@@ -37,14 +37,18 @@ Extract:
 Run the workspace scaffolder from the repo root:
 
 ```bash
-node prototype-workspace/scripts/create-task-prototype.mjs <taskId> "<Title>"
+node prototype-workspace/scripts/create-task-prototype.mjs <taskId> --title "<Title>" [--author "<Name>"]
 ```
 
 This creates:
 - `prototype-workspace/app/{taskId}/page.tsx`
 - `prototype-workspace/components/projects/{taskId}/index.tsx`
+- an entry in `prototype-workspace/public/local-prototypes.json` (author/status metadata)
 
-The route must render at `/{taskId}` and remain wrapped in `ProjectLayout`.
+The route must render at `/{taskId}` and remain wrapped in `ProjectLayout`. The
+prototype is auto-discovered by the bridge from its `app/{taskId}/page.tsx` file,
+so it appears in the workspace listing as a "Local" prototype as soon as the files
+exist — even if this scaffold step is skipped (metadata is then derived from the id).
 
 ### 3. Reuse Before Building
 
