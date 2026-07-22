@@ -2031,6 +2031,13 @@ function runComposerTool(toolId) {
   openToolPage(toolId);
 }
 
+/* Toggle the home input section (composer + suggestion chips) off while a run is
+   in flight, and back on when it finishes or is cancelled. */
+function setHomeRunning(active) {
+  const hero = document.querySelector('.home-hero');
+  if (hero) hero.classList.toggle('is-running', !!active);
+}
+
 function runTool(toolId) {
   closeComposerMenus();
   const tool = TOOL_REGISTRY.find(t => t.id === toolId);
@@ -2212,6 +2219,7 @@ function setSeqStatus(out, state, i, status) {
 }
 
 async function runSeqFrom(out, state, startIndex) {
+  setHomeRunning(true);
   for (let j = startIndex; j < state.steps.length; j++) {
     if (state.statuses[j] === 'skipped') setSeqStatus(out, state, j, 'pending');
   }
@@ -2321,6 +2329,7 @@ function runSequenceStep(step, state, mountEl) {
 }
 
 function showSeqFailControls(out, state, i, err) {
+  setHomeRunning(false);
   const controls = out.querySelector('.run-seq-controls');
   if (!controls) return;
   const msg = (err && err.message) || 'Step failed.';
@@ -2358,6 +2367,7 @@ function finishSeq(out, state) {
 
 function seqCancel(state) {
   if (!state) return;
+  setHomeRunning(false);
   state.aborted = true;
   if (state.jobId) cancelJob(state.jobId);
   const out = document.getElementById('commandOutput');
@@ -2876,6 +2886,7 @@ let CURRENT_JOB = null;
 
 async function runAgent({ kind, prompt, agent, taskId, mountEl, label, sourceArtifacts, runtimeSourceArtifacts, toolId }) {
   if (!mountEl) return;
+  setHomeRunning(true);
   const cleanPrompt = stripAgentPrefix(prompt);
   mountEl.innerHTML = processingPanelHtml(label || 'Starting…');
   const logEl = mountEl.querySelector('.run-log');
@@ -2910,6 +2921,7 @@ async function runAgent({ kind, prompt, agent, taskId, mountEl, label, sourceArt
       logSourceContext(logEl, data.sourceContext);
     }
   } catch (err) {
+    setHomeRunning(false);
     statusEl.textContent = 'Could not reach the bridge.';
     appendLogLine(logEl, 'stderr', String(err.message || err));
     appendLogLine(logEl, 'system', 'Falling back to copy-prompt mode.');
@@ -2974,6 +2986,7 @@ async function runAgent({ kind, prompt, agent, taskId, mountEl, label, sourceArt
 
 async function finishRun(mountEl, { ok, flagged, cancelled, artifacts = [], error, taskId, prompt, agent, kind, label, verifyResult, sourceArtifacts = [] }) {
   CURRENT_JOB = null;
+  setHomeRunning(false);
   const panel = mountEl.querySelector('.processing-panel');
   const spinner = mountEl.querySelector('.run-spinner');
   const statusEl = mountEl.querySelector('.run-status-text');

@@ -1841,6 +1841,12 @@ body:has(.sidebar.rail-collapsed) .main { margin-left: 64px; }
 .chip:hover { background: rgba(0,0,0,0.04); border-color: var(--color-neutral-300); }
 #commandOutput { width: 100%; margin-top: 18px; }
 
+/* While a run is active, hide the input affordances entirely so the run panel
+   is the sole focus. Restored when the run finishes or is cancelled. */
+.home-hero.is-running #composer,
+.home-hero.is-running .suggestion-chips { display: none; }
+.home-hero.is-running #commandOutput { margin-top: 0; }
+
 /* ================================================================
    HOME COMPOSER — unified prompt + sources + run options
    ================================================================ */
