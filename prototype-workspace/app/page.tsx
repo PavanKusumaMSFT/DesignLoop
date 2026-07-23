@@ -12,16 +12,13 @@ import {
   SearchBox,
   Button,
   Spinner,
-  Dialog,
-  DialogSurface,
-  DialogBody,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  Avatar,
 } from "@fluentui/react-components";
 import {
   ArrowRight20Regular,
   CloudArrowUp16Regular,
+  ArrowExport16Regular,
+  Open16Regular,
 } from "@fluentui/react-icons";
 import { projects } from "../data/projects";
 import liveExtras from "../data/live-prototypes.json";
@@ -49,6 +46,7 @@ type CardItem = {
   route?: string;
   deployUrl?: string;
   sourceType?: string;
+  hasLocalChanges?: boolean;
 };
 
 /** Shape of an entry in public/local-prototypes.json (all optional but id/title). */
@@ -60,27 +58,12 @@ type LocalPrototypeEntry = {
   author?: string;
   createdBy?: string;
   route?: string;
+  hasLocalChanges?: boolean;
 };
 
 // ---------------------------------------------------------------------------
-// Status maps + local prototype loading
+// Local prototype loading
 // ---------------------------------------------------------------------------
-
-const statusColorMap: Record<
-  string,
-  "success" | "brand" | "informative" | "warning" | "subtle"
-> = {
-  active: "success",
-  "in-progress": "brand",
-  "coming-soon": "warning",
-  archived: "subtle",
-};
-const statusLabels: Record<string, string> = {
-  active: "Active",
-  "in-progress": "In progress",
-  "coming-soon": "Coming soon",
-  archived: "Archived",
-};
 
 /** Shape of an entry in data/live-prototypes.json (promoted prototypes). */
 type LivePrototypeEntry = {
@@ -94,18 +77,23 @@ type LivePrototypeEntry = {
 
 /** Live (repo baseline) prototypes as flat card items. */
 const LIVE_ITEMS: CardItem[] = (() => {
-  const fromRegistry: CardItem[] = projects.map((p) => ({
-    id: p.id,
-    title: p.title,
-    description: p.description,
-    status: p.status,
-    author: p.author || p.owner,
-    createdBy: p.createdBy,
-    origin: "live" as const,
-    route: p.source.route,
-    deployUrl: p.source.deployUrl,
-    sourceType: p.source.type,
-  }));
+  // Defensive: `projects` is a mutable registry that agents/scaffolds append to,
+  // so a single imperfect entry (missing `id` or `source`) must never crash the
+  // whole home page. Skip malformed entries instead of throwing at import time.
+  const fromRegistry: CardItem[] = (Array.isArray(projects) ? projects : [])
+    .filter((p) => p && p.id && p.title && p.source)
+    .map((p) => ({
+      id: p.id,
+      title: p.title,
+      description: p.description,
+      status: p.status,
+      author: p.author || p.owner,
+      createdBy: p.createdBy,
+      origin: "live" as const,
+      route: p.source.route,
+      deployUrl: p.source.deployUrl,
+      sourceType: p.source.type,
+    }));
   // Prototypes promoted to live via "Make live" (committed data/live-prototypes.json).
   const fromPromoted: CardItem[] = (liveExtras as LivePrototypeEntry[])
     .filter((e) => e && e.id && e.title)
@@ -135,6 +123,7 @@ function toLocalCard(e: LocalPrototypeEntry): CardItem {
     origin: "local" as const,
     route: e.route || `/${e.id}`,
     sourceType: "local",
+    hasLocalChanges: e.hasLocalChanges,
   };
 }
 
@@ -303,8 +292,6 @@ const useStyles = makeStyles({
       transform: "translateX(4px)",
       color: tokens.colorBrandForeground1,
     },
-    ":hover .makeLiveBtn": { opacity: 1 },
-    ":focus-within .makeLiveBtn": { opacity: 1 },
     ":focus-visible": {
       outline: `2px solid ${tokens.colorBrandStroke1}`,
       outlineOffset: "2px",
@@ -360,12 +347,16 @@ const useStyles = makeStyles({
   },
   authorText: {
     fontSize: tokens.fontSizeBase200,
-    color: tokens.colorNeutralForeground3,
+    color: tokens.colorNeutralForeground2,
   },
-  youText: {
-    fontSize: tokens.fontSizeBase200,
-    color: tokens.colorBrandForeground1,
+  youBadge: {
+    fontSize: tokens.fontSizeBase100,
     fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorBrandForeground1,
+    backgroundColor: tokens.colorBrandBackground2,
+    borderRadius: tokens.borderRadiusSmall,
+    padding: `1px ${tokens.spacingHorizontalXS}`,
+    lineHeight: "1.4",
   },
   chevron: {
     flexShrink: 0,
@@ -375,38 +366,72 @@ const useStyles = makeStyles({
     transitionDuration: tokens.durationNormal,
     transitionTimingFunction: tokens.curveEasyEase,
   },
-  makeLiveBtn: {
+  goLiveWrap: {
+    display: "flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalXS,
     flexShrink: 0,
-    opacity: 0,
-    transitionProperty: "opacity",
-    transitionDuration: tokens.durationNormal,
   },
-  makeLiveBtnVisible: {
-    opacity: 1,
+  goLiveBtn: {
+    flexShrink: 0,
   },
-  dialogText: {
+  goLiveWorking: {
+    display: "flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalXS,
+    flexShrink: 0,
     color: tokens.colorNeutralForeground2,
-    lineHeight: "1.5",
-  },
-  dialogCode: {
-    fontFamily: tokens.fontFamilyMonospace,
     fontSize: tokens.fontSizeBase200,
-    color: tokens.colorNeutralForeground1,
-    backgroundColor: tokens.colorNeutralBackground3,
-    padding: `1px ${tokens.spacingHorizontalXS}`,
-    borderRadius: tokens.borderRadiusSmall,
   },
-  dialogStatus: {
+  goLiveErrorText: {
+    color: tokens.colorPaletteRedForeground1,
+    fontSize: tokens.fontSizeBase200,
+    maxWidth: "160px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
+  },
+  cardActions: {
     display: "flex",
     alignItems: "center",
     gap: tokens.spacingHorizontalS,
-    marginTop: tokens.spacingVerticalM,
+    flexShrink: 0,
   },
-  dialogError: {
+  figmaWrap: {
+    display: "flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalXS,
+    flexShrink: 0,
+  },
+  figmaBtn: {
+    flexShrink: 0,
+  },
+  figmaWorking: {
+    display: "flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalXS,
+    flexShrink: 0,
+    color: tokens.colorNeutralForeground2,
+    fontSize: tokens.fontSizeBase200,
+  },
+  figmaLink: {
+    display: "flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalXXS,
+    flexShrink: 0,
+    color: tokens.colorBrandForegroundLink,
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightSemibold,
+    textDecorationLine: "none",
+    ":hover": { textDecorationLine: "underline" },
+  },
+  figmaErrorText: {
     color: tokens.colorPaletteRedForeground1,
     fontSize: tokens.fontSizeBase200,
-    marginTop: tokens.spacingVerticalM,
-    whiteSpace: "pre-wrap" as const,
+    maxWidth: "140px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
   },
   empty: {
     padding: tokens.spacingVerticalXXXL,
@@ -424,11 +449,17 @@ const useStyles = makeStyles({
 function PrototypeCard({
   item,
   currentEmail,
-  onMakeLive,
+  onGoLive,
+  goLiveState,
+  onSendFigma,
+  figmaState,
 }: {
   item: CardItem;
   currentEmail: string | null;
-  onMakeLive?: (item: CardItem) => void;
+  onGoLive?: (item: CardItem) => void;
+  goLiveState?: { phase: "working" | "error"; detail?: string };
+  onSendFigma?: (item: CardItem) => void;
+  figmaState?: { phase: "working" | "error" | "done"; detail?: string; link?: string };
 }) {
   const styles = useStyles();
   const router = useRouter();
@@ -445,6 +476,18 @@ function PrototypeCard({
     !!currentEmail &&
     !!item.createdBy &&
     item.createdBy.toLowerCase() === currentEmail.toLowerCase();
+
+  const canGoLive =
+    !!onGoLive && item.origin === "local" && !!item.hasLocalChanges;
+
+  // Send-to-Figma is available for any workspace-rendered prototype (has a
+  // local route), regardless of live/local status. Forks (external deploy only)
+  // have no reconstructable source, so they are excluded.
+  // TEMPORARILY HIDDEN: the Send-to-Figma feature is disabled until the Fluent
+  // kit fidelity issues are resolved. Flip this back to re-enable the CTA.
+  const SEND_FIGMA_ENABLED = false;
+  const canSendFigma =
+    SEND_FIGMA_ENABLED && !!onSendFigma && !!item.route && item.sourceType !== "fork";
 
   return (
     <div
@@ -469,43 +512,120 @@ function PrototypeCard({
           >
             {item.origin === "live" ? "Live" : "Local"}
           </Badge>
-          <Badge
-            appearance="tint"
-            size="small"
-            color={statusColorMap[item.status] ?? "informative"}
-          >
-            {statusLabels[item.status] ?? item.status}
-          </Badge>
         </div>
 
         {item.description && (
           <Text className={styles.cardDesc}>{item.description}</Text>
         )}
 
-        {(isMine || item.author) && (
+        {item.author && (
           <div className={styles.metaRow}>
-            {isMine ? (
-              <Text className={styles.youText}>Created by you</Text>
-            ) : (
-              <Text className={styles.authorText}>By {item.author}</Text>
-            )}
+            <Avatar
+              name={item.author}
+              size={20}
+              color="colorful"
+              aria-hidden
+            />
+            <Text className={styles.authorText}>{item.author}</Text>
+            {isMine && <span className={styles.youBadge}>You</span>}
           </div>
         )}
       </div>
 
-      {onMakeLive && item.origin === "local" && (
-        <Button
-          className={`${styles.makeLiveBtn} makeLiveBtn`}
-          appearance="subtle"
-          size="small"
-          icon={<CloudArrowUp16Regular />}
-          onClick={(e) => {
-            e.stopPropagation();
-            onMakeLive(item);
-          }}
+      {canGoLive && (
+        <div
+          className={styles.goLiveWrap}
+          onClick={(e) => e.stopPropagation()}
+          role="presentation"
         >
-          Make live
-        </Button>
+          {goLiveState?.phase === "working" ? (
+            <span className={styles.goLiveWorking}>
+              <Spinner size="tiny" />
+              Going live…
+            </span>
+          ) : goLiveState?.phase === "error" ? (
+            <>
+              <Text
+                className={styles.goLiveErrorText}
+                title={goLiveState.detail}
+              >
+                {goLiveState.detail || "Failed"}
+              </Text>
+              <Button
+                className={styles.goLiveBtn}
+                appearance="primary"
+                size="small"
+                icon={<CloudArrowUp16Regular />}
+                onClick={() => onGoLive?.(item)}
+              >
+                Retry
+              </Button>
+            </>
+          ) : (
+            <Button
+              className={styles.goLiveBtn}
+              appearance="primary"
+              size="small"
+              icon={<CloudArrowUp16Regular />}
+              onClick={() => onGoLive?.(item)}
+            >
+              Go Live
+            </Button>
+          )}
+        </div>
+      )}
+
+      {canSendFigma && (
+        <div
+          className={styles.figmaWrap}
+          onClick={(e) => e.stopPropagation()}
+          role="presentation"
+        >
+          {figmaState?.phase === "working" ? (
+            <span className={styles.figmaWorking}>
+              <Spinner size="tiny" />
+              Sending to Figma…
+            </span>
+          ) : figmaState?.phase === "done" ? (
+            <a
+              className={styles.figmaLink}
+              href={figmaState.link}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Open16Regular />
+              In Figma
+            </a>
+          ) : figmaState?.phase === "error" ? (
+            <>
+              <Text
+                className={styles.figmaErrorText}
+                title={figmaState.detail}
+              >
+                {figmaState.detail || "Failed"}
+              </Text>
+              <Button
+                className={styles.figmaBtn}
+                appearance="secondary"
+                size="small"
+                icon={<ArrowExport16Regular />}
+                onClick={() => onSendFigma?.(item)}
+              >
+                Retry
+              </Button>
+            </>
+          ) : (
+            <Button
+              className={styles.figmaBtn}
+              appearance="secondary"
+              size="small"
+              icon={<ArrowExport16Regular />}
+              onClick={() => onSendFigma?.(item)}
+            >
+              Send to Figma
+            </Button>
+          )}
+        </div>
       )}
 
       <ArrowRight20Regular className={`${styles.chevron} protoChevron`} />
@@ -517,8 +637,6 @@ function PrototypeCard({
 // Page
 // ---------------------------------------------------------------------------
 
-type PromotePhase = "confirm" | "working" | "done" | "error";
-
 function WorkspaceContent() {
   const styles = useStyles();
   const [query, setQuery] = useState("");
@@ -527,10 +645,15 @@ function WorkspaceContent() {
   const [currentEmail, setCurrentEmail] = useState<string | null>(null);
   const [bridgeReady, setBridgeReady] = useState(false);
 
-  // Make-live dialog state.
-  const [target, setTarget] = useState<CardItem | null>(null);
-  const [phase, setPhase] = useState<PromotePhase>("confirm");
-  const [errorDetail, setErrorDetail] = useState("");
+  // Per-card "Go Live" progress, keyed by prototype id.
+  const [goLiveState, setGoLiveState] = useState<
+    Record<string, { phase: "working" | "error"; detail?: string }>
+  >({});
+
+  // Per-card "Send to Figma" progress, keyed by prototype id.
+  const [figmaState, setFigmaState] = useState<
+    Record<string, { phase: "working" | "error" | "done"; detail?: string; link?: string }>
+  >({});
 
   useEffect(() => {
     loadLocalItems().then(setLocalItems);
@@ -541,54 +664,123 @@ function WorkspaceContent() {
     } catch {
       setCurrentEmail(null);
     }
-    // Probe the local bridge — "Make live" (git commit + push) only works when it's up.
+    // Probe the local bridge — "Go Live" (git commit + push) only works when it's up.
     fetch(`${BRIDGE_URL}/api/health`, { cache: "no-store" })
       .then((r) => setBridgeReady(r.ok))
       .catch(() => setBridgeReady(false));
   }, []);
 
-  const openPromote = useCallback((item: CardItem) => {
-    setTarget(item);
-    setPhase("confirm");
-    setErrorDetail("");
-  }, []);
-
-  const runPromote = useCallback(async () => {
-    if (!target) return;
-    setPhase("working");
+  const runGoLive = useCallback(async (item: CardItem) => {
+    setGoLiveState((prev) => ({ ...prev, [item.id]: { phase: "working" } }));
+    const setError = (detail: string) =>
+      setGoLiveState((prev) => ({ ...prev, [item.id]: { phase: "error", detail } }));
     try {
       const res = await fetch(`${BRIDGE_URL}/api/prototypes/make-live`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: target.id }),
+        body: JSON.stringify({ id: item.id }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.ok === false) {
-        setErrorDetail(data.detail || data.error || `Bridge returned ${res.status}.`);
-        setPhase("error");
+        setError(data.detail || data.error || `Bridge returned ${res.status}.`);
         return;
       }
-      // Flip the card to Live locally so the change is reflected immediately.
-      setLocalItems((prev) => prev.filter((p) => p.id !== target.id));
-      setPromotedItems((prev) => [
-        { ...target, origin: "live" as const },
-        ...prev,
-      ]);
       if (data.pushed === false) {
-        setErrorDetail(data.warning || "Committed locally, but push failed.");
-        setPhase("error");
+        setError(data.warning || "Committed locally, but push failed.");
         return;
       }
-      setPhase("done");
+      // Success — seamlessly flip the card to Live and clear its progress.
+      setLocalItems((prev) => prev.filter((p) => p.id !== item.id));
+      setPromotedItems((prev) => [{ ...item, origin: "live" as const }, ...prev]);
+      setGoLiveState((prev) => {
+        const next = { ...prev };
+        delete next[item.id];
+        return next;
+      });
     } catch {
-      setErrorDetail(
-        `Could not reach the local bridge at ${BRIDGE_URL}. Start it and try again.`,
+      setError(
+        `Couldn't reach the local bridge at ${BRIDGE_URL}. Start it and try again.`,
       );
-      setPhase("error");
     }
-  }, [target]);
+  }, []);
 
-  // Local prototypes first, then promoted (session), then live baseline.
+  const runSendFigma = useCallback(async (item: CardItem) => {
+    const setFig = (s: { phase: "working" | "error" | "done"; detail?: string; link?: string }) =>
+      setFigmaState((prev) => ({ ...prev, [item.id]: s }));
+    setFig({ phase: "working" });
+    try {
+      // Reuse the task's saved Figma file if any; otherwise prompt once.
+      let figmaUrl: string | undefined;
+      const tRes = await fetch(
+        `${BRIDGE_URL}/api/figma/target?id=${encodeURIComponent(item.id)}`,
+        { cache: "no-store" },
+      );
+      const tData = await tRes.json().catch(() => ({}));
+      if (!tData?.target?.url) {
+        const entered = window.prompt(
+          "Paste the Figma file URL to send this prototype into.\n(Saved for this task and reused next time.)",
+        );
+        if (!entered) {
+          setFigmaState((prev) => {
+            const next = { ...prev };
+            delete next[item.id];
+            return next;
+          });
+          return;
+        }
+        figmaUrl = entered.trim();
+      }
+
+      const res = await fetch(`${BRIDGE_URL}/api/figma/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prototypeId: item.id, taskId: item.id, figmaUrl }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.jobId) {
+        const detail = (data.needsPlugin || data.needsFigmaMcp)
+          ? (data.hint || "Open the DesignLoop Figma plugin, then retry.")
+          : data.error || `Bridge returned ${res.status}.`;
+        setFig({ phase: "error", detail });
+        return;
+      }
+
+      const fileLink: string | undefined = data.target?.url;
+      // Stream job status; flip to done/error on the terminal event. The plugin
+      // path returns a deep link (…?node-id=…) on the status payload once built.
+      const es = new EventSource(`${BRIDGE_URL}/api/jobs/${data.jobId}/stream`);
+      es.addEventListener("status", (ev) => {
+        let status = "";
+        let link: string | undefined;
+        try {
+          const parsed = JSON.parse((ev as MessageEvent).data) || {};
+          status = parsed.status || "";
+          link = parsed.link || undefined;
+        } catch {
+          /* ignore malformed */
+        }
+        if (status === "done") {
+          es.close();
+          setFig({ phase: "done", link: link || fileLink });
+        } else if (status === "error" || status === "cancelled") {
+          es.close();
+          setFig({
+            phase: "error",
+            detail: status === "cancelled" ? "Cancelled" : "Send failed — check the bridge log.",
+          });
+        }
+      });
+      es.onerror = () => {
+        es.close();
+        setFig({ phase: "error", detail: "Lost connection to the bridge." });
+      };
+    } catch {
+      setFig({
+        phase: "error",
+        detail: `Couldn't reach the local bridge at ${BRIDGE_URL}.`,
+      });
+    }
+  }, []);
   const allItems = useMemo(
     () => [...localItems, ...promotedItems, ...LIVE_ITEMS],
     [localItems, promotedItems],
@@ -644,87 +836,15 @@ function WorkspaceContent() {
                 key={p.id}
                 item={p}
                 currentEmail={currentEmail}
-                onMakeLive={bridgeReady ? openPromote : undefined}
+                onGoLive={bridgeReady ? runGoLive : undefined}
+                goLiveState={goLiveState[p.id]}
+                onSendFigma={bridgeReady ? runSendFigma : undefined}
+                figmaState={figmaState[p.id]}
               />
             ))}
           </div>
         )}
       </div>
-
-      <Dialog
-        open={!!target}
-        onOpenChange={(_, data) => {
-          if (!data.open && phase !== "working") setTarget(null);
-        }}
-      >
-        <DialogSurface>
-          <DialogBody>
-            <DialogTitle>
-              {phase === "done" ? "Prototype is live" : "Make prototype live"}
-            </DialogTitle>
-            <DialogContent>
-              {phase === "confirm" && (
-                <Text className={styles.dialogText}>
-                  This commits <span className={styles.dialogCode}>{target?.id}</span>{" "}
-                  and pushes it to the repository, making it visible to everyone as
-                  a Live prototype. Continue?
-                </Text>
-              )}
-              {phase === "working" && (
-                <div className={styles.dialogStatus}>
-                  <Spinner size="tiny" />
-                  <Text className={styles.dialogText}>
-                    Committing and pushing to the repository…
-                  </Text>
-                </div>
-              )}
-              {phase === "done" && (
-                <Text className={styles.dialogText}>
-                  <span className={styles.dialogCode}>{target?.id}</span> was pushed
-                  to the repo. It now appears as Live for everyone once the hosted
-                  workspace redeploys.
-                </Text>
-              )}
-              {phase === "error" && (
-                <>
-                  <Text className={styles.dialogText}>
-                    Couldn&rsquo;t fully make this prototype live.
-                  </Text>
-                  <Text as="p" className={styles.dialogError}>
-                    {errorDetail}
-                  </Text>
-                </>
-              )}
-            </DialogContent>
-            <DialogActions>
-              {phase === "confirm" && (
-                <>
-                  <Button appearance="secondary" onClick={() => setTarget(null)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    appearance="primary"
-                    icon={<CloudArrowUp16Regular />}
-                    onClick={runPromote}
-                  >
-                    Make live
-                  </Button>
-                </>
-              )}
-              {phase === "working" && (
-                <Button appearance="primary" disabled>
-                  Working…
-                </Button>
-              )}
-              {(phase === "done" || phase === "error") && (
-                <Button appearance="primary" onClick={() => setTarget(null)}>
-                  Close
-                </Button>
-              )}
-            </DialogActions>
-          </DialogBody>
-        </DialogSurface>
-      </Dialog>
     </div>
   );
 }

@@ -1,0 +1,115 @@
+<!-- DesignLoop Figma plugin — hidden UI iframe.
+     This is the ONLY context in a Figma plugin that can open a network
+     connection, so it hosts the WebSocket client and relays messages between
+     the DesignLoop bridge and the plugin's main thread (code.js). -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font-family: Inter, "Segoe UI", system-ui, sans-serif;
+        margin: 0;
+        padding: 14px 16px;
+        color: #242424;
+        font-size: 12px;
+      }
+      .row { display: flex; align-items: center; gap: 8px; }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: #c8c8c8; flex: 0 0 auto; }
+      .dot.on { background: #107c10; }
+      .dot.off { background: #d13438; }
+      h1 { font-size: 13px; font-weight: 600; margin: 0 0 8px; }
+      #status { color: #616161; }
+      #msg { color: #424242; margin-top: 8px; min-height: 16px; }
+      .hint { color: #8a8a8a; margin-top: 10px; line-height: 1.4; }
+      button {
+        font: inherit; font-weight: 600; color: #fff; background: #0078D4;
+        border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer;
+      }
+      button:hover { background: #106EBE; }
+    </style>
+  </head>
+  <body>
+    <h1>DesignLoop</h1>
+    <div class="row"><span id="dot" class="dot"></span><span id="status">Connecting to bridge…</span></div>
+    <div class="row" style="margin-top:12px;">
+      <button id="learn">Learn kit</button>
+      <span id="kit" style="color:#616161;">Kit: not learned</span>
+    </div>
+    <div id="msg"></div>
+    <div class="hint">1) Open your <b>Fluent kit</b> file and click <b>Learn kit</b> once. 2) Open your working file, keep this plugin open, then click <b>Send to Figma</b> on a prototype card.</div>
+
+    <script>
+      var BRIDGE_WS = "ws://127.0.0.1:8099/figma-plugin";
+      var ws = null;
+      var dot = document.getElementById("dot");
+      var statusEl = document.getElementById("status");
+      var msgEl = document.getElementById("msg");
+      var kitEl = document.getElementById("kit");
+      var learnBtn = document.getElementById("learn");
+
+      function setStatus(connected, text) {
+        dot.className = "dot " + (connected ? "on" : "off");
+        statusEl.textContent = text;
+      }
+
+      function toMain(m) {
+        parent.postMessage({ pluginMessage: m }, "*");
+      }
+
+      learnBtn.onclick = function () {
+        msgEl.textContent = "Learning kit — scanning components…";
+        toMain({ type: "learn-kit" });
+      };
+
+      function connect() {
+        try {
+          ws = new WebSocket(BRIDGE_WS);
+        } catch (e) {
+          setStatus(false, "Bridge not reachable — retrying…");
+          setTimeout(connect, 2500);
+          return;
+        }
+        ws.onopen = function () {
+          setStatus(true, "Connected to DesignLoop bridge");
+          try { ws.send(JSON.stringify({ type: "hello", client: "figma-plugin" })); } catch (e) {}
+          toMain({ type: "ws-open" });
+        };
+        ws.onclose = function () {
+          setStatus(false, "Disconnected — retrying…");
+          toMain({ type: "ws-close" });
+          setTimeout(connect, 2500);
+        };
+        ws.onerror = function () {};
+        ws.onmessage = function (ev) {
+          var m;
+          try { m = JSON.parse(ev.data); } catch (e) { return; }
+          if (m && m.type === "kit-ack") {
+            kitEl.textContent = "Kit: " + m.setCount + " components learned";
+            msgEl.textContent = "Kit learned ✓";
+            return; // bridge ack — nothing for the main thread
+          }
+          if (m && m.type === "build") {
+            msgEl.textContent = "Building design…";
+          }
+          toMain(m); // forward bridge -> main thread
+        };
+      }
+
+      // main thread -> bridge (progress / done / error / kit)
+      window.onmessage = function (ev) {
+        var m = ev.data && ev.data.pluginMessage;
+        if (!m) return;
+        if (m.type === "kit-progress") { msgEl.textContent = m.message || ""; return; }
+        if (m.type === "progress" && m.message) msgEl.textContent = m.message;
+        if (m.type === "done") msgEl.textContent = "Done — layers created.";
+        if (m.type === "error") msgEl.textContent = "Error: " + (m.message || "unknown");
+        if (ws && ws.readyState === 1) {
+          try { ws.send(JSON.stringify(m)); } catch (e) {}
+        }
+      };
+
+      connect();
+    </script>
+  </body>
+</html>

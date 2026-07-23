@@ -26,6 +26,79 @@ description: "Use when setting up MCP servers, configuring API tokens, or troubl
 
 ---
 
+## Send to Figma (prototype → editable native Figma layers)
+
+The **"Send to Figma"** action on each prototype card pushes a prototype into a
+Figma file as **editable native layers** (frames with fills/strokes/corner radius
+and real, editable text nodes). It is the reverse of `/figma-to-fluent`.
+
+The default path uses the **DesignLoop Figma plugin** — **no Claude, no MCP, no
+OAuth**. The bridge renders the live prototype headlessly (Playwright), serializes
+its layout into a design tree, and streams it over a local WebSocket to the plugin,
+which rebuilds it natively via the Figma Plugin API.
+
+### One-time setup (install the plugin)
+1. Open the **Figma desktop app**.
+2. Menu → **Plugins → Development → Import plugin from manifest…**
+3. Select `figma-plugin/manifest.json` from this repo.
+4. Open the target Figma file, then run **Plugins → Development → DesignLoop**.
+   A small panel shows **“Connected to DesignLoop bridge”** — keep it open.
+5. Click **Send to Figma** on a prototype card and paste the target Figma **file
+   URL** once (saved per task and reused). Layers land on a new page named
+   `DesignLoop — <prototypeId>`; the card shows an **In Figma** deep link when done.
+
+The plugin talks to the bridge at `ws://127.0.0.1:8099/figma-plugin` (allow-listed
+in `figma-plugin/manifest.json → networkAccess`). See `figma-plugin/README.md`.
+
+### Real Fluent components (one-time "Learn kit")
+To land designs as **instances of your published Fluent components** instead of
+redrawn primitives, teach the plugin your kit once (the Plugin API can't read a
+team library's catalog, so keys are captured from the kit file itself):
+1. Open your **Fluent UI kit** file (components must be **published as a library**).
+2. Run the **DesignLoop** plugin and click **Learn kit**. Keys are saved to
+   `bridge/data/figma-kit.json` (grouped by normalized set name) and reused.
+3. In your working file, **enable that library** (Assets → Libraries) so the
+   plugin can import instances by key.
+
+At build time the bridge detects Fluent components in the DOM (stable
+`fui-<Component>` classes), resolves each to the best kit variant key
+(`resolveKitComponent` — `KIT_SYNONYMS` + variant scoring), and the plugin
+instances them via `figma.importComponentByKeyAsync` + `createInstance()`,
+overriding the first text sublayer with the detected label. Unmatched components
+fall back to frames/text. Skipping Learn kit is fine — everything falls back. The
+`done` message reports instanced-vs-fallback counts. `GET /api/figma/kit` reports
+the learned map.
+
+> **Optional MCP runners.** The bridge can instead drive Figma's write MCP via a
+> CLI. Set `FIGMA_RUNNER=copilot` to use the Copilot CLI + Figma's **local desktop
+> MCP** (`127.0.0.1:3845`, enable via Figma → Preferences → “Enable local MCP
+> server”), or `FIGMA_RUNNER=claude` for Claude Code + the **remote** Figma MCP
+> (`https://mcp.figma.com/mcp`, one-time `/mcp` OAuth). The local Dev Mode MCP is
+> currently read-only, so the plugin path is the default and recommended route.
+
+### How it works
+- The user clicks **Send to Figma** and pastes the Figma **file URL** once. The
+  bridge saves it per task (`tasks/<id>/.task.json` `figmaFile`, or a per-user
+  `bridge/data/figma-targets.json` fallback) and reuses it for that task's prototypes.
+- `POST /api/figma/send { prototypeId, taskId?, figmaUrl? }` (default `plugin`
+  runner) returns **409 `needsPlugin`** with a hint if no plugin is connected.
+  Otherwise it creates a manual job, serializes the live prototype
+  (`bridge/figma-serialize.js`, Playwright), and sends `{type:'build', jobId,
+  pageName, tree}` to the plugin. Plugin progress/done/error is relayed to the job
+  SSE stream; the terminal `done` status carries a `link` deep link
+  (`…?node-id=…`). `GET /api/figma/plugin-status` reports connection state;
+  `GET /api/figma/target?id=<id>` reports the saved target.
+- The prototype workspace is behind MSAL, so the serializer appends
+  `?auditBridge=1` (the workspace's built-in headless-tooling bypass).
+- Fonts that don't exist in Figma (Segoe UI, Aptos, …) fall back to **Inter**.
+
+### Used By
+- Prototype card **Send to Figma** CTA (any workspace-rendered prototype)
+- `figma-plugin/` (DesignLoop plugin) + bridge `/figma-plugin` WebSocket relay
+- `/fluent-to-figma` skill / `@fluent-to-figma` agent (only for the MCP runners)
+
+---
+
 ## Playwright MCP
 
 **Server**: `@anthropic/mcp-server-playwright`

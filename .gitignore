@@ -26,3 +26,6 @@ prototype-workspace/.env*.local
 
 # Locally-created prototypes registry (per-user, not part of the live repo baseline)
 prototype-workspace/public/local-prototypes.json
+
+# Bridge runtime state (per-user Figma send targets, etc.)
+bridge/data/

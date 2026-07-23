@@ -1,0 +1,12 @@
+{
+  "name": "DesignLoop",
+  "id": "designloop-bridge-plugin",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": ["*"],
+    "reasoning": "Connects to the local DesignLoop bridge (WebSocket on localhost:8099) to receive prototype designs and rebuild them as native Figma layers."
+  }
+}

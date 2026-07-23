@@ -14,7 +14,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const JSZip = require('jszip');
 const mammoth = require('mammoth');
 const pdfParse = require('pdf-parse');
@@ -23,6 +23,8 @@ const xlsx = require('xlsx');
 const { XMLParser } = require('fast-xml-parser');
 const { JobManager, COPILOT_BIN } = require('./jobs');
 const { Verifier } = require('./verifier');
+const { attachWss } = require('./ws');
+const { serializePrototype } = require('./figma-serialize');
 const { fetchUrl, browseUrl, listSessions, clearSession, detectProvider, hasSession } = require('./fetcher');
 const hits = require('./hits');
 
@@ -121,6 +123,18 @@ function agentSlug(input) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || null;
+}
+
+/** Look up the runner declared by a skill's tool.json ("copilot" | "claude").
+ *  Some skills (e.g. fluent-to-figma) must run on Claude Code because they use
+ *  Figma MCP write tools the Copilot CLI cannot access. Defaults to "copilot". */
+function toolRunner(toolId) {
+  if (!toolId) return 'copilot';
+  try {
+    const p = path.join(ROOT, '.github', 'skills', String(toolId), 'tool.json');
+    const j = JSON.parse(fs.readFileSync(p, 'utf8'));
+    return j && j.runner === 'claude' ? 'claude' : 'copilot';
+  } catch { return 'copilot'; }
 }
 
 function safeFileName(name, fallback = 'attachment') {
@@ -652,6 +666,311 @@ function readArtifactMeta(absPath, fallbackTitle) {
 }
 
 /** Scan tasks/<id>/ to build the registry the frontend renders. */
+/* Read an optional per-task config (tasks/<id>/.task.json). Currently holds a
+   user-set display title so renames survive bridge restarts without touching
+   the folder id/slug or any artifact path references. Defensive: returns {} on
+   any read/parse error. */
+function readTaskConfig(id) {
+  try {
+    const p = path.join(ROOT, 'tasks', id, '.task.json');
+    const raw = fs.readFileSync(p, 'utf8');
+    const obj = JSON.parse(raw);
+    return obj && typeof obj === 'object' ? obj : {};
+  } catch { return {}; }
+}
+
+/* ─── Figma "Send to Figma" per-task target registry ───
+ * The target Figma file a task's prototypes are sent into is remembered so the
+ * user only pastes the URL once. When the task has a tasks/<id>/ dir the target
+ * lives in its .task.json (survives with the task); otherwise it falls back to
+ * a bridge-side registry keyed by id. Never throws. */
+const FIGMA_REGISTRY = path.join(__dirname, 'data', 'figma-targets.json');
+
+/** Extract the file key from a Figma file/design/proto URL, or null. */
+function figmaFileKey(url) {
+  const m = String(url || '').match(/figma\.com\/(?:design|file|proto)\/([A-Za-z0-9]+)/i);
+  return m ? m[1] : null;
+}
+
+/** Is Figma's local desktop MCP server up? (127.0.0.1:3845, no OAuth, not
+ *  client-gated — usable by the Copilot CLI.) TCP-connect probe; never throws. */
+function probeFigmaLocalMcp() {
+  const host = process.env.FIGMA_MCP_HOST || '127.0.0.1';
+  const port = Number(process.env.FIGMA_MCP_PORT) || 3845;
+  return new Promise((resolve) => {
+    const net = require('net');
+    const socket = net.connect({ host, port });
+    const done = (ok) => { try { socket.destroy(); } catch {} resolve(ok); };
+    socket.setTimeout(1500);
+    socket.once('connect', () => done(true));
+    socket.once('timeout', () => done(false));
+    socket.once('error', () => done(false));
+  });
+}
+
+function readFigmaRegistry() {
+  try {
+    const obj = JSON.parse(fs.readFileSync(FIGMA_REGISTRY, 'utf8'));
+    return obj && typeof obj === 'object' ? obj : {};
+  } catch { return {}; }
+}
+
+/** Resolve the saved Figma target for a task/prototype id → { url, fileKey } | null. */
+function readFigmaTarget(id) {
+  if (!id) return null;
+  const cfg = readTaskConfig(id);
+  if (cfg.figmaFile && cfg.figmaFile.url) return cfg.figmaFile;
+  const reg = readFigmaRegistry();
+  return reg[id] || null;
+}
+
+/** Persist the Figma target for a task/prototype id. Returns the stored value. */
+function saveFigmaTarget(id, url) {
+  const fileKey = figmaFileKey(url);
+  const value = { url: String(url), fileKey };
+  const taskDir = path.join(ROOT, 'tasks', id);
+  if (fs.existsSync(taskDir) && fs.statSync(taskDir).isDirectory()) {
+    const cfg = readTaskConfig(id);
+    cfg.figmaFile = value;
+    fs.writeFileSync(path.join(taskDir, '.task.json'), JSON.stringify(cfg, null, 2) + '\n', 'utf8');
+  } else {
+    const reg = readFigmaRegistry();
+    reg[id] = value;
+    fs.mkdirSync(path.dirname(FIGMA_REGISTRY), { recursive: true });
+    fs.writeFileSync(FIGMA_REGISTRY, JSON.stringify(reg, null, 2) + '\n', 'utf8');
+  }
+  return value;
+}
+
+/* ─── Figma plugin WebSocket relay ───
+ * The DesignLoop Figma plugin connects to /figma-plugin and rebuilds a
+ * serialized prototype as native layers. We keep the live connections here and
+ * route a build job's messages to/from the plugin, bridging into a manual job
+ * so the workspace card shows live progress + a deep link. */
+const figmaPluginClients = new Set();     // WsConnection
+const figmaBuildJobs = new Map();         // jobId -> { job, deepLink }
+
+/* ─── Fluent kit map (learned from the plugin's "Learn kit" action) ───
+ * Maps normalized Fluent component-set names → their published variant keys, so
+ * a build can instantiate real kit components instead of redrawing primitives.
+ * Persisted to bridge/data/figma-kit.json (gitignored). */
+const FIGMA_KIT = path.join(__dirname, 'data', 'figma-kit.json');
+
+function normalizeKitName(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+// Detected Fluent component → candidate kit set names (normalized), in priority
+// order. Kits name things slightly differently, so we try several.
+const KIT_SYNONYMS = {
+  button: ['button'],
+  compoundbutton: ['compoundbutton', 'button'],
+  menubutton: ['menubutton', 'button'],
+  togglebutton: ['togglebutton', 'button'],
+  splitbutton: ['splitbutton', 'button'],
+  searchbox: ['searchbox', 'search', 'searchfield', 'searchinput'],
+  input: ['input', 'textfield', 'textinput', 'text'],
+  textarea: ['textarea', 'textfield', 'textinput'],
+  dropdown: ['dropdown', 'combobox', 'select'],
+  combobox: ['combobox', 'dropdown', 'select'],
+  spinbutton: ['spinbutton', 'numberinput', 'input'],
+  avatar: ['avatar', 'persona'],
+  badge: ['badge'],
+  counterbadge: ['counterbadge', 'badge'],
+  presencebadge: ['presencebadge', 'badge'],
+  checkbox: ['checkbox'],
+  radio: ['radio', 'radiobutton', 'radioitem'],
+  switch: ['switch', 'toggle'],
+  slider: ['slider'],
+  link: ['link', 'hyperlink'],
+  divider: ['divider', 'separator'],
+  spinner: ['spinner', 'progressring', 'loader'],
+  progressbar: ['progressbar', 'progress'],
+  tag: ['tag', 'chip'],
+};
+
+function readKitMap() {
+  try { return JSON.parse(fs.readFileSync(FIGMA_KIT, 'utf8')); }
+  catch { return null; }
+}
+
+/** Save a learned kit from the plugin. `components` is a flat array of
+ * { set, name, key, props }. We group by normalized set name. */
+function saveKitMap(components) {
+  const sets = {};
+  for (const c of (components || [])) {
+    if (!c || !c.key) continue;
+    const norm = normalizeKitName(c.set || c.name);
+    if (!norm) continue;
+    if (!sets[norm]) sets[norm] = { display: c.set || c.name, variants: [] };
+    sets[norm].variants.push({ key: c.key, props: c.props || {} });
+  }
+  const map = { learnedAt: Date.now(), setCount: Object.keys(sets).length, sets };
+  fs.mkdirSync(path.dirname(FIGMA_KIT), { recursive: true });
+  fs.writeFileSync(FIGMA_KIT, JSON.stringify(map, null, 2) + '\n', 'utf8');
+  return map;
+}
+
+// Prop-value tokens that indicate a neutral/default variant (used to pick a
+// sensible variant when the DOM gives no strong hint).
+const DEFAULT_TOKENS = new Set(['rest', 'medium', 'secondary', 'default', 'false', 'off', 'no', 'regular', 'normal', 'filled']);
+
+/** Choose the best variant key for a detected component from the kit. */
+function resolveKitComponent(fluent, kit) {
+  if (!fluent || !kit || !kit.sets) return null;
+  const candidates = KIT_SYNONYMS[normalizeKitName(fluent.component)] || [normalizeKitName(fluent.component)];
+  let set = null;
+  for (const cand of candidates) {
+    if (kit.sets[cand]) { set = kit.sets[cand]; break; }
+  }
+  if (!set || !set.variants || !set.variants.length) return null;
+
+  const props = fluent.props || {};
+  const scoreVariant = (v) => {
+    let score = 0;
+    const vals = Object.entries(v.props || {});
+    for (const [k, val] of vals) {
+      const lk = String(k).toLowerCase();
+      const lv = String(val).toLowerCase();
+      // Match explicit DOM hints.
+      if (props.disabled && (lk === 'state' ? lv === 'disabled' : (lk === 'disabled' && lv === 'true'))) score += 5;
+      if (props.selected && ((lk === 'state' && lv === 'selected') || (lk === 'selected' && lv === 'true'))) score += 5;
+      if (props.checked && ((lk === 'checked' && lv === 'true') || (lk === 'state' && lv === 'checked'))) score += 5;
+      // Reward neutral defaults when no hint applies.
+      if (DEFAULT_TOKENS.has(lv)) score += 1;
+    }
+    // Penalise obviously non-default states when the DOM gave no hint.
+    if (!props.disabled && !props.selected && !props.checked) {
+      for (const [, val] of vals) {
+        const lv = String(val).toLowerCase();
+        if (['disabled', 'selected', 'pressed', 'error'].includes(lv)) score -= 3;
+      }
+    }
+    return score;
+  };
+  let best = set.variants[0], bestScore = -Infinity;
+  for (const v of set.variants) {
+    const s = scoreVariant(v);
+    if (s > bestScore) { bestScore = s; best = v; }
+  }
+  return { componentKey: best.key, setName: set.display };
+}
+
+/** Walk the tree and attach a resolved kit key to each detected Fluent node.
+ * Returns { matched, unmatched } counts. */
+function annotateKit(root, kit) {
+  let matched = 0, unmatched = 0;
+  (function walk(n) {
+    if (n.fluent) {
+      const r = kit ? resolveKitComponent(n.fluent, kit) : null;
+      if (r) { n.fluent.componentKey = r.componentKey; n.fluent.setName = r.setName; matched++; }
+      else { unmatched++; }
+    }
+    for (const c of (n.children || [])) walk(c);
+  })(root);
+  return { matched, unmatched };
+}
+
+
+function buildFigmaDeepLink(target, nodeId) {
+  const base = String((target && target.url) || '');
+  if (!base) return null;
+  if (!nodeId) return base;
+  const enc = encodeURIComponent(nodeId);
+  return base.includes('?') ? `${base}&node-id=${enc}` : `${base}?node-id=${enc}`;
+}
+
+/** Handle a message coming back from the plugin (progress / done / error / kit). */
+function onFigmaPluginMessage(raw, conn) {
+  let msg;
+  try { msg = JSON.parse(raw); } catch { return; }
+  if (!msg || msg.type === 'hello') return;
+
+  // "Learn kit" result: persist the component→key map and acknowledge.
+  if (msg.type === 'kit') {
+    const map = saveKitMap(msg.components || []);
+    console.log(`  Figma kit learned: ${map.setCount} component set(s).`);
+    if (conn) conn.send(JSON.stringify({ type: 'kit-ack', setCount: map.setCount }));
+    return;
+  }
+
+  const entry = msg.jobId ? figmaBuildJobs.get(msg.jobId) : null;
+  if (!entry) return;
+  const { job } = entry;
+  if (msg.type === 'progress') {
+    if (msg.message) jobs.manualLog(job, msg.message);
+  } else if (msg.type === 'done') {
+    if (entry.timer) clearTimeout(entry.timer);
+    if (msg.message) jobs.manualLog(job, `✔ ${msg.message}`);
+    const link = buildFigmaDeepLink(entry.target, msg.nodeId);
+    if (link) jobs.manualLog(job, `Open in Figma: ${link}`);
+    jobs.manualFinish(job, { status: 'done', link });
+    figmaBuildJobs.delete(msg.jobId);
+  } else if (msg.type === 'error') {
+    if (entry.timer) clearTimeout(entry.timer);
+    jobs.manualLog(job, `✖ ${msg.message || 'Plugin build failed.'}`, 'stderr');
+    jobs.manualFinish(job, { status: 'error', error: msg.message || 'Plugin build failed.' });
+    figmaBuildJobs.delete(msg.jobId);
+  }
+}
+
+/** Broadcast a build command to every connected plugin (usually one). */
+function sendFigmaBuild(payload) {
+  const str = JSON.stringify(payload);
+  let sent = 0;
+  for (const conn of figmaPluginClients) {
+    if (conn.send(str)) sent++;
+  }
+  return sent;
+}
+
+/** Orchestrate a plugin build: snapshot the live prototype, then hand the tree
+ * to the connected plugin and let onFigmaPluginMessage drive the job to done. */
+async function runFigmaPluginBuild(job, prototypeId, target) {
+  const entry = figmaBuildJobs.get(job.id);
+  try {
+    const liveUrl = `http://localhost:${PROTO_PORT}/${prototypeId}`;
+    const tree = await serializePrototype(liveUrl, {
+      onLog: (m) => jobs.manualLog(job, m),
+    });
+    if (!figmaPluginClients.size) {
+      throw new Error('The DesignLoop Figma plugin disconnected before the build started. Re-open it in Figma.');
+    }
+    // Resolve detected Fluent components to learned kit component keys.
+    const kit = readKitMap();
+    const counts = annotateKit(tree.root, kit);
+    if (kit) {
+      jobs.manualLog(job, `Matched ${counts.matched} Fluent component(s) to the kit; ${counts.unmatched} will use fallback layers.`);
+    } else if (counts.matched + counts.unmatched > 0) {
+      jobs.manualLog(job, `No kit learned yet — run “Learn kit” in the plugin for real components. Building ${counts.unmatched} fallback layer(s).`);
+    }
+    const pageName = `DesignLoop — ${prototypeId}`;
+    jobs.manualLog(job, `Sending ${tree.nodeCount} layers to the Figma plugin…`);
+    const sent = sendFigmaBuild({
+      type: 'build',
+      jobId: job.id,
+      pageName,
+      fileKey: (target && target.fileKey) || null,
+      tree,
+    });
+    if (!sent) throw new Error('Could not reach the Figma plugin.');
+    // Safety timeout: if the plugin never reports done/error, fail the job.
+    if (entry) {
+      entry.timer = setTimeout(() => {
+        if (!job.endedAt) {
+          jobs.manualFinish(job, { status: 'error', error: 'Timed out waiting for the Figma plugin to finish.' });
+        }
+        figmaBuildJobs.delete(job.id);
+      }, 4 * 60 * 1000);
+    }
+  } catch (e) {
+    jobs.manualLog(job, `✖ ${e.message}`, 'stderr');
+    jobs.manualFinish(job, { status: 'error', error: e.message });
+    figmaBuildJobs.delete(job.id);
+  }
+}
+
+
 function discoverTasks() {
   const tasksDir = path.join(ROOT, 'tasks');
   let ids;
@@ -663,6 +982,7 @@ function discoverTasks() {
 
   return ids.map((id) => {
     const taskAbs = path.join(tasksDir, id);
+    const customTitle = String(readTaskConfig(id).title || '').trim();
     const phases = [];
     for (const ph of PHASES) {
       const files = [];
@@ -782,8 +1102,9 @@ function discoverTasks() {
     return {
       id,
       dir: `tasks/${id}`,
-      title: titleCase(id),
-      description: `Design lifecycle artifacts for ${titleCase(id)}.`,
+      title: customTitle || titleCase(id),
+      customTitle: customTitle || null,
+      description: `Design lifecycle artifacts for ${customTitle || titleCase(id)}.`,
       source,
       phases,
     };
@@ -814,6 +1135,39 @@ function liveIdSet() {
     }
   } catch { /* projects.ts unreadable */ }
   return ids;
+}
+
+/**
+ * The local git user's display name (cached). Used as the author fallback for
+ * prototypes that have no explicit author metadata.
+ */
+let _gitUserName;
+function gitUserName() {
+  if (_gitUserName !== undefined) return _gitUserName;
+  try {
+    _gitUserName = execSync('git config user.name', { cwd: ROOT, encoding: 'utf8' }).trim() || null;
+  } catch { _gitUserName = null; }
+  return _gitUserName;
+}
+
+/**
+ * Best-effort author name for a prototype id: the author of the most recent
+ * commit touching its files, falling back to the local git user name (for
+ * untracked/never-committed prototypes). Never throws.
+ */
+function gitAuthorFor(id) {
+  const scopes = [
+    `prototype-workspace/app/${id}`,
+    `prototype-workspace/components/projects/${id}`,
+  ];
+  try {
+    const out = execSync(
+      `git log -1 --format=%an -- ${scopes.map((s) => `"${s}"`).join(' ')}`,
+      { cwd: ROOT, encoding: 'utf8' },
+    ).trim();
+    if (out) return out;
+  } catch { /* no commit history for these paths */ }
+  return gitUserName();
 }
 
 /**
@@ -853,7 +1207,7 @@ function discoverLocalPrototypes() {
       title: m.title || titleCase(id),
       description: m.description,
       status: m.status || 'in-progress',
-      author: m.author,
+      author: m.author || gitAuthorFor(id),
       createdBy: m.createdBy,
       origin: 'local',
       route: m.route || `/${id}`,
@@ -862,6 +1216,53 @@ function discoverLocalPrototypes() {
   // Newest first when a created timestamp is known.
   items.sort((a, b) => (meta[b.id]?.createdAt || '').localeCompare(meta[a.id]?.createdAt || ''));
   return items;
+}
+
+/**
+ * Determine which local prototypes have uncommitted or unpushed changes at the
+ * local end. A prototype is "dirty" when its files under
+ * prototype-workspace/app/<id> or prototype-workspace/components/projects/<id>
+ * show up in the working tree (untracked/modified/staged) OR in commits that
+ * haven't been pushed to the upstream branch. Returns a Set of prototype ids.
+ * Never throws — git failures resolve to an empty (or partial) set.
+ */
+async function dirtyPrototypeIds() {
+  const ids = new Set();
+  const scopes = ['prototype-workspace/app', 'prototype-workspace/components/projects'];
+  const addFromPath = (p) => {
+    if (!p) return;
+    const clean = p.replace(/^"|"$/g, '');
+    const m =
+      clean.match(/prototype-workspace\/app\/([a-z0-9][a-z0-9-_]*)(?:\/|$)/i) ||
+      clean.match(/prototype-workspace\/components\/projects\/([a-z0-9][a-z0-9-_]*)(?:\/|$)/i);
+    if (m) ids.add(m[1]);
+  };
+
+  // Working-tree changes (untracked, modified, staged).
+  const status = await runGit(['status', '--porcelain', '--', ...scopes]);
+  if (status.code === 0) {
+    for (const line of status.stdout.split('\n')) {
+      if (!line.trim()) continue;
+      // Porcelain v1: "XY <path>" (rename shows "orig -> new"; take the new path).
+      let p = line.slice(3).trim();
+      const arrow = p.indexOf(' -> ');
+      if (arrow !== -1) p = p.slice(arrow + 4);
+      addFromPath(p);
+    }
+  }
+
+  // Commits not yet pushed to the upstream branch (skipped gracefully when there
+  // is no upstream configured).
+  const log = await runGit([
+    'log', '--name-only', '--pretty=format:', '@{u}..HEAD', '--', ...scopes,
+  ]);
+  if (log.code === 0) {
+    for (const line of log.stdout.split('\n')) {
+      if (line.trim()) addFromPath(line.trim());
+    }
+  }
+
+  return ids;
 }
 
 async function handleApi(req, res, url) {
@@ -890,9 +1291,15 @@ async function handleApi(req, res, url) {
   }
 
   // GET /api/prototypes/list — LOCAL prototypes discovered from the filesystem.
-  // The workspace merges these with the committed LIVE baseline.
+  // The workspace merges these with the committed LIVE baseline. Each item is
+  // annotated with hasLocalChanges so the UI can offer "Go Live" only when there
+  // is something to push.
   if (req.method === 'GET' && pathname === '/api/prototypes/list') {
-    return sendJson(res, 200, { items: discoverLocalPrototypes() });
+    const items = discoverLocalPrototypes();
+    let dirty = new Set();
+    try { dirty = await dirtyPrototypeIds(); } catch { /* git unavailable */ }
+    for (const it of items) it.hasLocalChanges = dirty.has(it.id);
+    return sendJson(res, 200, { items });
   }
 
   // POST /api/prototypes/make-live — promote a locally-created prototype to the
@@ -941,7 +1348,7 @@ async function handleApi(req, res, url) {
       title: entry.title || id,
       description: entry.description,
       status: entry.status || 'in-progress',
-      author: entry.author,
+      author: entry.author || gitAuthorFor(id),
       route: entry.route || `/${id}`,
       promotedAt: new Date().toISOString(),
     };
@@ -1200,6 +1607,159 @@ async function handleApi(req, res, url) {
     }
   }
 
+  // POST /api/tasks/rename — set a user-defined display title for a task.
+  // Non-destructive: writes { title } to tasks/<id>/.task.json, leaving the
+  // folder id/slug, URLs, and artifact path references untouched.
+  if (req.method === 'POST' && pathname === '/api/tasks/rename') {
+    let body;
+    try { body = await readBody(req); }
+    catch (e) { return sendJson(res, 400, { error: `Invalid body: ${e.message}` }); }
+
+    const id = String(body.id || '').trim();
+    const title = String(body.title || '').trim();
+    if (!/^[a-z0-9][a-z0-9-_]*$/i.test(id)) {
+      return sendJson(res, 400, { error: 'Invalid task id.' });
+    }
+    if (!title) return sendJson(res, 400, { error: 'Title cannot be empty.' });
+    if (title.length > 120) return sendJson(res, 400, { error: 'Title is too long (max 120 chars).' });
+
+    const taskDir = path.join(ROOT, 'tasks', id);
+    if (!fs.existsSync(taskDir) || !fs.statSync(taskDir).isDirectory()) {
+      return sendJson(res, 404, { error: `Task not found: ${id}` });
+    }
+
+    try {
+      const cfg = readTaskConfig(id);
+      cfg.title = title;
+      fs.writeFileSync(path.join(taskDir, '.task.json'), JSON.stringify(cfg, null, 2) + '\n', 'utf8');
+      return sendJson(res, 200, { ok: true, id, title });
+    } catch (e) {
+      return sendJson(res, 500, { error: e.message });
+    }
+  }
+
+  // GET /api/figma/target?id=<prototypeOrTaskId> — does this task already have a
+  // saved Figma file target? The UI uses this to decide whether to prompt for a
+  // URL before sending.
+  if (req.method === 'GET' && pathname === '/api/figma/target') {
+    const id = String(url.searchParams.get('id') || url.searchParams.get('taskId') || '').trim();
+    if (!/^[a-z0-9][a-z0-9-_]*$/i.test(id)) {
+      return sendJson(res, 400, { error: 'Invalid id.' });
+    }
+    const target = readFigmaTarget(id);
+    return sendJson(res, 200, { id, target: target || null });
+  }
+
+  // GET /api/figma/plugin-status — is the DesignLoop Figma plugin connected?
+  if (req.method === 'GET' && pathname === '/api/figma/plugin-status') {
+    return sendJson(res, 200, { connected: figmaPluginClients.size > 0, clients: figmaPluginClients.size });
+  }
+
+  // GET /api/figma/kit — has a Fluent kit been learned? (names + count)
+  if (req.method === 'GET' && pathname === '/api/figma/kit') {
+    const kit = readKitMap();
+    if (!kit) return sendJson(res, 200, { learned: false, setCount: 0, sets: [] });
+    return sendJson(res, 200, {
+      learned: true,
+      setCount: kit.setCount || 0,
+      learnedAt: kit.learnedAt || null,
+      sets: Object.values(kit.sets || {}).map((s) => s.display).sort(),
+    });
+  }
+
+  // POST /api/figma/send { prototypeId, taskId?, figmaUrl? } — send a prototype
+  // into a Figma file as editable native layers. Default path ("plugin") snapshots
+  // the live prototype and rebuilds it via the DesignLoop Figma plugin over a local
+  // WebSocket — no Claude, no MCP, no OAuth. Set FIGMA_RUNNER=copilot|claude to
+  // instead drive Figma's write MCP through the respective CLI. Persists the
+  // per-task target so the URL is pasted once. Returns a streaming { jobId }.
+  if (req.method === 'POST' && pathname === '/api/figma/send') {
+    let body;
+    try { body = await readBody(req); }
+    catch (e) { return sendJson(res, 400, { error: `Invalid body: ${e.message}` }); }
+
+    const prototypeId = String(body.prototypeId || '').trim();
+    const taskId = String(body.taskId || prototypeId || '').trim();
+    if (!/^[a-z0-9][a-z0-9-_]*$/i.test(prototypeId)) {
+      return sendJson(res, 400, { error: 'Invalid prototype id.' });
+    }
+
+    let target = readFigmaTarget(taskId);
+    const provided = String(body.figmaUrl || '').trim();
+    if (provided) {
+      if (!figmaFileKey(provided)) {
+        return sendJson(res, 400, { error: 'That does not look like a Figma file URL.' });
+      }
+      target = saveFigmaTarget(taskId, provided);
+    }
+    if (!target || !target.url) {
+      return sendJson(res, 400, { error: 'No Figma file target. Provide a figmaUrl.', needsUrl: true });
+    }
+
+    const envRunner = (process.env.FIGMA_RUNNER || 'plugin').toLowerCase();
+    const runner = ['plugin', 'copilot', 'claude'].includes(envRunner) ? envRunner : 'plugin';
+
+    // Default path: the DesignLoop Figma plugin rebuilds the design natively.
+    if (runner === 'plugin') {
+      if (figmaPluginClients.size === 0) {
+        return sendJson(res, 409, {
+          error: 'The DesignLoop Figma plugin is not connected.',
+          hint: 'In Figma: Plugins → Development → DesignLoop (import figma-plugin/manifest.json once), run it, and keep it open. Then try again.',
+          needsPlugin: true,
+        });
+      }
+      const job = jobs.createManualJob({ taskId: taskId || null, kind: 'figma', prototypeId, runner: 'plugin' });
+      figmaBuildJobs.set(job.id, { job, target, timer: null });
+      jobs.manualLog(job, `▶ Sending “${prototypeId}” to Figma…`);
+      // Kick off asynchronously; the card subscribes to the job stream.
+      runFigmaPluginBuild(job, prototypeId, target);
+      return sendJson(res, 202, { jobId: job.id, status: job.status, taskId: taskId || null, runner, target });
+    }
+
+    // Preflight: the copilot runner needs Figma's local desktop MCP server up.
+    if (runner === 'copilot' && !(await probeFigmaLocalMcp())) {
+      return sendJson(res, 409, {
+        error: 'Figma local MCP server is not running.',
+        hint: 'In the Figma desktop app: Preferences → “Enable local MCP server” (Dev Mode MCP server), then try again. It listens on 127.0.0.1:3845.',
+        needsFigmaMcp: true,
+      });
+    }
+
+    const liveUrl = `http://localhost:${PROTO_PORT}/${prototypeId}`;
+    const prompt = [
+      `Run the "fluent-to-figma" skill to send a DesignLoop prototype into a Figma file as editable native layers.`,
+      ``,
+      `Read the full instructions in .github/skills/fluent-to-figma/SKILL.md and the quality bar in .github/skills/fluent-to-figma/VERIFY.md, then execute them precisely.`,
+      ``,
+      `Inputs:`,
+      `- prototypeId: ${prototypeId}`,
+      `- taskId: ${taskId}`,
+      `- figmaFileUrl: ${target.url}`,
+      `- figmaFileKey: ${target.fileKey || '(parse from the URL)'}`,
+      `- liveUrl: ${liveUrl}`,
+      `- Prototype source: prototype-workspace/app/${prototypeId}/page.tsx and prototype-workspace/components/projects/${prototypeId}/`,
+      `- Reverse token map: run \`node prototype-workspace/scripts/fluent-to-figma-map.mjs\` for the Fluent→Figma variable table.`,
+      ``,
+      `Use the connected "figma" MCP server's write tools. Create a new Page named "DesignLoop — ${prototypeId}" in the target file with auto-layout frames, real text nodes, and variable-bound styles. Do not modify any repository files. Report the Figma page deep link, node counts, and any unmapped-token fallbacks.`,
+    ].join('\n');
+
+    const job = jobs.createJob({
+      prompt,
+      agent: runner === 'copilot' ? 'fluent-to-figma' : null,
+      runner,
+      taskId: taskId || null,
+      kind: 'figma',
+      _skipVerify: true,
+    });
+    return sendJson(res, 202, {
+      jobId: job.id,
+      status: job.status,
+      taskId: taskId || null,
+      runner,
+      target,
+    });
+  }
+
   // POST /api/run-stage — run a full stage via its coordinator agent
   if (req.method === 'POST' && pathname === '/api/run-stage') {
     let body;
@@ -1305,6 +1865,7 @@ This stage may be invoked directly without prior stages having run. Follow this 
 
     const sourceCtx = await materializeSourceArtifacts(body.sourceArtifacts);
     const finalPrompt = sourceCtx.promptBlock ? `${prompt}${sourceCtx.promptBlock}` : prompt;
+    const runner = body.runner || toolRunner(body.toolId);
     const job = jobs.createJob({
       prompt: finalPrompt,
       agent:      agentSlug(body.agent),
@@ -1312,7 +1873,10 @@ This stage may be invoked directly without prior stages having run. Follow this 
       kind:       body.kind    || 'run',
       toolId:     body.toolId  || null,
       round:      body.round   || 1,
-      _skipVerify: !body.toolId, // only verify when a toolId is provided
+      runner,
+      // Only verify copilot tool runs; claude-runner tools (e.g. fluent-to-figma)
+      // produce Figma-side output the copilot verify/rerun loop can't act on.
+      _skipVerify: !body.toolId || runner === 'claude',
     });
     return sendJson(res, 202, {
       jobId: job.id,
@@ -1336,6 +1900,7 @@ This stage may be invoked directly without prior stages having run. Follow this 
         'Cache-Control': 'no-cache, no-transform',
         'Connection': 'keep-alive',
         'X-Accel-Buffering': 'no',
+        ...CORS_HEADERS,
       });
       res.write('retry: 2000\n\n');
       // Replay buffered log, then current status, then live updates.
@@ -1494,6 +2059,17 @@ const server = http.createServer((req, res) => {
     return sendJson(res, 405, { error: 'Method not allowed' });
   }
   serveStatic(req, res);
+});
+
+// DesignLoop Figma plugin WebSocket endpoint.
+attachWss(server, '/figma-plugin', (conn) => {
+  figmaPluginClients.add(conn);
+  console.log(`  Figma plugin connected (${figmaPluginClients.size} client(s)).`);
+  conn.on('message', (raw) => onFigmaPluginMessage(raw, conn));
+  conn.on('close', () => {
+    figmaPluginClients.delete(conn);
+    console.log(`  Figma plugin disconnected (${figmaPluginClients.size} client(s)).`);
+  });
 });
 
 server.listen(PORT, HOST, () => {

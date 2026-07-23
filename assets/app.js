@@ -184,6 +184,7 @@ const TASKS = [
 let activeFile = null;
 let collapsedPhases = {};
 let currentTaskId = null;
+let TASK_RUN_CONTEXT = null; // when set, run actions target this task (task-page runner)
 let ROUTING = false; // true while rendering from a URL route (suppresses pushState)
 const TASK_SOURCE_ARTIFACTS_KEY = 'dl-task-source-artifacts-v1';
 
@@ -292,6 +293,7 @@ const ICONS = {
   panelLeft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>',
   send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>',
   sparkle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>',
+  pencil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
 };
 
 /* =================================================================
@@ -642,6 +644,7 @@ function loadTask(taskId) {
   if (!task) return;
   activeFile = null;
   currentTaskId = taskId;
+  TASK_RUN_CONTEXT = taskId;
   if (!ROUTING) pushTaskRoute({ task: taskId });
   renderSidebar(taskId);
   closeSidebar();
@@ -657,54 +660,150 @@ function loadTask(taskId) {
   area.innerHTML = `
     <div class="task-overview">
       <div class="task-overview-header">
-        <h1>${task.title}</h1>
+        <h1 id="taskTitleHeading">${escapeHtml(task.title)}<button type="button" class="task-rename-btn" title="Rename task" aria-label="Rename task" onclick="startRenameTask('${task.id}')">${ICONS.pencil}</button></h1>
         <p>${task.description}</p>
         ${sourceArtifactsForTask(task).length ? `<button type="button" class="task-overview-source" onclick="openArtifactsDialog('${task.id}')">${ICONS.folder} Artifacts</button>` : ''}
       </div>
-      ${renderTaskTimeline(task)}
-      ${task.phases.map(phase => `
-        <div class="phase-section">
-          <div class="phase-section-head">
-            <span class="phase-dot ${phase.id}"></span>
-            <h3>${phase.label}</h3>
-            <span class="phase-count">${phase.files.length + (phase.components || []).length} item(s)</span>
-          </div>
-          <div class="phase-file-list">
-            ${phase.files.map(file => `
-              <div class="phase-file-row" onclick="loadFile('${task.id}', '${file.path}', '${phase.id}')">
-                <span class="file-icon">${getFileIcon(file.path)}</span>${file.label}
-              </div>
-            `).join('')}
-            ${(phase.components || []).map(comp => `
-              <div class="phase-file-row" onclick="loadComponent('${task.id}', '${comp.name}', '${comp.demo}', ${JSON.stringify(comp.sources).replace(/"/g, '&quot;')})">
-                <span class="file-icon">${ICONS.cube}</span>${comp.name} <span style="color:var(--color-neutral-400);font-size:0.75rem">— live prototype</span>
-              </div>
-            `).join('')}
-          </div>
-          ${(phase.fluentPreviewRoute || phase.fluentPreview) ? (() => {
-            const src = prototypePreviewSrc(phase);
-            return src ? `
-            <div class="phase-live-preview">
-              <div class="phase-live-preview-head">
-                <span class="proto-badge">Live prototype</span>
-                <a class="preview-open-new" href="${src}" target="_blank" rel="noopener">Open in new tab ↗</a>
-              </div>
-              <div class="preview-iframe-wrapper">
-                <iframe class="preview-iframe preview-iframe--app" src="${src}" title="${task.title} — live prototype" loading="lazy" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
-              </div>
-            </div>
-          ` : '';
-          })() : ''}
-        </div>
-      `).join('')}
+      ${renderTaskRunner(task)}
+      <div id="taskPhases">
+        ${renderTaskTimeline(task)}
+        ${renderTaskPhases(task)}
+      </div>
     </div>
   `;
   document.getElementById('breadcrumb').innerHTML = `
     <span style="cursor:pointer" onclick="goHome()">Home</span>
     <span>›</span>
-    <span class="crumb-active">${task.title}</span>
+    <span class="crumb-active">${escapeHtml(task.title)}</span>
   `;
   wireTaskTimeline();
+  wireComposer('lifecycle');
+}
+
+/* The in-task runner — mirrors the home composer so a user can run more stages,
+   re-run a stage, or run tools/frameworks without leaving the task. All runs
+   target this task via TASK_RUN_CONTEXT. */
+function renderTaskRunner(task) {
+  const done = new Set((task.phases || []).map(p => p.id));
+  const next = STAGES.find(s => !done.has(s.id));
+  const hint = next
+    ? `Continue with the ${next.label} stage, re-run a stage, or run a tool.`
+    : `Re-run any stage or run a tool or framework for this task.`;
+  return `
+    <div class="task-runner" id="taskRunner">
+      <div class="task-runner-head">
+        <span class="task-runner-title">${ICONS.sparkle} Do more in this task</span>
+        <span class="task-runner-hint">${hint}</span>
+      </div>
+      ${composerMarkup('Run another stage, re-run a stage, or run a tool in this task…')}
+      <div id="commandOutput"></div>
+    </div>`;
+}
+
+function renderTaskPhases(task) {
+  return task.phases.map(phase => `
+    <div class="phase-section">
+      <div class="phase-section-head">
+        <span class="phase-dot ${phase.id}"></span>
+        <h3>${phase.label}</h3>
+        <span class="phase-count">${phase.files.length + (phase.components || []).length} item(s)</span>
+      </div>
+      <div class="phase-file-list">
+        ${phase.files.map(file => `
+          <div class="phase-file-row" onclick="loadFile('${task.id}', '${file.path}', '${phase.id}')">
+            <span class="file-icon">${getFileIcon(file.path)}</span>${file.label}
+          </div>
+        `).join('')}
+        ${(phase.components || []).map(comp => `
+          <div class="phase-file-row" onclick="loadComponent('${task.id}', '${comp.name}', '${comp.demo}', ${JSON.stringify(comp.sources).replace(/"/g, '&quot;')})">
+            <span class="file-icon">${ICONS.cube}</span>${comp.name} <span style="color:var(--color-neutral-400);font-size:0.75rem">— live prototype</span>
+          </div>
+        `).join('')}
+      </div>
+      ${(phase.fluentPreviewRoute || phase.fluentPreview) ? (() => {
+        const src = prototypePreviewSrc(phase);
+        return src ? `
+        <div class="phase-live-preview">
+          <div class="phase-live-preview-head">
+            <span class="proto-badge">Live prototype</span>
+            <a class="preview-open-new" href="${src}" target="_blank" rel="noopener">Open in new tab ↗</a>
+          </div>
+          <div class="preview-iframe-wrapper">
+            <iframe class="preview-iframe preview-iframe--app" src="${src}" title="${task.title} — live prototype" loading="lazy" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+          </div>
+        </div>
+      ` : '';
+      })() : ''}
+    </div>
+  `).join('');
+}
+
+/* Re-render only the timeline + phase list for a task (leaving the runner and
+   its output panel intact), used after a run completes on the task page so new
+   artifacts appear without discarding the run result. */
+async function refreshTaskPhases(taskId) {
+  await refreshTasks();
+  const task = getTask(taskId);
+  const host = document.getElementById('taskPhases');
+  if (!task || !host) return;
+  host.innerHTML = `${renderTaskTimeline(task)}${renderTaskPhases(task)}`;
+  wireTaskTimeline();
+}
+
+/* =================================================================
+   TASK RENAME (non-destructive display title via bridge .task.json)
+   ================================================================= */
+function startRenameTask(taskId) {
+  const task = getTask(taskId);
+  if (!task) return;
+  const h1 = document.getElementById('taskTitleHeading');
+  if (!h1 || h1.querySelector('.task-rename-form')) return;
+  h1.innerHTML = `
+    <form class="task-rename-form" onsubmit="return commitRenameTask(event, '${taskId}')">
+      <input type="text" id="taskRenameInput" class="task-rename-input"
+             value="${escapeHtml(task.title)}" maxlength="120" autocomplete="off"
+             aria-label="Task name" />
+      <button type="submit" class="task-rename-save" title="Save" aria-label="Save name">${ICONS.check}</button>
+      <button type="button" class="task-rename-cancel" title="Cancel" aria-label="Cancel"
+              onclick="loadTask('${taskId}')">&times;</button>
+    </form>`;
+  const input = document.getElementById('taskRenameInput');
+  if (input) {
+    input.focus();
+    input.select();
+    input.addEventListener('keydown', (e) => { if (e.key === 'Escape') loadTask(taskId); });
+  }
+}
+
+async function commitRenameTask(event, taskId) {
+  event.preventDefault();
+  const task = getTask(taskId);
+  const input = document.getElementById('taskRenameInput');
+  if (!task || !input) return false;
+  const title = input.value.trim();
+  if (!title || title === task.title) { loadTask(taskId); return false; }
+
+  const saveBtn = document.querySelector('.task-rename-save');
+  if (saveBtn) saveBtn.disabled = true;
+  try {
+    const r = await fetch('/api/tasks/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: taskId, title }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    task.title = data.title || title;
+    task.customTitle = task.title;
+  } catch (err) {
+    if (input) { input.classList.add('task-rename-input--error'); input.disabled = false; }
+    if (saveBtn) saveBtn.disabled = false;
+    alert(`Rename failed: ${err.message}`);
+    return false;
+  }
+  loadTask(taskId);
+  buildGlobalSidebar({ type: 'task', id: taskId });
+  return false;
 }
 
 /* =================================================================
@@ -1406,10 +1505,14 @@ function buildGlobalSidebar(active) {
   const taskItems = TASKS.map(task => {
     const isActive = active && active.type === 'task' && active.id === task.id;
     return `
-      <a class="nav-item ${isActive ? 'active' : ''}"
-         onclick="openTaskPage('${task.id}')" title="${task.title}">
-        <span class="nav-item-label">${task.title}</span>
-      </a>`;
+      <div class="nav-item-wrap" data-task="${task.id}">
+        <a class="nav-item ${isActive ? 'active' : ''}"
+           onclick="openTaskPage('${task.id}')" title="${escapeHtml(task.title)}">
+          <span class="nav-item-label">${escapeHtml(task.title)}</span>
+        </a>
+        <button type="button" class="nav-rename-btn" title="Rename task" aria-label="Rename task"
+                onclick="event.stopPropagation(); startRenameTaskRail('${task.id}')">${ICONS.pencil}</button>
+      </div>`;
   }).join('');
 
   nav.innerHTML = `
@@ -1424,6 +1527,65 @@ function toggleRail() {
   if (!sb) return;
   const collapsed = sb.classList.toggle('rail-collapsed');
   localStorage.setItem('dl-rail-collapsed', collapsed ? '1' : '0');
+}
+
+/* Inline rename from the left rail (home + task pages), mirroring the task
+   overview header affordance. */
+function startRenameTaskRail(taskId) {
+  const task = getTask(taskId);
+  if (!task) return;
+  const wrap = document.querySelector(`.nav-item-wrap[data-task="${taskId}"]`);
+  if (!wrap || wrap.querySelector('.nav-rename-form')) return;
+  wrap.classList.add('renaming');
+  wrap.innerHTML = `
+    <form class="nav-rename-form" onsubmit="return commitRenameTaskRail(event, '${taskId}')">
+      <input type="text" class="nav-rename-input" value="${escapeHtml(task.title)}"
+             maxlength="120" autocomplete="off" aria-label="Task name" />
+      <button type="submit" class="nav-rename-save" title="Save" aria-label="Save name">${ICONS.check}</button>
+      <button type="button" class="nav-rename-cancel" title="Cancel" aria-label="Cancel"
+              onclick="buildGlobalSidebar(CURRENT_SCOPE)">&times;</button>
+    </form>`;
+  const input = wrap.querySelector('.nav-rename-input');
+  if (input) {
+    input.focus();
+    input.select();
+    input.addEventListener('keydown', (e) => { if (e.key === 'Escape') buildGlobalSidebar(CURRENT_SCOPE); });
+    input.addEventListener('click', (e) => e.stopPropagation());
+  }
+}
+
+async function commitRenameTaskRail(event, taskId) {
+  event.preventDefault();
+  const task = getTask(taskId);
+  const wrap = document.querySelector(`.nav-item-wrap[data-task="${taskId}"]`);
+  const input = wrap && wrap.querySelector('.nav-rename-input');
+  if (!task || !input) return false;
+  const title = input.value.trim();
+  if (!title || title === task.title) { buildGlobalSidebar(CURRENT_SCOPE); return false; }
+
+  const saveBtn = wrap.querySelector('.nav-rename-save');
+  if (saveBtn) saveBtn.disabled = true;
+  try {
+    const r = await fetch('/api/tasks/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: taskId, title }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    task.title = data.title || title;
+    task.customTitle = task.title;
+  } catch (err) {
+    input.classList.add('nav-rename-input--error');
+    input.disabled = false;
+    if (saveBtn) saveBtn.disabled = false;
+    alert(`Rename failed: ${err.message}`);
+    return false;
+  }
+  buildGlobalSidebar(CURRENT_SCOPE);
+  // Keep an open task overview header in sync if it's showing this task.
+  if (currentTaskId === taskId && document.getElementById('taskTitleHeading')) loadTask(taskId);
+  return false;
 }
 
 /* =================================================================
@@ -1467,6 +1629,14 @@ function renderTaskRoute() {
 
 async function initTaskPage() {
   await bridgeHealth();
+  loadToolRegistry();
+  const linkInput = document.getElementById('linkSourceInput');
+  if (linkInput) {
+    linkInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submitLinkSource(); }
+      if (e.key === 'Escape') { e.preventDefault(); closeLinkSourceModal(); }
+    });
+  }
   await refreshTasks();
   renderTaskRoute();
   window.addEventListener('popstate', renderTaskRoute);
@@ -1521,6 +1691,68 @@ let HOME_SOURCE_PENDING = 0;
 function commandText() {
   const box = document.getElementById('commandInput');
   return box ? box.value.trim() : '';
+}
+
+/* Build the composer markup (textarea + source CTAs + Run split button) used on
+   both the home page and, injected dynamically, inside the task page runner.
+   Reuses the exact same element ids/classes so the entire run machinery
+   (runComposer, runStage, runSequence, runAgent, the run menu) works unchanged. */
+function composerMarkup(placeholder) {
+  const ph = placeholder || "Design a settings page, run a usability evaluation, draft a PRD…";
+  return `
+    <div class="composer" id="composer">
+      <textarea id="commandInput" rows="2" placeholder="${escapeHtml(ph)}"></textarea>
+      <div class="composer-sources" id="composerSources" hidden></div>
+      <div class="composer-bar">
+        <div class="composer-left">
+          <div class="composer-source-ctas">
+            <button class="composer-source-btn" type="button" onclick="pickDocumentArtifact()" title="Add document or file">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            </button>
+            <button class="composer-source-btn" type="button" onclick="pickLinkArtifact()" title="Add link or URL">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+            </button>
+          </div>
+          <input type="file" id="artifactFileInput" multiple hidden onchange="onArtifactFiles(event)">
+        </div>
+        <div class="composer-right">
+          <div class="run-split">
+            <button class="cmd-primary" type="button" aria-haspopup="true" aria-expanded="false" onclick="toggleRunMenu(event)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0" fill-rule="evenodd"><path fill="currentColor" d="M8 5.14v13.72a1 1 0 0 0 1.54.84l10.28-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14z"/></svg>
+              Run
+            </button>
+            <div class="composer-menu run-menu" id="runMenu" hidden role="menu"></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* Wire composer keyboard shortcuts + outside-click/Escape handling. Called once
+   per page (home and task) after the composer exists in the DOM. */
+let COMPOSER_WIRED = false;
+function wireComposer(defaultMode) {
+  const box = document.getElementById('commandInput');
+  if (box && !box.dataset.wired) {
+    box.dataset.wired = '1';
+    box.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        runComposer(defaultMode || 'lifecycle');
+      }
+    });
+  }
+  if (COMPOSER_WIRED) return;
+  COMPOSER_WIRED = true;
+  document.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'linkSourceModal') { closeLinkSourceModal(); return; }
+    const path = (typeof e.composedPath === 'function') ? e.composedPath() : [];
+    const inside = path.some(el => el && el.classList && el.classList.contains('composer-bar'));
+    if (!inside) closeComposerMenus();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeComposerMenus();
+  });
 }
 
 function fillCommand(text) {
@@ -1695,6 +1927,8 @@ function slugFromText(raw) {
 
 /** Find the first URL in a string of text or attached sources. */
 function extractTaskId() {
+  // On the task page, always target the task currently being viewed.
+  if (TASK_RUN_CONTEXT) return TASK_RUN_CONTEXT;
   // Prefer an explicitly attached link source.
   const link = HOME_SOURCES.find(s => s.type === 'link');
   if (link) return slugFromUrl(link.value);
@@ -2036,6 +2270,8 @@ function runComposerTool(toolId) {
 function setHomeRunning(active) {
   const hero = document.querySelector('.home-hero');
   if (hero) hero.classList.toggle('is-running', !!active);
+  const runner = document.getElementById('taskRunner');
+  if (runner) runner.classList.toggle('is-running', !!active);
 }
 
 function runTool(toolId) {
@@ -2407,30 +2643,7 @@ function initHomePage() {
       }
     });
   }
-  const box = document.getElementById('commandInput');
-  if (box) {
-    box.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); runComposer('lifecycle'); }
-    });
-  }
-  // Close composer menus on outside click / Escape.
-  // Use composedPath() (frozen at dispatch) so submenu navigation that
-  // re-renders innerHTML — detaching the clicked node — is still treated as
-  // an inside click rather than closing the menu.
-  document.addEventListener('click', (e) => {
-    if (e.target && e.target.id === 'linkSourceModal') {
-      closeLinkSourceModal();
-      return;
-    }
-    const path = (typeof e.composedPath === 'function') ? e.composedPath() : [];
-    const inside = path.some(el => el && el.classList && el.classList.contains('composer-bar'));
-    if (!inside) closeComposerMenus();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      closeComposerMenus();
-    }
-  });
+  wireComposer('lifecycle');
   bridgeBoot({ type: 'home' }).then(updatePrototypesLink);
 }
 
@@ -2677,6 +2890,12 @@ async function refreshTasks() {
    author/excerpt from the bridge) into a curated task, matching files by path so
    the curated human labels are preserved. */
 function mergeTaskMeta(existing, fresh) {
+  // Adopt a user-defined display title (from tasks/<id>/.task.json via the
+  // bridge) so renames persist across reloads even for curated tasks.
+  if (fresh && fresh.customTitle) {
+    existing.title = fresh.customTitle;
+    existing.customTitle = fresh.customTitle;
+  }
   const metaByPath = {};
   for (const ph of (fresh.phases || [])) {
     for (const f of (ph.files || [])) {
@@ -3031,6 +3250,13 @@ async function finishRun(mountEl, { ok, flagged, cancelled, artifacts = [], erro
   // Make the new/updated task show up in the sidebar.
   await refreshTasks();
   rebuildSidebar();
+
+  // On the task page, refresh the phase list in place so newly generated
+  // artifacts appear immediately without discarding the run output panel.
+  const runTid = taskId || taskIdFromArtifacts(artifacts);
+  if (TASK_RUN_CONTEXT && runTid === TASK_RUN_CONTEXT && document.getElementById('taskPhases')) {
+    refreshTaskPhases(TASK_RUN_CONTEXT);
+  }
 
   const tid = taskId || taskIdFromArtifacts(artifacts);
   if (tid && Array.isArray(sourceArtifacts) && sourceArtifacts.length) {

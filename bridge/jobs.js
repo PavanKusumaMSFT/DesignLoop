@@ -33,6 +33,29 @@ function resolveCopilotBin() {
 
 const COPILOT_BIN = resolveCopilotBin();
 
+/** Resolve the absolute path to the `claude` (Claude Code) binary once. */
+function resolveClaudeBin() {
+  if (process.env.CLAUDE_BIN) return process.env.CLAUDE_BIN;
+  const tries = [
+    () => execSync('command -v claude', { shell: '/bin/zsh', encoding: 'utf8' }).trim(),
+    () => execSync('which claude', { encoding: 'utf8' }).trim(),
+    () => {
+      const home = process.env.HOME || '';
+      const p = home ? path.join(home, '.local', 'bin', 'claude') : '';
+      return p && fs.existsSync(p) ? p : '';
+    },
+  ];
+  for (const t of tries) {
+    try {
+      const p = t();
+      if (p) return p;
+    } catch { /* keep trying */ }
+  }
+  return 'claude'; // fall back to PATH lookup at spawn time
+}
+
+const CLAUDE_BIN = resolveClaudeBin();
+
 class JobManager {
   /**
    * @param {object} opts
@@ -48,6 +71,27 @@ class JobManager {
   }
 
   copilotBin() { return COPILOT_BIN; }
+  claudeBin() { return CLAUDE_BIN; }
+
+  /**
+   * Build the spawn command for a job based on its runner.
+   * @param {object} job
+   * @returns {{ bin: string, args: string[], label: string }}
+   */
+  _runnerCommand(job) {
+    if (job.runner === 'claude') {
+      // Claude Code print-mode; skip permission prompts to match copilot's
+      // --allow-all-tools posture so the headless run isn't blocked on approval.
+      return {
+        bin: CLAUDE_BIN,
+        args: ['-p', job.promptText, '--dangerously-skip-permissions'],
+        label: 'Claude Code',
+      };
+    }
+    const args = ['-p', job.promptText, '--allow-all-tools'];
+    if (job.agent) args.push(`--agent=${job.agent}`);
+    return { bin: COPILOT_BIN, args, label: 'Copilot CLI' };
+  }
 
   /** Snapshot of `git status --porcelain` as a Set of raw lines. */
   _gitSnapshot() {
@@ -143,13 +187,14 @@ class JobManager {
    * @param {string} [spec.parentJobId] - round-2 jobs reference their parent.
    * @param {boolean} [spec._skipVerify] - internal: skip verification (verify jobs, plain runs).
    */
-  createJob({ prompt, agent, taskId, kind, toolId, round, parentJobId, _skipVerify }) {
+  createJob({ prompt, agent, taskId, kind, toolId, round, parentJobId, runner, _skipVerify }) {
     const id = randomUUID();
     const job = {
       id,
       kind: kind || 'run',
       taskId: taskId || null,
       agent: agent || null,
+      runner: runner === 'claude' ? 'claude' : 'copilot',
       promptText: prompt || '',
       toolId: toolId || null,
       round: round || 1,
@@ -177,6 +222,58 @@ class JobManager {
   }
 
   get(id) { return this.jobs.get(id); }
+
+  /**
+   * Create a "manual" job that is NOT backed by a spawned process — its lifecycle
+   * is driven externally (e.g. the Figma-plugin build flow) via manualLog /
+   * manualFinish. It never enters the queue and never occupies a concurrency slot.
+   * @param {object} spec { taskId, kind, prototypeId, runner }
+   */
+  createManualJob({ taskId, kind, prototypeId, runner } = {}) {
+    const id = randomUUID();
+    const job = {
+      id,
+      kind: kind || 'run',
+      taskId: taskId || null,
+      agent: null,
+      runner: runner || 'plugin',
+      prototypeId: prototypeId || null,
+      promptText: '',
+      toolId: null,
+      round: 1,
+      parentJobId: null,
+      rerunJobId: null,
+      verifyResult: null,
+      _manual: true,
+      _skipVerify: true,
+      status: 'running',
+      log: [],
+      exitCode: null,
+      error: null,
+      link: null,
+      artifacts: [],
+      createdAt: Date.now(),
+      startedAt: Date.now(),
+      endedAt: null,
+      _child: null,
+      _subscribers: new Set(),
+    };
+    this.jobs.set(id, job);
+    return job;
+  }
+
+  /** Append a log line to a manual job (mirrors spawned-job logging). */
+  manualLog(job, line, stream = 'system') {
+    if (!job) return;
+    this._appendLog(job, stream, line);
+  }
+
+  /** Terminate a manual job, optionally attaching a deep link + artifacts. */
+  manualFinish(job, { status = 'done', error = null, link = null, artifacts = [] } = {}) {
+    if (!job || job.endedAt) return;
+    if (link) job.link = link;
+    this._finalise(job, { status, error, artifacts });
+  }
 
   subscribe(id, res) {
     const job = this.jobs.get(id);
@@ -217,24 +314,23 @@ class JobManager {
     job._filesStart = this._filesSnapshot();
     this._emit(job, 'status', { status: 'running' });
 
-    const finalArgs = ['-p', job.promptText, '--allow-all-tools'];
-    if (job.agent) finalArgs.push(`--agent=${job.agent}`);
+    const { bin, args: finalArgs, label } = this._runnerCommand(job);
 
     let child;
     try {
-      child = spawn(COPILOT_BIN, finalArgs, {
+      child = spawn(bin, finalArgs, {
         cwd: this.root,
         env: process.env,
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: true, // own process group so cancel can kill the whole subtree
       });
     } catch (err) {
-      this._appendLog(job, 'stderr', `Failed to launch Copilot CLI: ${err.message}`);
+      this._appendLog(job, 'stderr', `Failed to launch ${label}: ${err.message}`);
       return this._finish(job, { status: 'error', error: err.message });
     }
 
     job._child = child;
-    this._appendLog(job, 'system', `▶ Running Copilot CLI${job.agent ? ` (agent: ${job.agent})` : ''}…`);
+    this._appendLog(job, 'system', `▶ Running ${label}${job.agent ? ` (agent: ${job.agent})` : ''}…`);
 
     const wire = (stream, name) => {
       let buf = '';
@@ -265,12 +361,17 @@ class JobManager {
         return this._finish(job, { status: 'cancelled', exitCode: code });
       }
       // The CLI exits 0 even when it can't authenticate — detect that explicitly.
-      const authFailed = job.log.some((e) =>
-        e.stream === 'stderr' && /No authentication information found/i.test(e.line));
+      const authFailed = job.runner === 'claude'
+        ? job.log.some((e) => e.stream === 'stderr' &&
+            /(Invalid API key|Please run .*login|not authenticated|OAuth)/i.test(e.line))
+        : job.log.some((e) => e.stream === 'stderr' &&
+            /No authentication information found/i.test(e.line));
       if (authFailed) {
-        this._appendLog(job, 'system',
-          '✖ Copilot CLI is not authenticated. Run `copilot` once and use /login, or set COPILOT_GITHUB_TOKEN.');
-        return this._finish(job, { status: 'error', exitCode: code, error: 'Copilot CLI not authenticated' });
+        const msg = job.runner === 'claude'
+          ? '✖ Claude Code is not authenticated. Run `claude` once and use /login (and connect Figma MCP via /mcp).'
+          : '✖ Copilot CLI is not authenticated. Run `copilot` once and use /login, or set COPILOT_GITHUB_TOKEN.';
+        this._appendLog(job, 'system', msg);
+        return this._finish(job, { status: 'error', exitCode: code, error: `${job.runner === 'claude' ? 'Claude Code' : 'Copilot CLI'} not authenticated` });
       }
       const artifacts = this._computeArtifacts(job._gitStart, this._gitSnapshot(), job._filesStart, this._filesSnapshot());
       job.artifacts = artifacts;
@@ -302,6 +403,7 @@ class JobManager {
       exitCode: job.exitCode,
       error: job.error,
       artifacts: job.artifacts,
+      link: job.link || null,
       verifyResult: job.verifyResult || null,
     });
   }
@@ -394,6 +496,7 @@ class JobManager {
       exitCode: job.exitCode,
       error: job.error,
       artifacts: job.artifacts,
+      link: job.link || null,
       verifyResult: job.verifyResult,
       createdAt: job.createdAt,
       startedAt: job.startedAt,

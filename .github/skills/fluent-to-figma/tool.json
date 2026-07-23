@@ -1,0 +1,27 @@
+{
+  "id": "fluent-to-figma",
+  "name": "Fluent to Figma",
+  "description": "Send a DesignLoop prototype into a Figma file as editable native layers (frames, auto-layout, text, variables) via the Figma MCP write tools.",
+  "stages": [
+    "prototype",
+    "deliver"
+  ],
+  "agent": "fluent-to-figma",
+  "runner": "copilot",
+  "inputs": [
+    {
+      "type": "task-description",
+      "required": false
+    },
+    {
+      "type": "artifact",
+      "from": "figma-to-fluent",
+      "required": false
+    }
+  ],
+  "outputs": [
+    "Figma file (new page per prototype)"
+  ],
+  "dependencies": [],
+  "required": false
+}

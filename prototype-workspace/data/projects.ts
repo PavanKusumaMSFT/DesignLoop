@@ -822,6 +822,28 @@ const ALL_PROJECTS: Project[] = [
     connections: [],
     icon: "Sparkle24Regular",
   },
+  {
+    id: "create-a-one-page-prototype-of-azure-home-highlighting-the-k",
+    title: "Create A One Page Prototype Of Azure Home Highlighting The K",
+    description:
+      "Azure Home page prototype highlighting the Azure Kubernetes Service card",
+    owner: "Prototyper Agent",
+    team: "FRE",
+    status: "in-progress",
+    area: "foundations",
+    subArea: "wayfinding",
+    category: "navigation",
+    experienceArea: "onboarding-fre",
+    pillars: ["discover"],
+    horizon: "build-2026",
+    timeframe: "short-term",
+    shell: "build-mvp",
+    componentPath: "projects/create-a-one-page-prototype-of-azure-home-highlighting-the-k/index.tsx",
+    tags: ["homepage", "kubernetes", "navigation", "highlight"],
+    source: { type: "local", route: "/create-a-one-page-prototype-of-azure-home-highlighting-the-k" },
+    connections: [],
+    icon: "Sparkle24Regular",
+  },
 ];
 
 /**

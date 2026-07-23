@@ -32,6 +32,20 @@
 
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
+  <!-- LINK SOURCE MODAL -->
+  <div class="modal-overlay" id="linkSourceModal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="linkSourceTitle">
+      <h2 id="linkSourceTitle">Add Link Source</h2>
+      <p class="modal-sub">Paste a URL, repo-relative path, or Figma link to add it as a source artifact.</p>
+      <label for="linkSourceInput">Link or path</label>
+      <input type="text" id="linkSourceInput" placeholder="https://example.com/spec or tasks/my-task/research/brief.md" />
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeLinkSourceModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="submitLinkSource()">Add source</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MAIN -->
   <main class="main">
     <header class="topbar" id="topbar">

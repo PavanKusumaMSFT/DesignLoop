@@ -77,6 +77,7 @@ const tokens: SafeTokens = fluentTokens;
 | `/component-audit` | Quality gate for Fluent token, icon, reuse, and markup violations | Prototyper |
 | `/refactor-to-system` | Refactor prototype code to Fluent tokens, primitives, and shared-component reuse | Prototyper |
 | `/figma-to-fluent` | Convert Figma designs into Fluent UI React v9 prototype-workspace code | Prototyper |
+| `/fluent-to-figma` | Send a prototype into a Figma file as editable native layers (Copilot CLI + Figma local MCP write tools) | Prototyper / Handoff |
 | `/design-with-fluent` | Design pages and component specs against Fluent UI React v9 and prototype-workspace reuse rules | Designer |
 
 ## Hooks (Automated Enforcement)
