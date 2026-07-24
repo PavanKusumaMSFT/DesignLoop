@@ -2027,6 +2027,107 @@ body:has(.sidebar.rail-collapsed) .main { margin-left: 64px; }
 }
 .task-runner .composer { box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06)); }
 .task-runner #commandOutput { width: 100%; margin-top: 16px; }
+
+/* ── Prototype report card (Test-stage checks) ─────────────────────── */
+.report-card {
+  margin: 0 0 28px;
+  padding: 16px 18px;
+  background: var(--color-neutral-0, #fff);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06));
+}
+.report-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.report-card-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-neutral-900);
+}
+.report-card-title svg { width: 16px; height: 16px; color: var(--color-success-500); }
+.report-card-sub { font-size: 0.8125rem; color: var(--color-neutral-500); }
+.report-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+.report-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-50, #fafafa);
+}
+.report-check.not-run { opacity: 0.55; }
+.report-check-icon { font-size: 1rem; line-height: 1.4; flex-shrink: 0; }
+.report-check-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.report-check-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.report-check-label { font-size: 0.875rem; font-weight: 600; color: var(--color-neutral-900); }
+.report-badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  line-height: 1.5;
+  border: 1px solid transparent;
+}
+.report-badge.approved { background: var(--color-success-50); color: var(--color-success-500); }
+.report-badge.completed { background: var(--color-success-50); color: var(--color-success-500); }
+.report-badge.in-review { background: var(--color-warning-50); color: var(--color-warning-500); }
+.report-badge.draft { background: var(--color-primary-50); color: var(--color-primary-500); }
+.report-badge.ran { background: var(--color-neutral-100, #f0f0f0); color: var(--color-neutral-600); }
+.report-badge.not-run {
+  background: transparent;
+  color: var(--color-neutral-500);
+  border-color: var(--color-neutral-300);
+}
+.report-check-files { display: flex; flex-direction: column; gap: 2px; }
+.report-check-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8125rem;
+  color: var(--color-primary-500);
+  cursor: pointer;
+}
+.report-check-file svg { width: 13px; height: 13px; }
+.report-check-file:hover { text-decoration: underline; }
+.report-check-file.muted { color: var(--color-neutral-500); cursor: default; text-decoration: none; }
+.report-check-empty { font-size: 0.75rem; color: var(--color-neutral-400); }
+.report-file-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.report-file-badge {
+  font-size: 0.625rem;
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: 999px;
+  line-height: 1.6;
+}
+.report-file-badge.completed,
+.report-file-badge.approved { background: var(--color-success-50); color: var(--color-success-500); }
+.report-file-badge.in-review { background: var(--color-warning-50); color: var(--color-warning-500); }
+.report-file-badge.draft { background: var(--color-primary-50); color: var(--color-primary-500); }
+.report-mark-done {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-success-500);
+  background: transparent;
+  border: 1px solid var(--color-success-500);
+  border-radius: 999px;
+  padding: 1px 9px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.report-mark-done:hover { background: var(--color-success-500); color: #fff; }
 /* Hide the composer while a run is active — the run panel becomes the focus. */
 .task-runner.is-running .task-runner-head,
 .task-runner.is-running #composer { display: none; }

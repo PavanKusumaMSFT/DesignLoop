@@ -13,12 +13,26 @@ import {
   Button,
   Spinner,
   Avatar,
+  Dialog,
+  DialogSurface,
+  DialogTitle,
+  DialogBody,
+  DialogContent,
+  DialogActions,
 } from "@fluentui/react-components";
 import {
   ArrowRight20Regular,
   CloudArrowUp16Regular,
   ArrowExport16Regular,
   Open16Regular,
+  Accessibility16Regular,
+  ShieldCheckmark16Regular,
+  PersonFeedback16Regular,
+  ClipboardTask16Regular,
+  Target16Regular,
+  ImageMultiple16Regular,
+  DocumentCheckmark16Regular,
+  CheckmarkCircle12Filled,
 } from "@fluentui/react-icons";
 import { projects } from "../data/projects";
 import liveExtras from "../data/live-prototypes.json";
@@ -48,6 +62,54 @@ type CardItem = {
   sourceType?: string;
   hasLocalChanges?: boolean;
 };
+
+// ---------------------------------------------------------------------------
+// Report card — Test-stage checks run on a prototype (from the bridge)
+// ---------------------------------------------------------------------------
+
+type ReportFile = { path: string; label: string; status?: string | null; updated?: string | null };
+type ReportCheck = { key: string; label: string; ran: boolean; status?: string | null; files: ReportFile[] };
+type ReportCard = { taskId: string; title: string; checks: ReportCheck[]; ranCount: number };
+
+/** Icon per canonical check key. */
+function checkIcon(key: string) {
+  switch (key) {
+    case "accessibility": return <Accessibility16Regular />;
+    case "security": return <ShieldCheckmark16Regular />;
+    case "tenets-traps": return <Target16Regular />;
+    case "usability": return <PersonFeedback16Regular />;
+    case "test-execution": return <ClipboardTask16Regular />;
+    case "visual": return <ImageMultiple16Regular />;
+    default: return <DocumentCheckmark16Regular />;
+  }
+}
+
+/** Map an artifact status to a Fluent Badge color. */
+function statusColor(status?: string | null): "success" | "warning" | "informative" | "subtle" {
+  switch ((status || "").toLowerCase()) {
+    case "completed": return "success";
+    case "approved": return "success";
+    case "in-review": return "warning";
+    case "draft": return "informative";
+    default: return "subtle";
+  }
+}
+
+function statusLabel(status?: string | null): string {
+  const s = (status || "").toLowerCase();
+  if (s === "completed") return "Completed";
+  if (s === "approved") return "Approved";
+  if (s === "in-review") return "In review";
+  if (s === "draft") return "Draft";
+  return "Ran";
+}
+
+// A test file can be marked completed while it's still in-review or draft.
+function canComplete(status?: string | null): boolean {
+  const s = (status || "").toLowerCase();
+  return s === "in-review" || s === "draft";
+}
+
 
 /** Shape of an entry in public/local-prototypes.json (all optional but id/title). */
 type LocalPrototypeEntry = {
@@ -440,6 +502,110 @@ const useStyles = makeStyles({
     border: `1px dashed ${tokens.colorNeutralStroke2}`,
     borderRadius: tokens.borderRadiusXLarge,
   },
+  reportStrip: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: tokens.spacingHorizontalXS,
+    marginTop: tokens.spacingVerticalS,
+  },
+  reportChip: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalXXS,
+    padding: `2px ${tokens.spacingHorizontalS}`,
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground3,
+    color: tokens.colorNeutralForeground2,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: "1.4",
+    cursor: "pointer",
+    ":hover": {
+      borderColor: tokens.colorBrandStroke1,
+      backgroundColor: tokens.colorNeutralBackground1Hover,
+    },
+  },
+  reportChipIcon: {
+    display: "inline-flex",
+    color: tokens.colorNeutralForeground3,
+  },
+  reportTick: {
+    color: tokens.colorPaletteGreenForeground1,
+  },
+  reportMore: {
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorBrandForegroundLink,
+    background: "none",
+    border: "none",
+    padding: `2px ${tokens.spacingHorizontalXS}`,
+    cursor: "pointer",
+    ":hover": { textDecorationLine: "underline" },
+  },
+  reportEmpty: {
+    marginTop: tokens.spacingVerticalS,
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground4,
+  },
+  dlgList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: tokens.spacingVerticalS,
+  },
+  dlgRow: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: tokens.spacingHorizontalM,
+    padding: tokens.spacingVerticalS,
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  dlgRowNotRun: {
+    opacity: 0.55,
+  },
+  dlgRowIcon: {
+    display: "inline-flex",
+    marginTop: "2px",
+    color: tokens.colorNeutralForeground3,
+  },
+  dlgRowMain: {
+    display: "flex",
+    flexDirection: "column",
+    gap: tokens.spacingVerticalXXS,
+    flexGrow: 1,
+    minWidth: 0,
+  },
+  dlgRowHead: {
+    display: "flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalS,
+    flexWrap: "wrap",
+  },
+  dlgRowLabel: {
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorNeutralForeground1,
+  },
+  dlgFileLink: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalXXS,
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorBrandForegroundLink,
+    textDecorationLine: "none",
+    ":hover": { textDecorationLine: "underline" },
+  },
+  dlgNotRunText: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground4,
+  },
+  dlgFileRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalS,
+    flexWrap: "wrap",
+  },
 });
 
 // ---------------------------------------------------------------------------
@@ -453,6 +619,7 @@ function PrototypeCard({
   goLiveState,
   onSendFigma,
   figmaState,
+  report,
 }: {
   item: CardItem;
   currentEmail: string | null;
@@ -460,9 +627,38 @@ function PrototypeCard({
   goLiveState?: { phase: "working" | "error"; detail?: string };
   onSendFigma?: (item: CardItem) => void;
   figmaState?: { phase: "working" | "error" | "done"; detail?: string; link?: string };
+  report?: ReportCard;
 }) {
   const styles = useStyles();
   const router = useRouter();
+  const [reportOpen, setReportOpen] = useState(false);
+  // Local copy so "Mark completed" updates the card immediately without a reload.
+  const [card, setCard] = useState<ReportCard | undefined>(report);
+  const [savingPath, setSavingPath] = useState<string | null>(null);
+  useEffect(() => { setCard(report); }, [report]);
+
+  const markCompleted = useCallback(
+    async (file: ReportFile) => {
+      if (!card || savingPath) return;
+      setSavingPath(file.path);
+      try {
+        const r = await fetch(`${BRIDGE_URL}/api/report/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: item.id, kind: "prototype", path: file.path, status: "completed" }),
+        });
+        if (r.ok) {
+          const data = await r.json();
+          if (data.report) setCard(data.report as ReportCard);
+        }
+      } catch {
+        /* offline — leave state unchanged */
+      } finally {
+        setSavingPath(null);
+      }
+    },
+    [card, savingPath, item.id],
+  );
 
   const open = useCallback(() => {
     if (item.sourceType === "fork" && item.deployUrl) {
@@ -471,6 +667,20 @@ function PrototypeCard({
       router.push(item.route);
     }
   }, [item, router]);
+
+  // Deep-link to a report in the DesignLoop task viewer (renders markdown). For
+  // non-markdown evidence (e.g. a visual screenshots folder) open the task page.
+  const reportHref = useCallback(
+    (file?: ReportFile) => {
+      if (!card) return "#";
+      const base = `${BRIDGE_URL}/task.html?task=${encodeURIComponent(card.taskId)}`;
+      if (file && /\.md$/i.test(file.path)) {
+        return `${base}&file=${encodeURIComponent(file.path)}&phase=test`;
+      }
+      return `${base}&phase=test`;
+    },
+    [card],
+  );
 
   const isMine =
     !!currentEmail &&
@@ -512,6 +722,16 @@ function PrototypeCard({
           >
             {item.origin === "live" ? "Live" : "Local"}
           </Badge>
+          {item.hasLocalChanges && (
+            <Badge
+              appearance="filled"
+              size="small"
+              color="danger"
+              title="This prototype has changes that haven't been pushed to live yet."
+            >
+              Changes to push
+            </Badge>
+          )}
         </div>
 
         {item.description && (
@@ -530,7 +750,120 @@ function PrototypeCard({
             {isMine && <span className={styles.youBadge}>You</span>}
           </div>
         )}
+
+        {card && (card.ranCount > 0 ? (
+          <div
+            className={styles.reportStrip}
+            onClick={(e) => e.stopPropagation()}
+            role="presentation"
+          >
+            {card.checks
+              .filter((c) => c.ran)
+              .map((c) => (
+                <a
+                  key={c.key}
+                  className={styles.reportChip}
+                  href={reportHref(c.files[0])}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={`${c.label} — ${statusLabel(c.status)}`}
+                >
+                  <span className={styles.reportChipIcon}>{checkIcon(c.key)}</span>
+                  {c.label}
+                  <CheckmarkCircle12Filled className={styles.reportTick} />
+                </a>
+              ))}
+            <button
+              type="button"
+              className={styles.reportMore}
+              onClick={() => setReportOpen(true)}
+            >
+              Report card ({card.ranCount})
+            </button>
+          </div>
+        ) : (
+          <div
+            className={styles.reportEmpty}
+            onClick={(e) => e.stopPropagation()}
+            role="presentation"
+          >
+            No tests run yet
+          </div>
+        ))}
       </div>
+
+      {card && (
+        <Dialog
+          open={reportOpen}
+          onOpenChange={(_, data) => setReportOpen(data.open)}
+        >
+          <DialogSurface onClick={(e) => e.stopPropagation()}>
+            <DialogBody>
+              <DialogTitle>Report card — {item.title}</DialogTitle>
+              <DialogContent>
+                <div className={styles.dlgList}>
+                  {card.checks.map((c) => (
+                    <div
+                      key={c.key}
+                      className={`${styles.dlgRow} ${c.ran ? "" : styles.dlgRowNotRun}`}
+                    >
+                      <span className={styles.dlgRowIcon}>{checkIcon(c.key)}</span>
+                      <div className={styles.dlgRowMain}>
+                        <div className={styles.dlgRowHead}>
+                          <Text className={styles.dlgRowLabel}>{c.label}</Text>
+                          {c.ran ? (
+                            <Badge appearance="tint" size="small" color={statusColor(c.status)}>
+                              {statusLabel(c.status)}
+                            </Badge>
+                          ) : (
+                            <Badge appearance="outline" size="small" color="subtle">
+                              Not run
+                            </Badge>
+                          )}
+                        </div>
+                        {c.ran &&
+                          c.files.map((f) => (
+                            <div key={f.path} className={styles.dlgFileRow}>
+                              <a
+                                className={styles.dlgFileLink}
+                                href={reportHref(f)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Open16Regular />
+                                {f.label}
+                              </a>
+                              {/\.md$/i.test(f.path) && canComplete(f.status) && (
+                                <Button
+                                  size="small"
+                                  appearance="outline"
+                                  disabled={savingPath === f.path}
+                                  onClick={() => markCompleted(f)}
+                                >
+                                  {savingPath === f.path ? "Saving…" : "Mark completed"}
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                        {!c.ran && (
+                          <Text className={styles.dlgNotRunText}>
+                            Run the {c.label.toLowerCase()} check in the Test stage.
+                          </Text>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </DialogContent>
+              <DialogActions>
+                <Button appearance="secondary" onClick={() => setReportOpen(false)}>
+                  Close
+                </Button>
+              </DialogActions>
+            </DialogBody>
+          </DialogSurface>
+        </Dialog>
+      )}
 
       {canGoLive && (
         <div
@@ -655,6 +988,9 @@ function WorkspaceContent() {
     Record<string, { phase: "working" | "error" | "done"; detail?: string; link?: string }>
   >({});
 
+  // Per-card report card (Test-stage checks), keyed by prototype id.
+  const [reports, setReports] = useState<Record<string, ReportCard>>({});
+
   useEffect(() => {
     loadLocalItems().then(setLocalItems);
     try {
@@ -691,7 +1027,7 @@ function WorkspaceContent() {
       }
       // Success — seamlessly flip the card to Live and clear its progress.
       setLocalItems((prev) => prev.filter((p) => p.id !== item.id));
-      setPromotedItems((prev) => [{ ...item, origin: "live" as const }, ...prev]);
+      setPromotedItems((prev) => [{ ...item, origin: "live" as const, hasLocalChanges: false }, ...prev]);
       setGoLiveState((prev) => {
         const next = { ...prev };
         delete next[item.id];
@@ -786,6 +1122,33 @@ function WorkspaceContent() {
     [localItems, promotedItems],
   );
 
+  // Fetch each prototype's report card (Test-stage checks) once the bridge is up.
+  useEffect(() => {
+    if (!bridgeReady || allItems.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      for (const item of allItems) {
+        if (reports[item.id]) continue;
+        try {
+          const r = await fetch(
+            `${BRIDGE_URL}/api/report?id=${encodeURIComponent(item.id)}&kind=prototype`,
+            { cache: "no-store" },
+          );
+          if (!r.ok) continue; // 404 = no task/report for this prototype
+          const data: ReportCard = await r.json();
+          if (cancelled) return;
+          setReports((prev) => ({ ...prev, [item.id]: data }));
+        } catch {
+          /* bridge unreachable — skip silently */
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bridgeReady, allItems]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return allItems;
@@ -840,6 +1203,7 @@ function WorkspaceContent() {
                 goLiveState={goLiveState[p.id]}
                 onSendFigma={bridgeReady ? runSendFigma : undefined}
                 figmaState={figmaState[p.id]}
+                report={reports[p.id]}
               />
             ))}
           </div>

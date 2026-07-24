@@ -665,6 +665,43 @@ function readArtifactMeta(absPath, fallbackTitle) {
   return meta;
 }
 
+/**
+ * Rewrite the `status:` (and refresh `updated:`) fields in a markdown artifact's
+ * YAML frontmatter, preserving everything else. If the file has no frontmatter,
+ * a minimal block is prepended. Returns the new status on success; throws on I/O
+ * errors. Used by the report card to let users mark a test check completed.
+ */
+function updateArtifactStatus(absPath, newStatus) {
+  const raw = fs.readFileSync(absPath, 'utf8');
+  const today = new Date().toISOString().slice(0, 10);
+  const fm = raw.match(/^(\uFEFF?)(---\r?\n)([\s\S]*?)(\r?\n---\r?\n?)/);
+
+  if (fm) {
+    const bom = fm[1] || '';
+    const open = fm[2];
+    let inner = fm[3];
+    const close = fm[4];
+    const body = raw.slice(fm[0].length);
+    const eol = /\r\n/.test(open) ? '\r\n' : '\n';
+
+    if (/^status\s*:.*$/im.test(inner)) {
+      inner = inner.replace(/^status\s*:.*$/im, `status: ${newStatus}`);
+    } else {
+      inner += `${eol}status: ${newStatus}`;
+    }
+    if (/^updated\s*:.*$/im.test(inner)) {
+      inner = inner.replace(/^updated\s*:.*$/im, `updated: ${today}`);
+    } else {
+      inner += `${eol}updated: ${today}`;
+    }
+    fs.writeFileSync(absPath, `${bom}${open}${inner}${close}${body}`, 'utf8');
+  } else {
+    const block = `---\nstatus: ${newStatus}\nupdated: ${today}\n---\n\n`;
+    fs.writeFileSync(absPath, block + raw, 'utf8');
+  }
+  return newStatus;
+}
+
 /** Scan tasks/<id>/ to build the registry the frontend renders. */
 /* Read an optional per-task config (tasks/<id>/.task.json). Currently holds a
    user-set display title so renames survive bridge restarts without touching
@@ -1109,6 +1146,153 @@ function discoverTasks() {
       phases,
     };
   });
+}
+
+/* ─────────────────────── Prototype report card ───────────────────────
+ * A prototype's "report card" is the set of Test-stage checks that ran on it:
+ * accessibility, security, usability, tenets & traps, visual verification, test
+ * execution, and any other test artifact. Each check reports whether it ran, a
+ * rolled-up status, and the artifact files (so the UI can link to the report). */
+
+// Canonical check types, in display order. `match(rel)` tests a lowercased
+// tests/-relative path (e.g. "usability/tenets-traps-evaluation-r1.md").
+const CHECK_TYPES = [
+  { key: 'accessibility', label: 'Accessibility', match: (p) => /accessib|a11y/.test(p) },
+  { key: 'security',      label: 'Security',       match: (p) => /security|(^|\/)audit-|\baudit\b/.test(p) },
+  { key: 'tenets-traps',  label: 'Tenets & Traps', match: (p) => /tenets?-?traps?/.test(p) },
+  { key: 'usability',     label: 'Usability',      match: (p) => /usability|test-?plan|task-?scripts?|observation|moderator/.test(p) },
+  { key: 'test-execution',label: 'Test Execution', match: (p) => /test-?execution|findings|results|synthesis/.test(p) },
+  { key: 'visual',        label: 'Visual',         match: (p) => /visual|screenshot|regression/.test(p) },
+];
+
+// Status rollup order — a check's status is the strongest of its files'.
+const STATUS_RANK = { completed: 4, approved: 3, 'in-review': 2, draft: 1, ran: 0 };
+function strongerStatus(a, b) {
+  const ra = STATUS_RANK[a] != null ? STATUS_RANK[a] : 0;
+  const rb = STATUS_RANK[b] != null ? STATUS_RANK[b] : 0;
+  return rb > ra ? b : a;
+}
+
+function classifyCheck(rel) {
+  const p = String(rel || '').toLowerCase();
+  for (const t of CHECK_TYPES) {
+    if (t.match(p)) return t.key;
+  }
+  return 'other';
+}
+
+/**
+ * Resolve a prototype id to its owning task id. Workspace-created prototypes use
+ * the same slug for both; otherwise scan tasks whose prototype manifest declares
+ * a matching route / project id / export path. Returns null when unresolved.
+ */
+function taskIdForPrototype(protoId) {
+  if (!protoId) return null;
+  const tasksDir = path.join(ROOT, 'tasks');
+  const direct = path.join(tasksDir, protoId);
+  if (fs.existsSync(direct) && fs.statSync(direct).isDirectory()) return protoId;
+
+  let ids;
+  try {
+    ids = fs.readdirSync(tasksDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+      .map((d) => d.name);
+  } catch { return null; }
+
+  for (const id of ids) {
+    const manifestAbs = path.join(tasksDir, id, 'prototypes', 'manifest.md');
+    let mf;
+    try { mf = fs.readFileSync(manifestAbs, 'utf8'); } catch { continue; }
+    const cands = new Set();
+    let m;
+    const routeRe = /route[^\n|]*\|\s*`?\/?([a-z0-9][a-z0-9-_]*)`?/ig;
+    while ((m = routeRe.exec(mf))) cands.add(m[1]);
+    const idRe = /project\s*id[^\n|]*\|\s*`?([a-z0-9][a-z0-9-_]*)`?/ig;
+    while ((m = idRe.exec(mf))) cands.add(m[1]);
+    const outRe = /out\/([a-z0-9][a-z0-9-_]*)\//ig;
+    while ((m = outRe.exec(mf))) cands.add(m[1]);
+    if (cands.has(protoId)) return id;
+  }
+  return null;
+}
+
+/**
+ * Build the report card for a task: categorize every Test-stage artifact into
+ * canonical checks, roll up frontmatter status, and note whether each ran.
+ * Returns { taskId, title, checks:[{key,label,ran,status,files:[…]}], ranCount }
+ * or null when the task doesn't exist. Canonical types with no artifact are
+ * included with ran:false so the UI can show a full checklist.
+ */
+function buildReportCard(taskId) {
+  const taskAbs = path.join(ROOT, 'tasks', taskId);
+  if (!fs.existsSync(taskAbs) || !fs.statSync(taskAbs).isDirectory()) return null;
+
+  // Gather Test-stage files: markdown reports under tests/, plus visual
+  // screenshots (which may live under tests/ or prototypes/tests/visual/).
+  const groups = {}; // key -> { files:[], status }
+  const addFile = (key, rel, label, meta) => {
+    if (!groups[key]) groups[key] = { files: [], status: 'ran' };
+    groups[key].files.push({
+      path: rel,
+      label,
+      status: (meta && meta.status) || null,
+      updated: (meta && (meta.updated || meta.created)) || null,
+    });
+    groups[key].status = strongerStatus(groups[key].status, (meta && meta.status) || 'ran');
+  };
+
+  const testsAbs = path.join(taskAbs, 'tests');
+  if (fs.existsSync(testsAbs)) {
+    const found = [];
+    walkFiles(testsAbs, '', found); // rel is relative to tests/
+    let sawScreenshot = false;
+    for (const rel of found) {
+      const lower = rel.toLowerCase();
+      if (lower.endsWith('.md')) {
+        const base = rel.split('/').pop().replace(/\.md$/i, '');
+        const meta = readArtifactMeta(path.join(testsAbs, rel), titleCase(base));
+        const label = (meta && meta.title) || titleCase(base);
+        addFile(classifyCheck(rel), `tests/${rel}`, label, meta);
+      } else if (/\.(png|jpe?g|gif|webp)$/i.test(lower)) {
+        sawScreenshot = true;
+      }
+    }
+    // Roll up any visual screenshots into a single "Visual" evidence entry.
+    if (sawScreenshot && !groups.visual) {
+      groups.visual = { files: [{ path: 'tests', label: 'Visual screenshots', status: null, updated: null }], status: 'ran' };
+    }
+  }
+
+  // Also surface visual verification stored under prototypes/tests/visual/.
+  const protoVisual = path.join(taskAbs, 'prototypes', 'tests', 'visual');
+  if (fs.existsSync(protoVisual)) {
+    const found = [];
+    walkFiles(protoVisual, '', found);
+    const hasShots = found.some((r) => /\.(png|jpe?g|gif|webp)$/i.test(r));
+    if (hasShots && !groups.visual) {
+      groups.visual = { files: [{ path: 'prototypes/tests/visual', label: 'Visual screenshots', status: null, updated: null }], status: 'ran' };
+    }
+  }
+
+  // Assemble canonical checks first (preserving order), then any "other".
+  const checks = [];
+  for (const t of CHECK_TYPES) {
+    const g = groups[t.key];
+    checks.push({
+      key: t.key,
+      label: t.label,
+      ran: !!g,
+      status: g ? g.status : null,
+      files: g ? g.files : [],
+    });
+  }
+  if (groups.other) {
+    checks.push({ key: 'other', label: 'Other Tests', ran: true, status: groups.other.status, files: groups.other.files });
+  }
+
+  const ranCount = checks.filter((c) => c.ran).length;
+  const customTitle = String(readTaskConfig(taskId).title || '').trim();
+  return { taskId, title: customTitle || titleCase(taskId), checks, ranCount };
 }
 
 /* ──────────────────────────── API router ─────────────────────────── */
@@ -1633,6 +1817,68 @@ async function handleApi(req, res, url) {
       cfg.title = title;
       fs.writeFileSync(path.join(taskDir, '.task.json'), JSON.stringify(cfg, null, 2) + '\n', 'utf8');
       return sendJson(res, 200, { ok: true, id, title });
+    } catch (e) {
+      return sendJson(res, 500, { error: e.message });
+    }
+  }
+
+  // GET /api/report?id=<id>&kind=task|prototype — the prototype "report card":
+  // Test-stage checks (accessibility, security, usability, tenets & traps,
+  // visual, test execution, other) with ran/status/files for each.
+  if (req.method === 'GET' && pathname === '/api/report') {
+    const rawId = String(url.searchParams.get('id') || '').trim();
+    const kind = String(url.searchParams.get('kind') || 'task').trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9-_]*$/i.test(rawId)) {
+      return sendJson(res, 400, { error: 'Invalid id.' });
+    }
+    try {
+      const taskId = kind === 'prototype' ? taskIdForPrototype(rawId) : rawId;
+      if (!taskId) return sendJson(res, 404, { error: `No task found for ${kind} "${rawId}".` });
+      const report = buildReportCard(taskId);
+      if (!report) return sendJson(res, 404, { error: `Task not found: ${taskId}` });
+      return sendJson(res, 200, report);
+    } catch (e) {
+      return sendJson(res, 500, { error: e.message });
+    }
+  }
+
+  // POST /api/report/status — mark a test artifact's status (e.g. in-review →
+  // completed) from the report card. Body: { id, kind?, path, status }.
+  if (req.method === 'POST' && pathname === '/api/report/status') {
+    let body;
+    try { body = await readBody(req); }
+    catch (e) { return sendJson(res, 400, { error: e.message }); }
+
+    const rawId = String(body.id || '').trim();
+    const kind = String(body.kind || 'task').trim().toLowerCase();
+    const relPath = String(body.path || '').trim();
+    const status = String(body.status || '').trim().toLowerCase();
+    const ALLOWED = ['draft', 'in-review', 'approved', 'completed'];
+
+    if (!/^[a-z0-9][a-z0-9-_]*$/i.test(rawId)) {
+      return sendJson(res, 400, { error: 'Invalid id.' });
+    }
+    if (!ALLOWED.includes(status)) {
+      return sendJson(res, 400, { error: `Invalid status. Allowed: ${ALLOWED.join(', ')}.` });
+    }
+    if (!/\.md$/i.test(relPath) || relPath.includes('..')) {
+      return sendJson(res, 400, { error: 'Only markdown report files can be updated.' });
+    }
+
+    try {
+      const taskId = kind === 'prototype' ? taskIdForPrototype(rawId) : rawId;
+      if (!taskId) return sendJson(res, 404, { error: `No task found for ${kind} "${rawId}".` });
+      const taskAbs = path.join(ROOT, 'tasks', taskId);
+      const abs = path.resolve(taskAbs, relPath);
+      if (abs !== taskAbs && !abs.startsWith(taskAbs + path.sep)) {
+        return sendJson(res, 400, { error: 'Path escapes the task directory.' });
+      }
+      if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
+        return sendJson(res, 404, { error: `File not found: ${relPath}` });
+      }
+      updateArtifactStatus(abs, status);
+      const report = buildReportCard(taskId);
+      return sendJson(res, 200, { ok: true, status, path: relPath, report });
     } catch (e) {
       return sendJson(res, 500, { error: e.message });
     }

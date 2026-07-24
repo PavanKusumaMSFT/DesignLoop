@@ -665,6 +665,7 @@ function loadTask(taskId) {
         ${sourceArtifactsForTask(task).length ? `<button type="button" class="task-overview-source" onclick="openArtifactsDialog('${task.id}')">${ICONS.folder} Artifacts</button>` : ''}
       </div>
       ${renderTaskRunner(task)}
+      <div id="reportCardMount"></div>
       <div id="taskPhases">
         ${renderTaskTimeline(task)}
         ${renderTaskPhases(task)}
@@ -678,6 +679,107 @@ function loadTask(taskId) {
   `;
   wireTaskTimeline();
   wireComposer('lifecycle');
+  loadReportCard(taskId);
+}
+
+/* ── Prototype report card (Test-stage checks) ──────────────────────────
+   Fetches the categorized report from the bridge and renders a compact
+   panel of checks (accessibility, security, usability, tenets & traps,
+   visual, …) with ran/status + links to each report. No-op when the bridge
+   is offline or the task has no checks. */
+const REPORT_CHECK_ICON = {
+  accessibility: '♿', security: '🛡️', 'tenets-traps': '🎯',
+  usability: '🧑‍💻', 'test-execution': '📋', visual: '🖼️', other: '📄',
+};
+function reportStatusMeta(status) {
+  switch (String(status || '').toLowerCase()) {
+    case 'completed': return { cls: 'completed', label: 'Completed' };
+    case 'approved': return { cls: 'approved', label: 'Approved' };
+    case 'in-review': return { cls: 'in-review', label: 'In review' };
+    case 'draft': return { cls: 'draft', label: 'Draft' };
+    default: return { cls: 'ran', label: 'Ran' };
+  }
+}
+// A test file can be marked completed while it's still in-review or draft.
+function reportCanComplete(status) {
+  const s = String(status || '').toLowerCase();
+  return s === 'in-review' || s === 'draft';
+}
+async function loadReportCard(taskId) {
+  const mount = document.getElementById('reportCardMount');
+  if (!mount || !BRIDGE.online) return;
+  try {
+    const r = await fetch(`/api/report?id=${encodeURIComponent(taskId)}&kind=task`, { cache: 'no-store' });
+    if (!r.ok) return;
+    const report = await r.json();
+    // Only render once the mount is still for this task (guards fast switches).
+    if (currentTaskId !== taskId) return;
+    mount.innerHTML = renderReportCardHtml(report);
+  } catch { /* offline — skip */ }
+}
+function renderReportCardHtml(report) {
+  const checks = report.checks || [];
+  const total = checks.length;
+  const ran = report.ranCount || checks.filter(c => c.ran).length;
+  const rows = checks.map(c => {
+    const m = reportStatusMeta(c.status);
+    const icon = REPORT_CHECK_ICON[c.key] || REPORT_CHECK_ICON.other;
+    const badge = c.ran
+      ? `<span class="report-badge ${m.cls}">${m.label}</span>`
+      : `<span class="report-badge not-run">Not run</span>`;
+    const files = c.ran
+      ? (c.files || []).map(f => {
+          const esc = f.path.replace(/'/g, "\\'");
+          const link = /\.md$/i.test(f.path)
+            ? `<a class="report-check-file" onclick="openReportFile('${report.taskId}','${esc}')">${ICONS.doc}${escapeHtml(f.label)}</a>`
+            : `<span class="report-check-file muted">${escapeHtml(f.label)}</span>`;
+          const fm = reportStatusMeta(f.status);
+          const fileBadge = f.status
+            ? `<span class="report-file-badge ${fm.cls}">${fm.label}</span>`
+            : '';
+          const action = (/\.md$/i.test(f.path) && reportCanComplete(f.status))
+            ? `<button type="button" class="report-mark-done" onclick="markReportFileCompleted('${report.taskId}','${esc}')">Mark completed</button>`
+            : '';
+          return `<div class="report-file-row">${link}${fileBadge}${action}</div>`;
+        }).join('')
+      : `<span class="report-check-empty">Run this check in the Test stage.</span>`;
+    return `
+      <div class="report-check ${c.ran ? '' : 'not-run'}">
+        <span class="report-check-icon" aria-hidden="true">${icon}</span>
+        <div class="report-check-body">
+          <div class="report-check-head"><span class="report-check-label">${escapeHtml(c.label)}</span>${badge}</div>
+          <div class="report-check-files">${files}</div>
+        </div>
+      </div>`;
+  }).join('');
+  return `
+    <div class="report-card">
+      <div class="report-card-head">
+        <span class="report-card-title">${ICONS.check || '✓'} Report card</span>
+        <span class="report-card-sub">${ran} of ${total} checks run</span>
+      </div>
+      <div class="report-card-grid">${rows}</div>
+    </div>`;
+}
+function openReportFile(taskId, filePath) {
+  loadFile(taskId, filePath, 'test');
+}
+// Mark a test report file completed, then refresh the report card in place.
+async function markReportFileCompleted(taskId, filePath) {
+  if (!BRIDGE.online) return;
+  try {
+    const r = await fetch('/api/report/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: taskId, kind: 'task', path: filePath, status: 'completed' }),
+    });
+    if (!r.ok) return;
+    const data = await r.json();
+    const mount = document.getElementById('reportCardMount');
+    if (mount && data.report && currentTaskId === taskId) {
+      mount.innerHTML = renderReportCardHtml(data.report);
+    }
+  } catch { /* offline — skip */ }
 }
 
 /* The in-task runner — mirrors the home composer so a user can run more stages,
@@ -748,6 +850,7 @@ async function refreshTaskPhases(taskId) {
   if (!task || !host) return;
   host.innerHTML = `${renderTaskTimeline(task)}${renderTaskPhases(task)}`;
   wireTaskTimeline();
+  loadReportCard(taskId);
 }
 
 /* =================================================================
