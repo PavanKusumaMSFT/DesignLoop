@@ -38,11 +38,49 @@ directly on your artifacts — all from a local web UI.
 
 ---
 
+## Sign in to Copilot
+
+The bridge drives the GitHub Copilot CLI on your behalf, so you must be
+**authenticated once** before starting it. Otherwise agent runs will fail with an
+auth error.
+
+```bash
+copilot login
+```
+
+This starts an OAuth browser (device) flow and stores the token securely in your
+system credential store (falling back to `~/.copilot/` if none is available).
+
+You can verify you're signed in by launching Copilot once:
+
+```bash
+copilot          # starts an interactive session; exit with /exit or Ctrl+C
+```
+
+### Headless / CI authentication
+
+For automation you can skip the browser flow by providing a token via environment
+variable (checked in this order): `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`,
+`GITHUB_TOKEN`.
+
+```bash
+export COPILOT_GITHUB_TOKEN=<token>   # fine-grained PAT with the "Copilot Requests" permission,
+                                      # or an OAuth token from the Copilot CLI / gh app
+```
+
+> Classic personal access tokens (`ghp_…`) are **not** supported. Run
+> `copilot help environment` for the full list.
+
+---
+
 ## Quick start
 
 From the repo root:
 
 ```bash
+# 0. Sign in to Copilot (once) — see "Sign in to Copilot" below
+copilot login
+
 # 1. Install bridge dependencies (once)
 cd bridge && npm install && cd ..
 
@@ -169,6 +207,9 @@ a **status badge**, and a **link to open the full report**.
   new endpoints (e.g. `/api/report`) are live.
 - **`copilot` not found** — install the GitHub Copilot CLI and ensure it's on
   `PATH`, or set `COPILOT_BIN` to its absolute path.
+- **Agent runs fail with an authentication error** — you're not signed in. Run
+  `copilot login` (or set `COPILOT_GITHUB_TOKEN`), then restart the bridge. See
+  "Sign in to Copilot".
 - **Port already in use** — another bridge/dev-server instance may be running.
   Stop it, or start on different ports with `PORT` / `PROTOTYPE_PORT`.
 
