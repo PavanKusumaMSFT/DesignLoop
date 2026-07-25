@@ -147,6 +147,34 @@ All configuration is via environment variables — no config file is required.
 | `COPILOT_BIN` | auto-detected | Absolute path to the `copilot` binary. |
 | `CLAUDE_BIN` | auto-detected | Absolute path to the `claude` (Claude Code) binary, used by skills that require Figma MCP write tools. |
 | `NEXT_PUBLIC_BRIDGE_URL` | `http://localhost:8099` | Bridge URL the prototype workspace calls (set in `prototype-workspace/.env.local`). |
+| `NEXT_PUBLIC_MICROSOFT_CLIENT_ID` | (demo id) | Entra ID app registration's Application (client) ID for workspace sign-in. |
+| `NEXT_PUBLIC_MICROSOFT_TENANT_ID` | `common` | Sign-in authority: a tenant ID (single-tenant), `organizations` (any work/school org), or `common` (also personal accounts). |
+
+---
+
+## Microsoft (Entra ID) sign-in
+
+The prototype workspace can gate access behind **Sign in with Microsoft** (MSAL,
+`prototype-workspace/lib/msal-config.ts`). Copy `prototype-workspace/.env.example`
+to `.env.local` and set the two `NEXT_PUBLIC_MICROSOFT_*` values, then restart the
+workspace (`.env.local` is gitignored — never commit real values).
+
+**Two things must agree:** the `NEXT_PUBLIC_MICROSOFT_TENANT_ID` authority **and**
+the app registration's *Supported account types*.
+
+| You want… | `NEXT_PUBLIC_MICROSOFT_TENANT_ID` | App registration "Supported account types" |
+|-----------|-----------------------------------|---------------------------------------------|
+| Only your org | your Directory (tenant) ID | Single tenant |
+| **Anyone with a work/school account** | `organizations` | **Accounts in any organizational directory (Multitenant)** |
+| Work/school **or** personal MS accounts | `common` | Multitenant + personal Microsoft accounts |
+
+> **"Selected user account does not exist in tenant … and cannot access the
+> application"** means the app is single-tenant (or the authority points at one
+> tenant) and the person is in a different org. Fix it by making the app
+> **multitenant** in the Azure Portal (App registrations → your app →
+> Authentication → *Supported account types*) **and** setting
+> `NEXT_PUBLIC_MICROSOFT_TENANT_ID=organizations`. Users from other orgs may see a
+> one-time consent prompt for the `User.Read` permission.
 
 ---
 

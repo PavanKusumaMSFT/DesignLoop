@@ -1,8 +1,11 @@
 import { Configuration } from "@azure/msal-browser";
 
-// Tenant the app is registered in. Set NEXT_PUBLIC_MICROSOFT_TENANT_ID to your
-// Directory (tenant) ID (from the app's Overview page) for a single-tenant app.
-// Falls back to "common" (multi-tenant / signed-in user's home tenant).
+// Sign-in authority tenant. Set NEXT_PUBLIC_MICROSOFT_TENANT_ID to:
+//   - a specific Directory (tenant) ID  → single-tenant (only that org can sign in)
+//   - "organizations"                   → any Microsoft work/school account (multi-tenant)
+//   - "common"                          → any work/school account OR personal Microsoft account
+// The app registration's "Supported account types" must match (e.g. multitenant
+// for "organizations"/"common"). Falls back to "common".
 const tenantId = process.env.NEXT_PUBLIC_MICROSOFT_TENANT_ID || "common";
 
 export const msalConfig: Configuration = {
