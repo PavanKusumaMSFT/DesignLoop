@@ -91,7 +91,10 @@ async function ownerFetch(path: string, init: RequestInit = {}) {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+      // Azure Static Web Apps reserves the `Authorization` header for its own
+      // platform auth and does not forward it to managed Functions, so the
+      // MSAL token is sent in a custom header the function reads instead.
+      "X-Owner-Token": token,
       ...(init.headers || {}),
     },
   });

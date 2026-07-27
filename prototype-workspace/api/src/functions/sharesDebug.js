@@ -12,9 +12,11 @@ app.http('sharesDebug', {
   authLevel: 'anonymous',
   route: 'shares/debug',
   handler: async (request) => {
+    const custom = request.headers.get('x-owner-token');
     const raw = request.headers.get('authorization') || '';
     const m = /^Bearer\s+(.+)$/i.exec(raw.trim());
-    const token = m ? m[1] : null;
+    const token = (custom && custom.trim()) || (m ? m[1] : null);
+    const source = custom ? 'x-owner-token' : m ? 'authorization' : 'none';
     let decoded = null;
     let decodeType = null;
     if (token) {
@@ -29,7 +31,7 @@ app.http('sharesDebug', {
     return json(200, {
       authClientIdSet: !!process.env.AUTH_CLIENT_ID,
       authClientId: process.env.AUTH_CLIENT_ID || null,
-      hasBearer: !!token,
+      tokenSource: source,
       decodeType,
       decoded,
       jsonwebtokenVersion: require('jsonwebtoken/package.json').version,

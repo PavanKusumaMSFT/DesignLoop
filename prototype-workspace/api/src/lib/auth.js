@@ -16,6 +16,13 @@ const jwt = require('jsonwebtoken');
 const CLOCK_SKEW = 300;
 
 function bearer(request) {
+  // Azure Static Web Apps consumes the standard `Authorization` header for its
+  // own platform auth and does not forward the client's value to managed
+  // Functions. The workspace therefore sends the MSAL token in a custom header
+  // (`x-owner-token`), which SWA forwards untouched. Fall back to Authorization
+  // for local `func start` dev where no SWA layer is involved.
+  const custom = request.headers.get('x-owner-token');
+  if (custom) return custom.trim();
   const raw = request.headers.get('authorization') || '';
   const m = /^Bearer\s+(.+)$/i.exec(raw.trim());
   return m ? m[1] : null;
