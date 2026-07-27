@@ -1,0 +1,80 @@
+{
+  "$comment": "Authoritative Azure Fluent 2 UI Kit map for DesignLoop 'Send to Figma'. Component/style/icon keys are global Figma library keys — no 'Learn kit' step needed. Source: AW-azure-fluent2-design-guidelines. Used by the bridge (deterministic serializer path) and referenced by the fluent-to-figma composer agent.",
+  "version": 1,
+  "libraries": {
+    "azureUiKit": { "fileKey": "q2TdO4dVcMhNWYp0N6Bc05", "name": "Azure UI Kit (Fluent 2)" },
+    "azurePatternTemplates": { "fileKey": "TXALL9CS0727dvGcZo84Bg", "name": "Azure Pattern Templates (Fluent 2)" },
+    "iconsAzureFluentExtension": { "fileKey": "fQO2yNBwr773QI4ANvb1Z4", "name": "Icons — Azure Fluent Extension" },
+    "fluentIconography": { "fileKey": "43oQOCD2164ExeSf5ajmou", "name": "Fluent Iconography" }
+  },
+  "layoutDefaults": {
+    "contentItemSpacing": 12,
+    "contentPaddingHorizontal": 20,
+    "pageWidth": 1920,
+    "pageHeight": 1080,
+    "primaryAxisAlignItems": "MIN"
+  },
+  "components": {
+    "SiteHeader": { "key": "1e24dff82507bad20840cab955ca59a852b788b2", "setKey": "d596d623205f82a6268227796dd0d61eb949211c", "nodeId": "31147:439", "defaultVariant": "Width=1048+ px", "variants": { "Width=1048+ px": "1e24dff82507bad20840cab955ca59a852b788b2" } },
+    "Breadcrumb": { "setKey": "6a55e6a832553b5ae6d3fa3f8e548dd0df94d867", "isSet": true, "nodeId": "133494:14994", "variants": { "Size=Large": "ad1a251259e9020d988bdf6227f1a84baaf80a54" }, "notes": "Component SET — import via importComponentSetByKeyAsync then defaultVariant.createInstance(). Set Divider=false on the last item." },
+    "BladeHeader": { "key": "c573ab76a0e1a39fe76ddd1eece3e460e0b07c0f", "setKey": "ae03dca2cae044e81079c8f6bf549dbd415f57bc", "nodeId": "32630:8970", "defaultVariant": "Size=1100+", "variants": { "Size=1100+": "c573ab76a0e1a39fe76ddd1eece3e460e0b07c0f" }, "properties": { "Page title": "Page title#32630:2", "Show subtitle": "Show subtitle#32630:8", "Subtitle": "Subtitle#32630:3", "Show Copilot Ribbon": "Show Copilot Ribbon?#32630:9" } },
+    "ServiceMenu": { "key": "f85852343c91c31207c69e8fca5fe5faffda0df7", "setKey": "0f5fe8abcfc3adac248b91fdc7e86a2bbc43baa6", "nodeId": "32610:9824", "defaultVariant": "State=Open, Expand groups=False", "variants": { "State=Open, Expand groups=False": "f85852343c91c31207c69e8fca5fe5faffda0df7" } },
+    "Toolbar": { "key": "b911751a8fde73751fe8572c68b8a48da4167be9", "setKey": "0ffe9582eb21b97c872b422eb11358dd20143b1d", "nodeId": "29553:7576", "defaultVariant": "Top of Page?=Yes", "variants": { "Top of Page?=Yes": "b911751a8fde73751fe8572c68b8a48da4167be9", "Top of Page?=No": "4aec7a2d3055d7b5ca1f704b1b7d39410c6461dd" }, "displayName": "Toolbar (Azure)" },
+    "HorizontalTabList": { "key": "f995a69c77a27d0fe8f3f804cd03432ef7def770", "setKey": "9be28cf0a9a10e62c22cb31361d245b0a13a89ab", "nodeId": "29553:14761", "defaultVariant": "Layout=Text only, Size=Medium, Circular=False", "variants": { "Layout=Text only, Size=Medium, Circular=False": "f995a69c77a27d0fe8f3f804cd03432ef7def770" }, "displayName": "Azure Horizontal TabList" },
+    "VerticalTabList": { "key": "f87940d9a9994975afd677907540baa0dc7cfa9f", "nodeId": "29553:14688", "displayName": "Azure Vertical TabList" },
+    "DataGrid": { "key": "65e135bd61aa14ef9c926262fc54779c6f75646b", "setKey": "53035ebee3b64adb9b572075ab12ab0a2c25b991", "nodeId": "28093:32728", "defaultVariant": "Type=Data grid (default)", "variants": { "Type=Data grid (default)": "65e135bd61aa14ef9c926262fc54779c6f75646b" }, "displayName": "Azure F2-Data Grid" },
+    "Essentials": { "key": "25070b7c2d37872c678ea3c680ba86c30064e902", "setKey": "64429d075e5bd7a220a23ea9bd800b2a6f47c434", "nodeId": "25412:8797", "defaultVariant": "State=Expanded, Show Tags=No, Mobile=No", "variants": { "State=Expanded, Show Tags=No, Mobile=No": "25070b7c2d37872c678ea3c680ba86c30064e902" } },
+    "FilterPillDropdown": { "key": "e83137376566f5f65341bb926729b0566c673376", "setKey": "fa45bd49673e96346eafe807fd157ad05a18f965", "nodeId": "25378:3066", "defaultVariant": "State=Default, Removable=No", "variants": { "State=Default, Removable=No": "e83137376566f5f65341bb926729b0566c673376" } },
+    "SearchBox": { "key": "db97bfd9a9e75cad3417131b0ce5190b7400071d", "library": "fluent2Web", "notes": "Style=Filled darker, Size=Medium, State=Rest" },
+    "Footer": { "key": "de3512b28d1b8da02a0ce2685c72ba9b56812430", "nodeId": "35285:10476", "defaultVariant": "Style=Create" },
+    "EmptyState": { "key": "f3aec5fec89d4bf21d7bcf4f2795056838834063", "nodeId": "29232:42433" },
+    "Accordion": { "key": "b33e672139efdb38d59cb283bf023eada4be7800", "nodeId": "30028:627" },
+    "Card": { "key": "ca5d1e2af199ac78f5ddbae7d62f027fb9f77745", "library": "fluent2Web", "notes": "Layout=Default, State=Rest, Style=Filled" },
+    "OverviewCard": { "key": "a99af5ca32ff5c6c2b82c39c5878151f90b20616", "library": "azurePatternTemplates" },
+    "Form": { "key": "a9c31e9b260f58f9e9785528e876fd91b7248947", "nodeId": "27181:1280" },
+    "FilterableComboBox": { "key": "61a874d2ce382397d4519e720d18c809b3875f6a", "nodeId": "25248:8173" }
+  },
+  "textStyles": {
+    "Web/Title 3": { "key": "8b7e6dc1f5c74244ac9027e7312fb5a698036225", "size": 24, "weight": 600, "lineHeight": 32 },
+    "Web/Subtitle 1": { "key": "579d0e6f439b670a78431f566e60b912a51001bb", "size": 20, "weight": 600, "lineHeight": 26 },
+    "Web/Subtitle 2": { "key": "0b8cb21aaf9f6f3b46a2ee64f64162a1a8eb7405", "size": 16, "weight": 600, "lineHeight": 22 },
+    "Web/Body 2": { "key": "3206cacd769c7316d94dea99b75163025bb4d37c", "size": 16, "weight": 400, "lineHeight": 22 },
+    "Web/Body 1 Strong": { "key": "ce8b1791e619c2b63a557029c4a68f1c9e7b5ec0", "size": 14, "weight": 600, "lineHeight": 20 },
+    "Web/Body 1": { "key": "390e4051fa2060ac5eddf749475418e08bc48740", "size": 14, "weight": 400, "lineHeight": 20 },
+    "Web/Caption 1 Strong": { "key": "7db21c4bddf4a0f6a1de4f2a9200ede31b1eb693", "size": 12, "weight": 600, "lineHeight": 16 },
+    "Web/Caption 1": { "key": "45e9fd2cd093c69e5e564683a7bd1c563a968a08", "size": 12, "weight": 400, "lineHeight": 16 },
+    "Web/Caption 2 Strong": { "key": "ace42c6cfee98ae174603cf5c455590f97ba8e76", "size": 10, "weight": 600, "lineHeight": 14 },
+    "Web/Caption 2": { "key": "f0d8c3533ea06a181e642b2ee420247f92261fbe", "size": 10, "weight": 400, "lineHeight": 14 }
+  },
+  "icons": {
+    "Virtual-Machine": "6d0bb41e11809dc8fa5b8f069278cfaea2c24bf5",
+    "Virtual-Networks": "f6569ff78042c1bbde62bef10ea253e2c0017d8e",
+    "Storage": "89a6d680699ece16ee710a14b337b343690b6dfd",
+    "SSH-Keys": "97dcdb9a1b4463ac0d02abe8fe24d6ff188f705e",
+    "Network-Interfaces": "13fa77b914853d1520050bbe2c6142cd1409474c",
+    "Network-Security-Groups": "7cdd9405867e25d4789f96cd69d5f260fd729534",
+    "Disks": "fc72cfe4240cbff7742298203c9bd2d0bf0eb0eb",
+    "Recovery-Services-Vaults": "7e2b00a9271100a6d276605fbed5d0644c2c53d6",
+    "Resource": "0a505a476c8fbb22bb20ebb5ce63f3d9bd61c331",
+    "Resource-Mover": "3acd86b8fa15c2fef3ca17834efcf1e025dc045c",
+    "App-Services": "722d176d19c27afdaad73818ab32e75c143a6380",
+    "Azure-Migrate": "b40e011f7a58fb4bc7e0be0e8266a5955d514ee6"
+  },
+  "atomicMap": {
+    "$comment": "Fluent v9 React component (from the DOM) → Azure kit component name above. Only components with a documented global key are listed; everything else falls back to native primitive layers.",
+    "SearchBox": "SearchBox",
+    "Combobox": "FilterableComboBox",
+    "Dropdown": "FilterableComboBox"
+  },
+  "textStyleForRamp": {
+    "$comment": "Maps a detected font (size, weight) to the nearest Web text style name for the deterministic path.",
+    "rules": [
+      { "maxSize": 11, "strongKey": "Web/Caption 2 Strong", "key": "Web/Caption 2" },
+      { "maxSize": 13, "strongKey": "Web/Caption 1 Strong", "key": "Web/Caption 1" },
+      { "maxSize": 15, "strongKey": "Web/Body 1 Strong", "key": "Web/Body 1" },
+      { "maxSize": 18, "strongKey": "Web/Subtitle 2", "key": "Web/Body 2" },
+      { "maxSize": 22, "strongKey": "Web/Subtitle 1", "key": "Web/Subtitle 1" },
+      { "maxSize": 9999, "strongKey": "Web/Title 3", "key": "Web/Title 3" }
+    ]
+  }
+}

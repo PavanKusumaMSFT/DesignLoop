@@ -373,7 +373,11 @@ class JobManager {
         this._appendLog(job, 'system', msg);
         return this._finish(job, { status: 'error', exitCode: code, error: `${job.runner === 'claude' ? 'Claude Code' : 'Copilot CLI'} not authenticated` });
       }
-      const artifacts = this._computeArtifacts(job._gitStart, this._gitSnapshot(), job._filesStart, this._filesSnapshot());
+      const gitEnd = this._gitSnapshot();
+      const filesEnd = this._filesSnapshot();
+      const artifacts = this._computeArtifacts(job._gitStart, gitEnd, job._filesStart, filesEnd);
+      job._gitEnd = gitEnd;
+      job._filesEnd = filesEnd;
       job.artifacts = artifacts;
       if (code === 0) {
         this._appendLog(job, 'system', `✔ Done — ${artifacts.length} artifact(s) changed.`);
@@ -406,6 +410,12 @@ class JobManager {
       link: job.link || null,
       verifyResult: job.verifyResult || null,
     });
+
+    // Post-completion hook (set by the server) — used to record prototype
+    // version events from the job's file changes. Never let it break the job.
+    if (typeof this._onFinalise === 'function') {
+      try { this._onFinalise(job); } catch { /* recording is best-effort */ }
+    }
   }
 
   _finish(job, { status, exitCode = null, error = null, artifacts = job.artifacts }) {

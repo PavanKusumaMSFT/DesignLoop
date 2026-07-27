@@ -33,3 +33,8 @@ prototype-workspace/public/local-prototypes.json
 
 # Bridge runtime state (per-user Figma send targets, etc.)
 bridge/data/
+
+# Temporary version-preview mirrors materialised by the bridge for the task
+# page's "view a past version" selector (checked-out snapshots of past commits)
+prototype-workspace/app/vpr__*
+prototype-workspace/components/projects/vpr__*

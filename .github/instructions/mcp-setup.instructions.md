@@ -26,16 +26,31 @@ description: "Use when setting up MCP servers, configuring API tokens, or troubl
 
 ---
 
-## Send to Figma (prototype → editable native Figma layers)
+## Send to Figma (prototype → real Azure Fluent 2 components)
 
 The **"Send to Figma"** action on each prototype card pushes a prototype into a
-Figma file as **editable native layers** (frames with fills/strokes/corner radius
-and real, editable text nodes). It is the reverse of `/figma-to-fluent`.
+Figma file as **real Azure Fluent 2 component instances** — Blade header, Site
+header, Data grid, Essentials, Toolbar, Search box, Card, etc. — with the correct
+variants, property values, and library text styles, for high-fidelity engineering
+handoff. Components that can't be matched fall back to editable native layers
+(auto-layout frames, fills/strokes/corner radius, real text). It is the reverse of
+`/figma-to-fluent`.
 
-The default path uses the **DesignLoop Figma plugin** — **no Claude, no MCP, no
-OAuth**. The bridge renders the live prototype headlessly (Playwright), serializes
-its layout into a design tree, and streams it over a local WebSocket to the plugin,
-which rebuilds it natively via the Figma Plugin API.
+The path uses the **DesignLoop Figma plugin** — **no Claude, no MCP, no OAuth**.
+The bridge produces a **build spec** and streams it over a local WebSocket to the
+plugin, which instantiates it via the Figma Plugin API.
+
+### Two modes (env `FIGMA_RUNNER`)
+- **`agent` (default)** — the bridge runs the `fluent-to-figma` Copilot agent,
+  which reads the prototype source plus `figma-plugin/azure-fluent2-kit.json` and
+  `.github/skills/fluent-to-figma/azure-fluent2-guidelines.md` and authors a build
+  spec of real component instances. Best fidelity for Azure-portal-style pages.
+- **`plugin`** — the bridge serializes the live prototype DOM (Playwright) and
+  maps detected Fluent v9 components to Azure kit keys automatically (no agent
+  run). Faster, lower fidelity.
+
+Both modes require the plugin connected and both render through the same build-spec
+executor in `figma-plugin/code.js`.
 
 ### One-time setup (install the plugin)
 1. Open the **Figma desktop app**.
@@ -44,50 +59,47 @@ which rebuilds it natively via the Figma Plugin API.
 4. Open the target Figma file, then run **Plugins → Development → DesignLoop**.
    A small panel shows **“Connected to DesignLoop bridge”** — keep it open.
 5. Click **Send to Figma** on a prototype card and paste the target Figma **file
-   URL** once (saved per task and reused). Layers land on a new page named
+   URL** once (saved per task and reused). Instances land on a new page named
    `DesignLoop — <prototypeId>`; the card shows an **In Figma** deep link when done.
 
 The plugin talks to the bridge at `ws://127.0.0.1:8099/figma-plugin` (allow-listed
 in `figma-plugin/manifest.json → networkAccess`). See `figma-plugin/README.md`.
 
-### Real Fluent components (one-time "Learn kit")
-To land designs as **instances of your published Fluent components** instead of
-redrawn primitives, teach the plugin your kit once (the Plugin API can't read a
-team library's catalog, so keys are captured from the kit file itself):
-1. Open your **Fluent UI kit** file (components must be **published as a library**).
-2. Run the **DesignLoop** plugin and click **Learn kit**. Keys are saved to
-   `bridge/data/figma-kit.json` (grouped by normalized set name) and reused.
-3. In your working file, **enable that library** (Assets → Libraries) so the
-   plugin can import instances by key.
+### Enable the Azure Fluent 2 libraries (one-time, no "Learn kit" needed)
+The Azure Fluent 2 component **keys are global**, so there is **no Learn-kit step**
+for them. In the target file, enable these libraries (Assets → Libraries) so the
+plugin can import instances by key:
+- **Azure UI Kit** (`q2TdO4dVcMhNWYp0N6Bc05`)
+- **Pattern Templates** (`TXALL9CS0727dvGcZo84Bg`)
+- **Icons — Azure Fluent Extension** (`fQO2yNBwr773QI4ANvb1Z4`)
 
-At build time the bridge detects Fluent components in the DOM (stable
-`fui-<Component>` classes), resolves each to the best kit variant key
-(`resolveKitComponent` — `KIT_SYNONYMS` + variant scoring), and the plugin
-instances them via `figma.importComponentByKeyAsync` + `createInstance()`,
-overriding the first text sublayer with the detected label. Unmatched components
-fall back to frames/text. Skipping Learn kit is fine — everything falls back. The
-`done` message reports instanced-vs-fallback counts. `GET /api/figma/kit` reports
-the learned map.
+### Custom kit (optional "Learn kit")
+Only if you send into a file that uses a **custom/private** kit (not the global
+Azure keys): open that kit file (components **published as a library**), run the
+DesignLoop plugin, click **Learn kit**. Keys are saved to
+`bridge/data/figma-kit.json` and used as a fallback when a component isn't in the
+global Azure map. `GET /api/figma/kit` reports the learned map.
 
-> **Optional MCP runners.** The bridge can instead drive Figma's write MCP via a
-> CLI. Set `FIGMA_RUNNER=copilot` to use the Copilot CLI + Figma's **local desktop
-> MCP** (`127.0.0.1:3845`, enable via Figma → Preferences → “Enable local MCP
-> server”), or `FIGMA_RUNNER=claude` for Claude Code + the **remote** Figma MCP
-> (`https://mcp.figma.com/mcp`, one-time `/mcp` OAuth). The local Dev Mode MCP is
-> currently read-only, so the plugin path is the default and recommended route.
+> **Legacy MCP runners.** `FIGMA_RUNNER=copilot` (Copilot CLI + Figma's local
+> desktop MCP on `127.0.0.1:3845`) and `FIGMA_RUNNER=claude` (Claude Code + remote
+> `https://mcp.figma.com/mcp`) remain as fallbacks, but the local Dev Mode MCP is
+> read-only and the write MCP is client-gated, so the plugin path is the default.
 
 ### How it works
 - The user clicks **Send to Figma** and pastes the Figma **file URL** once. The
   bridge saves it per task (`tasks/<id>/.task.json` `figmaFile`, or a per-user
   `bridge/data/figma-targets.json` fallback) and reuses it for that task's prototypes.
-- `POST /api/figma/send { prototypeId, taskId?, figmaUrl? }` (default `plugin`
+- `POST /api/figma/send { prototypeId, taskId?, figmaUrl? }` (default `agent`
   runner) returns **409 `needsPlugin`** with a hint if no plugin is connected.
-  Otherwise it creates a manual job, serializes the live prototype
-  (`bridge/figma-serialize.js`, Playwright), and sends `{type:'build', jobId,
-  pageName, tree}` to the plugin. Plugin progress/done/error is relayed to the job
+  Otherwise it creates a single manual job and dispatches to `runFigmaAgentBuild`
+  (agent authors a spec to `bridge/data/figma-specs/<jobId>.json`, which the bridge
+  reads on process close and sends to the plugin; falls back to the deterministic
+  path if the agent yields no spec) or `runFigmaPluginBuild` (serialize →
+  annotate with Azure keys → build spec). It sends `{type:'build', jobId,
+  pageName, spec}` to the plugin. Plugin progress/done/error is relayed to the job
   SSE stream; the terminal `done` status carries a `link` deep link
-  (`…?node-id=…`). `GET /api/figma/plugin-status` reports connection state;
-  `GET /api/figma/target?id=<id>` reports the saved target.
+  (`…?node-id=…`) and instanced-vs-fallback counts. `GET /api/figma/plugin-status`
+  reports connection state; `GET /api/figma/target?id=<id>` reports the saved target.
 - The prototype workspace is behind MSAL, so the serializer appends
   `?auditBridge=1` (the workspace's built-in headless-tooling bypass).
 - Fonts that don't exist in Figma (Segoe UI, Aptos, …) fall back to **Inter**.
@@ -95,7 +107,8 @@ the learned map.
 ### Used By
 - Prototype card **Send to Figma** CTA (any workspace-rendered prototype)
 - `figma-plugin/` (DesignLoop plugin) + bridge `/figma-plugin` WebSocket relay
-- `/fluent-to-figma` skill / `@fluent-to-figma` agent (only for the MCP runners)
+- `/fluent-to-figma` skill / `@fluent-to-figma` agent (authors the build spec in
+  agent mode)
 
 ---
 

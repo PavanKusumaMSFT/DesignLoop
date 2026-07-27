@@ -1,7 +1,7 @@
 {
   "id": "fluent-to-figma",
   "name": "Fluent to Figma",
-  "description": "Send a DesignLoop prototype into a Figma file as editable native layers (frames, auto-layout, text, variables) via the Figma MCP write tools.",
+  "description": "Send a DesignLoop prototype into a Figma file as real Azure Fluent 2 component instances by authoring a build spec the DesignLoop Figma plugin renders.",
   "stages": [
     "prototype",
     "deliver"

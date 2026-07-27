@@ -13,6 +13,7 @@ import {
   ChevronRight16Regular,
   Rocket20Regular,
   Book20Regular,
+  Sparkle20Regular,
 } from "@fluentui/react-icons";
 
 type SafeTokens = { [key: string]: any };
@@ -42,10 +43,14 @@ export interface KubernetesHighlightCardProps {
   primaryLabel?: string;
   /** Secondary CTA label */
   secondaryLabel?: string;
+  /** Copilot CTA label */
+  copilotLabel?: string;
   /** Primary CTA handler */
   onPrimaryAction?: () => void;
   /** Secondary CTA handler */
   onSecondaryAction?: () => void;
+  /** Copilot CTA handler */
+  onCopilotAction?: () => void;
   /** Root className override */
   className?: string;
   /** Corner radius override (Fluent token) */
@@ -217,9 +222,11 @@ export default function KubernetesHighlightCard({
   features = DEFAULT_FEATURES,
   stats = DEFAULT_STATS,
   primaryLabel = "Create Kubernetes cluster",
-  secondaryLabel = "View documentation",
+  secondaryLabel = "Learn more",
+  copilotLabel = "Ask Copilot",
   onPrimaryAction,
   onSecondaryAction,
+  onCopilotAction,
   className,
   borderRadius,
   shadow,
@@ -283,6 +290,13 @@ export default function KubernetesHighlightCard({
             onClick={onSecondaryAction}
           >
             {secondaryLabel}
+          </Button>
+          <Button
+            appearance="subtle"
+            icon={<Sparkle20Regular />}
+            onClick={onCopilotAction}
+          >
+            {copilotLabel}
           </Button>
         </div>
       </div>

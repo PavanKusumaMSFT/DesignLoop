@@ -1,112 +1,103 @@
 ---
 name: fluent-to-figma
-description: "Send a DesignLoop prototype into a Figma file as editable native layers (frames, auto-layout, text, variables) via the Figma MCP write tools."
-argument-hint: "Prototype/task id plus the target Figma file URL (e.g., 'prototype cost-dashboard into https://figma.com/design/<key>/...')"
+description: "Send a DesignLoop prototype into a Figma file as real Azure Fluent 2 component instances by authoring a build spec the DesignLoop Figma plugin renders."
+argument-hint: "Prototype/task id plus the target Figma file (e.g., 'prototype cost-dashboard into https://figma.com/design/<key>/...')"
 ---
 
 # Fluent to Figma
 
-> This skill runs on the **Copilot CLI** and uses the connected **`figma` MCP
-> server** (Figma's local desktop Dev Mode MCP server at `127.0.0.1:3845`, which
-> needs no OAuth and is not client-gated). If `FIGMA_RUNNER=claude` is set the
-> bridge routes it through Claude Code + the remote Figma MCP instead; the
-> procedure below is identical either way.
+> This skill runs on the **Copilot CLI** and does **not** call any Figma tool or
+> MCP. It authors a **build spec** (JSON) describing the design in terms of real
+> Azure Fluent 2 library components. The DesignLoop bridge hands that spec to the
+> connected **DesignLoop Figma plugin**, which instantiates the components in the
+> target file. Your only job is to write the best possible build spec to the
+> file path given in the invoking prompt.
 
 ## Goal
 
-Reconstruct a DesignLoop prototype inside a Figma file as **editable native
-Figma layers** — real frames with **auto-layout**, real **text nodes**, and
-fills/strokes/radii/spacing **bound to Figma variables** (not raw hex/px).
-No screenshot import, no flattened images, no rasterized frames.
+Reconstruct a DesignLoop prototype inside a Figma file as **real Azure Fluent 2
+library component INSTANCES** — Site Header, Blade header, Service Menu, Toolbar,
+Data Grid, Essentials, Card, SearchBox, TabList, Form, etc. — instantiated by
+their global component **keys**, configured with the correct **variants** and
+**property IDs**, with **library text styles** and **icon swaps**. Never redraw a
+component as manual frames/rectangles/text. The plugin adds the result as a new
+**Page** in the user-provided file.
 
-The design is added as a **new Page** inside the **user-provided target Figma
-file** (MCP cannot create a new file). Reuse the same file across a task's
-prototypes; add one Page per send, named after the prototype.
+## Reference material (read in this order)
 
-## Inputs (provided in the invoking prompt)
-
-- `prototypeId` / `taskId` — the prototype route id (e.g. `cost-dashboard`).
-- `figmaFileUrl` and `figmaFileKey` — the target Figma file.
-- `liveUrl` — the running prototype, e.g. `http://localhost:3100/<prototypeId>`.
-- Source paths in this repo:
-  - Page: `prototype-workspace/app/<prototypeId>/page.tsx`
-  - Components: `prototype-workspace/components/projects/<prototypeId>/*.tsx`
-  - Shared components used: `prototype-workspace/components/shared/`
-  - Fluent rules/inventory: `prototype-workspace/AGENTS.md`
-- Reverse token map: run
-  `node prototype-workspace/scripts/fluent-to-figma-map.mjs`
-  to print the **Fluent token → Figma variable name** table
-  (`FLUENT_TO_FIGMA`). Use it to bind variables; `FLUENT_SIZE_VALUES` gives the
-  literal px fallback when a variable is missing from the file's library.
-
-## Preconditions
-
-1. The `figma` MCP server is connected and listed in your tools. On the Copilot
-   CLI this is Figma's local desktop server (enable it in Figma → Preferences →
-   “Enable local MCP server” / Dev Mode MCP server; it listens on
-   `127.0.0.1:3845`). If it is not available, stop and report that the Figma
-   local MCP server must be enabled.
-2. The target file is open/accessible to the signed-in Figma desktop account.
+1. **`figma-plugin/azure-fluent2-kit.json`** — authoritative, machine-readable
+   map: component keys, variant-specific keys, set keys, property IDs, text-style
+   keys, icon keys, and layout defaults. Prefer these keys.
+2. **`.github/skills/fluent-to-figma/azure-fluent2-guidelines.md`** — the full
+   Azure Fluent 2 guidance: Component Instantiation Rules (CRITICAL), Master
+   Component Key Reference, Variant Selection, property-ID formats, Typography
+   Application (text-style keys), Auto-Layout Rules, full-page blade recipes, and
+   pitfalls. This is your primary reference for keys and page structure.
+3. **The prototype source** — `prototype-workspace/app/<prototypeId>/page.tsx`
+   and every file under `prototype-workspace/components/projects/<prototypeId>/`.
+   Optionally read the live render at `liveUrl` (append `?auditBridge=1`) to
+   recover exact copy, order, and geometry. Do not screenshot-import.
 
 ## Procedure
 
-### 1. Read the prototype source
+1. **Understand the prototype.** Read the source (and, if helpful, the live DOM)
+   to identify each region and which Azure Fluent 2 component represents it.
+   Follow the guidelines' "Search Before You Create" and the Golden Rules — every
+   recognizable element must be a component instance, not a hand-drawn frame.
+2. **Choose keys + variants.** For each element pick the best key from the kit
+   json / guidelines. Prefer a **variant-specific key** (`key`); when only a set
+   key exists, use `setKey` plus a `variant` object. Set text/boolean properties
+   using the exact `Name#ID:N` property IDs from the guidelines.
+3. **Text.** Use `styleKey` from the kit's `textStyles` (Web/Title 3, Web/Body 1,
+   Web/Caption 1, …) for every text node instead of hardcoding font properties.
+4. **Layout.** Wrap flex regions in auto-layout frames using the guideline
+   defaults (`gap: 12`, horizontal `padding: 20`, `primaryAlign: "MIN"`). Use
+   `layoutSizing`/`stretch`/`grow` for children that fill. Only use absolute x/y
+   on a frame when the source is genuinely absolute.
+5. **Icons.** Swap service/resource icons by key via `iconSwaps` where relevant.
+6. **Write the spec.** Emit ONLY the JSON build spec (no markdown fences, no
+   prose) to the exact file path given in the prompt. Then print
+   `SPEC_WRITTEN <path>`.
 
-Read `app/<prototypeId>/page.tsx` and every file under
-`components/projects/<prototypeId>/`. Build a tree of:
+## Build-spec schema
 
-- Layout regions and nesting (which `makeStyles` classes wrap what).
-- Fluent primitives used (`Card`, `Button`, `Text`/`Title2`/`Body1`, `Badge`,
-  `Field`, `Table`, `Avatar`, etc.) and shared components from
-  `components/shared/`.
-- For each styled element, the Fluent tokens referenced in `makeStyles`
-  (`colorNeutralBackground1`, `spacingHorizontalM`, `borderRadiusMedium`, …),
-  plus `display:flex` direction/gap/padding (→ auto-layout), and typography
-  ramp (`fontSize*`, `fontWeight*`, `lineHeight*`).
+```jsonc
+{
+  "page": "DesignLoop — <prototypeId>",
+  "root": <node>
+}
+```
 
-### 2. (Optional) Read live geometry
+`node` is one of:
 
-If `liveUrl` is reachable, you may inspect the rendered DOM/computed styles to
-recover exact sizes and order. Do not screenshot-import; use it only to inform
-frame sizes and layout that are ambiguous from source.
+- **frame** — `{ "op":"frame", "name":str, "size":{"w":n,"h":n},
+  "layout":{ "mode":"VERTICAL|HORIZONTAL", "gap":n, "padding":[t,r,b,l],
+  "primaryAlign":"MIN|CENTER|MAX|SPACE_BETWEEN", "counterAlign":"MIN|CENTER|MAX",
+  "widthMode":"FIXED|AUTO", "heightMode":"FIXED|AUTO" },
+  "fill":{"r":0-1,"g":0-1,"b":0-1,"a":0-1}, "radius":n, "clip":bool,
+  "children":[node], "x":n, "y":n,
+  "layoutSizing":{"h":"FILL|HUG|FIXED","v":"..."}, "stretch":bool, "grow":bool }`
+- **instance** — `{ "op":"instance", "key":"<variant key>",
+  "setKey":"<set key when key is a set>", "variant":{"Prop":"Value"},
+  "props":{"Page title#32630:2":"…"}, "label":str,
+  "textOverrides":{"<layer name>":str},
+  "iconSwaps":[{"find":"<layer name>","key":"<icon key>"}],
+  "size":{"w":n,"h":n}, "layoutSizing":{...}, "stretch":bool }`
+- **text** — `{ "op":"text", "chars":str, "styleKey":"<text style key>",
+  "color":{...}, "align":"left|center|right", "width":n }`
 
-### 3. Map Fluent tokens → Figma variables
-
-For every color/radius/stroke/spacing/typography value, translate the Fluent
-token to its Figma variable via `FLUENT_TO_FIGMA`. Bind the layer property to
-that **variable**. Only if the variable is absent in the target file's library,
-fall back to the literal value from `FLUENT_SIZE_VALUES` (sizes) or the Fluent
-default color, and record the fallback in your summary.
-
-### 4. Create the page + native layers via Figma MCP write tools
-
-Using the Figma MCP **write** tools (create-frame / auto-layout / text /
-set-variable-binding style operations exposed by the connected server):
-
-1. Create a **new Page** in the target file named `DesignLoop — <prototypeId>`.
-2. Recreate the layout as nested **auto-layout frames** matching the flex
-   direction, `gap`, and `padding` from the source. Never use absolute
-   positioning where the source uses flex.
-3. Create real **text nodes** for every `Text`/`Title2`/`Body1`/label, with the
-   mapped typography variables and the actual copy from source.
-4. Recreate Fluent primitives as grouped native layers (e.g. a `Button` = an
-   auto-layout frame + text + bound brand background/foreground + corner
-   radius), reusing your own components on the page where a primitive repeats.
-5. **Bind variables** for all fills, strokes, corner radius, and spacing — do
-   not hardcode hex/px when a variable exists.
-
-### 5. Report
-
-Return: the Figma **page deep link** (file URL + `node-id` of the new page),
-the count of frames/text nodes created, and a list of any tokens that fell back
-to literals (unmapped variables).
+Notes:
+- `variant` and `props` are both applied via the instance's property setter, one
+  key at a time (a bad key is skipped, never fatal). Use the exact property-ID
+  format from the guidelines.
+- Children of an auto-layout frame are positioned by the layout — do not set x/y
+  on them; use `layoutSizing`/`stretch`/`grow` instead.
 
 ## Hard rules
 
-- Editable native layers only — **no** image/screenshot import, no flattened or
-  rasterized output.
-- Auto-layout for anything that is flex in source; absolute only for truly
-  absolute source positioning.
-- Bind Figma **variables**; raw hex/px only as an explicitly-reported fallback.
-- One new Page per send; never overwrite existing pages/frames in the file.
-- Do not modify any repo files — this skill only writes into Figma.
+- Real component instances (by key) for every recognizable element — **no**
+  manual frames/rectangles mimicking a component, **no** screenshot import.
+- Library text styles (`styleKey`) for text; auto-layout for flex regions.
+- Write ONLY valid JSON to the given path; do not modify any other repo file and
+  do not call any Figma tool/MCP.
+- The plugin creates a new Page — never target existing pages/frames.

@@ -141,6 +141,7 @@ export default function AzureHomeKubernetesHighlight({
             onSecondaryAction={() =>
               window.open("https://learn.microsoft.com/azure/aks/", "_blank")
             }
+            onCopilotAction={() => go("/agents")}
           />
         </div>
 

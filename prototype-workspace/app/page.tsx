@@ -34,11 +34,14 @@ import {
   DocumentCheckmark16Regular,
   CheckmarkCircle12Filled,
   Share16Regular,
+  History16Regular,
 } from "@fluentui/react-icons";
 import { projects } from "../data/projects";
 import liveExtras from "../data/live-prototypes.json";
 import { msalInstance } from "../components/auth/auth-providers";
 import ShareDialog from "../components/share/share-dialog";
+import VersionHistoryDialog from "../components/versions/version-history-dialog";
+import { relativeTime, type PrototypeLastUpdate } from "../lib/versions";
 
 type SafeTokens = { [key: string]: any };
 const tokens: SafeTokens = fluentTokens;
@@ -63,6 +66,8 @@ type CardItem = {
   deployUrl?: string;
   sourceType?: string;
   hasLocalChanges?: boolean;
+  lastUpdate?: PrototypeLastUpdate | null;
+  versionCount?: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -123,6 +128,8 @@ type LocalPrototypeEntry = {
   createdBy?: string;
   route?: string;
   hasLocalChanges?: boolean;
+  lastUpdate?: PrototypeLastUpdate | null;
+  versionCount?: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -188,6 +195,8 @@ function toLocalCard(e: LocalPrototypeEntry): CardItem {
     route: e.route || `/${e.id}`,
     sourceType: "local",
     hasLocalChanges: e.hasLocalChanges,
+    lastUpdate: e.lastUpdate,
+    versionCount: e.versionCount,
   };
 }
 
@@ -341,24 +350,21 @@ const useStyles = makeStyles({
     borderRadius: "12px",
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     backgroundColor: tokens.colorNeutralBackground1,
-    cursor: "pointer",
+    cursor: "default",
     boxShadow: tokens.shadow2,
     transitionProperty: "transform, box-shadow, border-color, background-color",
     transitionDuration: tokens.durationNormal,
     transitionTimingFunction: tokens.curveEasyEase,
     ":hover": {
-      transform: "translateY(-2px)",
       boxShadow: tokens.shadow8,
-      borderColor: tokens.colorBrandStroke1,
-      backgroundColor: tokens.colorNeutralBackground1Hover,
+      borderColor: tokens.colorNeutralStroke1,
     },
     ":hover .protoChevron": {
       transform: "translateX(4px)",
       color: tokens.colorBrandForeground1,
     },
-    ":focus-visible": {
-      outline: `2px solid ${tokens.colorBrandStroke1}`,
-      outlineOffset: "2px",
+    ":focus-within": {
+      borderColor: tokens.colorBrandStroke1,
     },
   },
   iconTile: {
@@ -413,6 +419,11 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase200,
     color: tokens.colorNeutralForeground2,
   },
+  updatedIcon: {
+    fontSize: "14px",
+    color: tokens.colorNeutralForeground4,
+    flexShrink: 0,
+  },
   youBadge: {
     fontSize: tokens.fontSizeBase100,
     fontWeight: tokens.fontWeightSemibold,
@@ -429,6 +440,30 @@ const useStyles = makeStyles({
     transitionProperty: "transform, color",
     transitionDuration: tokens.durationNormal,
     transitionTimingFunction: tokens.curveEasyEase,
+  },
+  chevronBtn: {
+    flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "36px",
+    height: "36px",
+    padding: 0,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: "50%",
+    backgroundColor: tokens.colorNeutralBackground1,
+    cursor: "pointer",
+    transitionProperty: "background-color, border-color, box-shadow",
+    transitionDuration: tokens.durationNormal,
+    transitionTimingFunction: tokens.curveEasyEase,
+    ":hover": {
+      backgroundColor: tokens.colorBrandBackground2,
+      borderColor: tokens.colorBrandStroke1,
+    },
+    ":focus-visible": {
+      outline: `2px solid ${tokens.colorBrandStroke1}`,
+      outlineOffset: "2px",
+    },
   },
   goLiveWrap: {
     display: "flex",
@@ -635,6 +670,7 @@ function PrototypeCard({
   const router = useRouter();
   const [reportOpen, setReportOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [versionOpen, setVersionOpen] = useState(false);
   // Local copy so "Mark completed" updates the card immediately without a reload.
   const [card, setCard] = useState<ReportCard | undefined>(report);
   const [savingPath, setSavingPath] = useState<string | null>(null);
@@ -695,34 +731,27 @@ function PrototypeCard({
 
   // Send-to-Figma is available for any workspace-rendered prototype (has a
   // local route), regardless of live/local status. Forks (external deploy only)
-  // have no reconstructable source, so they are excluded.
-  // TEMPORARILY HIDDEN: the Send-to-Figma feature is disabled until the Fluent
-  // kit fidelity issues are resolved. Flip this back to re-enable the CTA.
-  const SEND_FIGMA_ENABLED = false;
+  // have no reconstructable source, so they are excluded. The bridge composes a
+  // build spec of real Azure Fluent 2 components (fluent-to-figma agent) and the
+  // local DesignLoop plugin instantiates them into the target file.
+  const SEND_FIGMA_ENABLED = true;
   const canSendFigma =
     SEND_FIGMA_ENABLED && !!onSendFigma && !!item.route && item.sourceType !== "fork";
 
   // External password-protected sharing is available for any workspace-rendered
   // prototype (has a local route). Forks (external deploy only) are excluded.
   const canShare = !!item.route && item.sourceType !== "fork";
+  // Version history is git-backed and served by the local bridge, so it is
+  // available for any workspace-rendered prototype (has a local route). Forks
+  // (external deploy only) have no local git source.
+  const canViewHistory = !!item.route && item.sourceType !== "fork";
   // The share id must match the route's first path segment, which is what the
   // auth gate uses to resolve a shared link.
   const shareId =
     (item.route || "").split("/").filter(Boolean)[0] || item.id;
 
   return (
-    <div
-      className={styles.card}
-      role="button"
-      tabIndex={0}
-      onClick={open}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          open();
-        }
-      }}
-    >
+    <div className={styles.card}>
       <div className={styles.body}>
         <div className={styles.cardTitleRow}>
           <Text className={styles.cardTitle}>{item.title}</Text>
@@ -759,6 +788,21 @@ function PrototypeCard({
             />
             <Text className={styles.authorText}>{item.author}</Text>
             {isMine && <span className={styles.youBadge}>You</span>}
+          </div>
+        )}
+
+        {item.lastUpdate && item.lastUpdate.at && (
+          <div className={styles.metaRow}>
+            <History16Regular className={styles.updatedIcon} />
+            <Text className={styles.authorText}>
+              {item.lastUpdate.sourceLabel || "Updated"}
+              {item.lastUpdate.author ? ` by ${item.lastUpdate.author}` : ""}
+              {" · "}
+              {relativeTime(item.lastUpdate.at)}
+              {typeof item.versionCount === "number" && item.versionCount > 0
+                ? ` · v${item.versionCount}`
+                : ""}
+            </Text>
           </div>
         )}
 
@@ -1002,7 +1046,44 @@ function PrototypeCard({
         </div>
       )}
 
-      <ArrowRight20Regular className={`${styles.chevron} protoChevron`} />
+      {canViewHistory && (
+        <div
+          className={styles.figmaWrap}
+          onClick={(e) => e.stopPropagation()}
+          role="presentation"
+        >
+          <Button
+            className={styles.figmaBtn}
+            appearance="subtle"
+            size="small"
+            icon={<History16Regular />}
+            onClick={() => setVersionOpen(true)}
+          >
+            History
+          </Button>
+        </div>
+      )}
+
+      {canViewHistory && versionOpen && (
+        <div onClick={(e) => e.stopPropagation()} role="presentation">
+          <VersionHistoryDialog
+            open={versionOpen}
+            onClose={() => setVersionOpen(false)}
+            prototypeId={item.id}
+            title={item.title}
+          />
+        </div>
+      )}
+
+      <button
+        type="button"
+        className={styles.chevronBtn}
+        onClick={open}
+        aria-label={`Open ${item.title}`}
+        title={`Open ${item.title}`}
+      >
+        <ArrowRight20Regular className={`${styles.chevron} protoChevron`} />
+      </button>
     </div>
   );
 }

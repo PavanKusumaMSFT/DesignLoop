@@ -1,36 +1,43 @@
 # VERIFY — fluent-to-figma
 
-Score the send against these dimensions. All must pass for a successful send.
+Score the authored build spec against these dimensions. All blocking items must
+pass before printing `SPEC_WRITTEN`.
 
-## 1. Native, editable layers (blocking)
-- [ ] The design is real Figma layers — frames, text, vectors — **not** an
-      imported screenshot or a single flattened/rasterized image.
-- [ ] Text is live editable text nodes with the real copy from the prototype.
+## 1. Real component instances (blocking)
+- [ ] Every recognizable UI element (header, breadcrumb, blade header, menu,
+      toolbar, grid, essentials, card, search box, tabs, form, …) is an
+      `instance` op referencing a real Azure Fluent 2 component **key** — not a
+      hand-drawn frame/rectangle/text mimicking it.
+- [ ] Keys come from `figma-plugin/azure-fluent2-kit.json` or the guidelines. A
+      variant-specific `key` is preferred; when a set is used, `setKey` + a
+      `variant` object is provided.
 
-## 2. Auto-layout fidelity (blocking)
-- [ ] Regions that use `display:flex` in source are **auto-layout frames** with
-      matching direction, gap, and padding.
-- [ ] Absolute positioning is used only where the source is genuinely absolute.
+## 2. Correct configuration (blocking)
+- [ ] Component text/boolean properties are set via the exact `Name#ID:N`
+      property IDs from the guidelines (e.g. Blade header `Page title#32630:2`).
+- [ ] Terminal/edge cases handled per the guidelines (last breadcrumb
+      `Divider=false`, toolbar buttons not deprecated dropdowns, etc.).
 
-## 3. Variables, not literals (blocking)
-- [ ] Fills, strokes, corner radius, and spacing are bound to Figma **variables**
-      mapped from Fluent tokens via `FLUENT_TO_FIGMA`.
-- [ ] Any literal hex/px used is only because the variable was missing from the
-      target file, and every such fallback is listed in the summary.
+## 3. Text styles, not hardcoded fonts (blocking)
+- [ ] Text nodes use a `styleKey` from the kit's `textStyles` (Web/Title 3,
+      Web/Body 1, Web/Caption 1, …). Hardcoded size/weight only when no style
+      fits, and noted.
 
-## 4. Placement (blocking)
-- [ ] Output is a **new Page** named `DesignLoop — <prototypeId>` in the
-      user-provided target file.
-- [ ] No existing pages, frames, or components in the file were modified.
+## 4. Auto-layout fidelity (blocking)
+- [ ] Flex regions are auto-layout frames with matching direction, `gap`, and
+      `padding` (defaults: gap 12, horizontal padding 20, `primaryAlign` MIN).
+- [ ] Children that fill use `layoutSizing`/`stretch`/`grow`; absolute x/y only
+      where the source is genuinely absolute.
 
-## 5. Fidelity to the running prototype
-- [ ] Layout, hierarchy, typography ramp, and colors visually match the running
-      prototype at `liveUrl` (compare against a screenshot of the live route).
-- [ ] Repeated primitives (buttons, cards, badges) are consistent.
+## 5. Valid, self-contained output (blocking)
+- [ ] The file at the given path is **valid JSON** matching the schema:
+      `{ "page": "...", "root": <node> }`.
+- [ ] No markdown fences, no prose, nothing else in the file.
+- [ ] No other repository file was modified; no Figma tool/MCP was called.
 
-## 6. Report completeness
-- [ ] Returns the Figma page deep link (file URL + new page `node-id`).
-- [ ] Reports counts (frames / text nodes) and the unmapped-token fallback list.
+## 6. Fidelity to the running prototype
+- [ ] Region order, hierarchy, typography ramp, and colors reflect the running
+      prototype at `liveUrl`.
+- [ ] Repeated elements are consistent instances.
 
-If any blocking item fails, the send is not complete — fix and re-run before
-reporting success.
+If any blocking item fails, fix the spec before printing `SPEC_WRITTEN`.

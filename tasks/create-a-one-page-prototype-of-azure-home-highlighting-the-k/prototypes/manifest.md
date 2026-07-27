@@ -73,7 +73,7 @@ pnpm --dir prototype-workspace build
 ## Variants & States
 
 - **Featured hero card:** default content (AKS copy, 3 feature bullets, 3 stats),
-  primary CTA ("Create Kubernetes cluster") and secondary CTA ("View documentation").
+  primary CTA ("Create Kubernetes cluster") and secondary CTA ("Learn more").
 - **Popular services grid:** Kubernetes tile in emphasized state (brand surface +
   "Featured" badge); standard tiles for VMs, Web App, SQL, Storage, Function App.
 - **Interactive states:** hover elevation on tiles/cards, `:focus-visible` outlines on

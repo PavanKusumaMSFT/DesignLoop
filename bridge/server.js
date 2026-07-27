@@ -14,6 +14,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { spawn, execSync } = require('child_process');
 const JSZip = require('jszip');
 const mammoth = require('mammoth');
@@ -893,15 +894,47 @@ function resolveKitComponent(fluent, kit) {
   return { componentKey: best.key, setName: set.display };
 }
 
+/** The vendored, authoritative Azure Fluent 2 UI Kit map (global component keys —
+ * no "Learn kit" needed). Read once and cached. */
+const AZURE_KIT_PATH = path.join(__dirname, '..', 'figma-plugin', 'azure-fluent2-kit.json');
+let _azureKit;
+function readAzureKit() {
+  if (_azureKit !== undefined) return _azureKit;
+  try { _azureKit = JSON.parse(fs.readFileSync(AZURE_KIT_PATH, 'utf8')); }
+  catch { _azureKit = null; }
+  return _azureKit;
+}
+
+/** Resolve a detected Fluent component to an Azure UI Kit component (global key)
+ * via the vendored kit's atomicMap. Returns { componentKey, setKey, setName } or null. */
+function resolveAzureComponent(fluent, kit) {
+  if (!fluent || !kit) return null;
+  const name = (kit.atomicMap || {})[fluent.component];
+  if (!name) return null;
+  const c = (kit.components || {})[name];
+  if (!c) return null;
+  return { componentKey: c.key || null, setKey: c.setKey || null, setName: name };
+}
+
 /** Walk the tree and attach a resolved kit key to each detected Fluent node.
+ * Prefers the vendored global Azure kit; falls back to a learned kit if present.
  * Returns { matched, unmatched } counts. */
-function annotateKit(root, kit) {
+function annotateKit(root) {
+  const azure = readAzureKit();
+  const learned = readKitMap();
   let matched = 0, unmatched = 0;
   (function walk(n) {
     if (n.fluent) {
-      const r = kit ? resolveKitComponent(n.fluent, kit) : null;
-      if (r) { n.fluent.componentKey = r.componentKey; n.fluent.setName = r.setName; matched++; }
-      else { unmatched++; }
+      let r = azure ? resolveAzureComponent(n.fluent, azure) : null;
+      if (!r && learned) r = resolveKitComponent(n.fluent, learned);
+      if (r && (r.componentKey || r.setKey)) {
+        n.fluent.componentKey = r.componentKey;
+        n.fluent.setKey = r.setKey;
+        n.fluent.setName = r.setName;
+        matched++;
+      } else {
+        unmatched++;
+      }
     }
     for (const c of (n.children || [])) walk(c);
   })(root);
@@ -973,13 +1006,12 @@ async function runFigmaPluginBuild(job, prototypeId, target) {
     if (!figmaPluginClients.size) {
       throw new Error('The DesignLoop Figma plugin disconnected before the build started. Re-open it in Figma.');
     }
-    // Resolve detected Fluent components to learned kit component keys.
-    const kit = readKitMap();
-    const counts = annotateKit(tree.root, kit);
-    if (kit) {
-      jobs.manualLog(job, `Matched ${counts.matched} Fluent component(s) to the kit; ${counts.unmatched} will use fallback layers.`);
+    // Resolve detected Fluent components to real Azure UI Kit component keys.
+    const counts = annotateKit(tree.root);
+    if (counts.matched) {
+      jobs.manualLog(job, `Matched ${counts.matched} Fluent component(s) to the Azure UI Kit; ${counts.unmatched} will use fallback layers.`);
     } else if (counts.matched + counts.unmatched > 0) {
-      jobs.manualLog(job, `No kit learned yet — run “Learn kit” in the plugin for real components. Building ${counts.unmatched} fallback layer(s).`);
+      jobs.manualLog(job, `No components matched the Azure UI Kit — building ${counts.unmatched} fallback layer(s). (Tip: use the agent path for full-fidelity component reconstruction.)`);
     }
     const pageName = `DesignLoop — ${prototypeId}`;
     jobs.manualLog(job, `Sending ${tree.nodeCount} layers to the Figma plugin…`);
@@ -1000,6 +1032,146 @@ async function runFigmaPluginBuild(job, prototypeId, target) {
         figmaBuildJobs.delete(job.id);
       }, 4 * 60 * 1000);
     }
+  } catch (e) {
+    jobs.manualLog(job, `✖ ${e.message}`, 'stderr');
+    jobs.manualFinish(job, { status: 'error', error: e.message });
+    figmaBuildJobs.delete(job.id);
+  }
+}
+
+/** Count nodes in a build spec tree (for progress messaging). */
+function countSpecNodes(node) {
+  if (!node) return 0;
+  let n = 1;
+  for (const c of (node.children || [])) n += countSpecNodes(c);
+  return n;
+}
+
+/** Build the prompt that drives the fluent-to-figma composer agent to author a
+ * build spec JSON (real Azure Fluent 2 components) and write it to `specPath`. */
+function figmaComposePrompt(prototypeId, taskId, target, specPath) {
+  const liveUrl = `http://localhost:${PROTO_PORT}/${prototypeId}`;
+  return [
+    `Compose a high-fidelity Figma build spec for a DesignLoop prototype using the "fluent-to-figma" skill.`,
+    ``,
+    `Read these first, in order:`,
+    `1. .github/skills/fluent-to-figma/SKILL.md — the full procedure and the build-spec op schema.`,
+    `2. figma-plugin/azure-fluent2-kit.json — authoritative Azure UI Kit component keys, variant keys, property IDs, text-style keys, and icon keys.`,
+    `3. .github/skills/fluent-to-figma/azure-fluent2-guidelines.md — component instantiation rules, variant selection, property IDs, and full-page blade recipes. This is your primary reference for keys and structure.`,
+    ``,
+    `Understand the prototype to reconstruct:`,
+    `- prototypeId: ${prototypeId}`,
+    `- Source page: prototype-workspace/app/${prototypeId}/page.tsx`,
+    `- Components: prototype-workspace/components/projects/${prototypeId}/`,
+    `- Live render (for geometry/text): ${liveUrl}  (append ?auditBridge=1 to bypass auth)`,
+    ``,
+    `Author a build spec that reconstructs the prototype as REAL Azure Fluent 2 library component INSTANCES (by global key from the kit json / guidelines) — never redraw components as manual frames/rectangles. Map each recognizable region to its component (Site Header, Breadcrumb, Blade header, Service Menu, Toolbar, Data Grid, Essentials, Card, SearchBox, TabList, Form, etc.), pick the best variant key, and set text/boolean properties via the documented property IDs. Use library text styles (styleKey) for text nodes. Use auto-layout frames for flex regions with the guideline spacing defaults (gap 12, horizontal padding 20). Swap resource/service icons by key where relevant.`,
+    ``,
+    `The build-spec op schema (write EXACTLY this shape):`,
+    `{ "page": "DesignLoop — ${prototypeId}", "root": <node> }`,
+    `node = one of:`,
+    `- frame:    { "op":"frame", "name":str, "size":{"w":n,"h":n}, "layout":{"mode":"VERTICAL|HORIZONTAL","gap":n,"padding":[top,right,bottom,left],"primaryAlign":"MIN|CENTER|MAX|SPACE_BETWEEN","counterAlign":"MIN|CENTER|MAX","widthMode":"FIXED|AUTO","heightMode":"FIXED|AUTO"}, "fill":{"r":0-1,"g":0-1,"b":0-1,"a":0-1}, "radius":n, "children":[node], "layoutSizing":{"h":"FILL|HUG|FIXED","v":"..."}, "stretch":bool, "grow":bool }`,
+    `- instance: { "op":"instance", "key":"<variant key>", "setKey":"<set key if key is a set>", "variant":{"Prop":"Value"}, "props":{"Name#id:n":value}, "label":str, "textOverrides":{"<layer name>":str}, "iconSwaps":[{"find":"<layer name>","key":"<icon key>"}], "size":{"w":n,"h":n}, "layoutSizing":{...}, "stretch":bool }`,
+    `- text:     { "op":"text", "chars":str, "styleKey":"<text style key>", "color":{...}, "align":"left|center|right", "width":n }`,
+    ``,
+    `Rules: prefer "key" (a variant-specific key) over "setKey"; when only a set key exists, provide "setKey" and a "variant". Only frames use absolute x/y (when no layout). Keep the tree shallow and clean.`,
+    ``,
+    `Write ONLY the JSON build spec (no markdown fences, no prose) to this exact file path: ${specPath}`,
+    `Do NOT modify any other repository file and do NOT attempt to call any Figma tool/MCP — the DesignLoop plugin renders your spec. When done, print: SPEC_WRITTEN ${specPath}`,
+  ].join('\n');
+}
+
+/** Agent-composer build: run the fluent-to-figma agent to author a build spec of
+ * real Azure Fluent 2 component instances, then hand it to the connected plugin.
+ * Falls back to the deterministic snapshot rebuild if the agent yields no spec. */
+async function runFigmaAgentBuild(job, prototypeId, target) {
+  const entry = figmaBuildJobs.get(job.id);
+  const specDir = path.join(__dirname, 'data', 'figma-specs');
+  const specPath = path.join(specDir, `${job.id}.json`);
+  try {
+    fs.mkdirSync(specDir, { recursive: true });
+    try { fs.unlinkSync(specPath); } catch {}
+    if (!figmaPluginClients.size) {
+      throw new Error('The DesignLoop Figma plugin disconnected before the build started. Re-open it in Figma.');
+    }
+    jobs.manualLog(job, 'Composing a Fluent 2 build spec with the fluent-to-figma agent (this can take a minute)…');
+    const bin = jobs.copilotBin();
+    const prompt = figmaComposePrompt(prototypeId, job.taskId, target, specPath);
+    let child;
+    try {
+      child = spawn(bin, ['-p', prompt, '--allow-all-tools', '--agent=fluent-to-figma'], {
+        cwd: ROOT, env: process.env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
+      });
+    } catch (e) {
+      jobs.manualLog(job, `Agent launch failed: ${e.message}. Falling back to snapshot rebuild.`, 'stderr');
+      return runFigmaPluginBuild(job, prototypeId, target);
+    }
+    if (entry) entry.child = child;
+
+    const wire = (stream, name) => {
+      let buf = '';
+      stream.setEncoding('utf8');
+      stream.on('data', (chunk) => {
+        buf += chunk;
+        let nl;
+        while ((nl = buf.indexOf('\n')) !== -1) {
+          const line = buf.slice(0, nl).replace(/\r$/, '');
+          buf = buf.slice(nl + 1);
+          if (line.trim()) jobs.manualLog(job, line, name);
+        }
+      });
+    };
+    wire(child.stdout, 'stdout');
+    wire(child.stderr, 'stderr');
+
+    // Overall cap on the agent so a stuck run can't hang the job forever.
+    if (entry) {
+      entry.agentTimer = setTimeout(() => {
+        try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch {} }
+      }, 8 * 60 * 1000);
+    }
+
+    child.on('error', (e) => {
+      if (entry && entry.agentTimer) clearTimeout(entry.agentTimer);
+      jobs.manualLog(job, `Agent process error: ${e.message}. Falling back to snapshot rebuild.`, 'stderr');
+      runFigmaPluginBuild(job, prototypeId, target);
+    });
+
+    child.on('close', () => {
+      if (entry && entry.agentTimer) clearTimeout(entry.agentTimer);
+      if (job.endedAt) return; // already cancelled/finished
+      let spec = null;
+      try { spec = JSON.parse(fs.readFileSync(specPath, 'utf8')); } catch {}
+      try { fs.unlinkSync(specPath); } catch {}
+      if (!spec || !spec.root) {
+        jobs.manualLog(job, 'Agent produced no usable build spec — falling back to snapshot rebuild.');
+        return runFigmaPluginBuild(job, prototypeId, target);
+      }
+      if (!figmaPluginClients.size) {
+        jobs.manualFinish(job, { status: 'error', error: 'The Figma plugin disconnected before rendering.' });
+        figmaBuildJobs.delete(job.id);
+        return;
+      }
+      const pageName = `DesignLoop — ${prototypeId}`;
+      jobs.manualLog(job, `Rendering ${countSpecNodes(spec.root)} spec node(s) as real Fluent 2 components in Figma…`);
+      const sent = sendFigmaBuild({
+        type: 'build', jobId: job.id, pageName,
+        fileKey: (target && target.fileKey) || null, spec,
+      });
+      if (!sent) {
+        jobs.manualFinish(job, { status: 'error', error: 'Could not reach the Figma plugin.' });
+        figmaBuildJobs.delete(job.id);
+        return;
+      }
+      if (entry) {
+        entry.timer = setTimeout(() => {
+          if (!job.endedAt) {
+            jobs.manualFinish(job, { status: 'error', error: 'Timed out waiting for the Figma plugin to finish.' });
+          }
+          figmaBuildJobs.delete(job.id);
+        }, 4 * 60 * 1000);
+      }
+    });
   } catch (e) {
     jobs.manualLog(job, `✖ ${e.message}`, 'stderr');
     jobs.manualFinish(job, { status: 'error', error: e.message });
@@ -1354,6 +1526,636 @@ function gitAuthorFor(id) {
   return gitUserName();
 }
 
+// ---------------------------------------------------------------------------
+// Prototype versioning
+//
+// A prototype's version history is git-backed: every commit touching its source
+// (prototype-workspace/app/<id> or components/projects/<id>) is a version, and
+// current uncommitted edits form a "Working copy" version. Because changes come
+// from two places — web sub-task runs (this bridge spawns Copilot) and manual
+// edits (VS Code Copilot Chat / editor) — an append-only event log records the
+// *provenance* of each run so the timeline can say "Updated via <tool> sub-task"
+// vs. "Edited locally". Everything degrades gracefully when git is unavailable.
+// ---------------------------------------------------------------------------
+
+const PROTO_EVENTS_PATH = path.join(__dirname, 'data', 'prototype-events.json');
+const PROTO_SCOPES = ['prototype-workspace/app', 'prototype-workspace/components/projects'];
+
+/** Extract a prototype id from a repo-relative path within a prototype scope. */
+function protoIdFromPath(p) {
+  if (!p) return null;
+  const clean = String(p).replace(/^"|"$/g, '');
+  const m =
+    clean.match(/prototype-workspace\/app\/([a-z0-9][a-z0-9-_]*)(?:\/|$)/i) ||
+    clean.match(/prototype-workspace\/components\/projects\/([a-z0-9][a-z0-9-_]*)(?:\/|$)/i);
+  if (!m) return null;
+  // `vpr__*` dirs are temporary version-preview mirrors, never real prototypes.
+  if (m[1].startsWith('vpr__')) return null;
+  return m[1];
+}
+
+/** Reserved app routes that are not prototypes. */
+const PROTO_RESERVED = new Set(['workspace']);
+
+function readProtoEvents() {
+  try {
+    const arr = JSON.parse(fs.readFileSync(PROTO_EVENTS_PATH, 'utf8'));
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+
+function appendProtoEvents(events) {
+  if (!events.length) return;
+  try {
+    fs.mkdirSync(path.dirname(PROTO_EVENTS_PATH), { recursive: true });
+    const all = readProtoEvents().concat(events);
+    // Cap the log so it can't grow unbounded (keep the most recent 2000).
+    const trimmed = all.length > 2000 ? all.slice(all.length - 2000) : all;
+    fs.writeFileSync(PROTO_EVENTS_PATH, JSON.stringify(trimmed, null, 2));
+  } catch { /* best-effort */ }
+}
+
+/**
+ * Which prototypes a finished job changed, mapped to their changed files.
+ * Derived from the job's own git snapshot delta (start→end) so concurrent jobs
+ * don't cross-attribute. Also catches brand-new untracked prototype directories
+ * that git reports as a single `??` dir entry.
+ */
+function changedPrototypesForJob(job) {
+  const map = new Map(); // id -> Set(files)
+  const start = job._gitStart instanceof Set ? job._gitStart : new Set();
+  const end = job._gitEnd instanceof Set ? job._gitEnd : new Set();
+  const consider = (rawLine) => {
+    if (!rawLine) return;
+    // porcelain: "XY <path>" possibly "orig -> new"
+    let p = rawLine.length > 3 ? rawLine.slice(3) : rawLine;
+    const arrow = p.indexOf(' -> ');
+    if (arrow !== -1) p = p.slice(arrow + 4);
+    p = p.trim().replace(/^"|"$/g, '');
+    const id = protoIdFromPath(p);
+    if (!id || PROTO_RESERVED.has(id)) return;
+    if (!map.has(id)) map.set(id, new Set());
+    // If the porcelain entry is a directory (new untracked proto), enumerate files.
+    const abs = path.join(ROOT, p);
+    let isDir = false;
+    try { isDir = fs.statSync(abs).isDirectory(); } catch { isDir = false; }
+    if (isDir) {
+      const walk = (dir) => {
+        let entries;
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+        for (const e of entries) {
+          if (e.name.startsWith('.')) continue;
+          const cabs = path.join(dir, e.name);
+          if (e.isDirectory()) walk(cabs);
+          else map.get(id).add(path.relative(ROOT, cabs));
+        }
+      };
+      walk(abs);
+    } else {
+      map.get(id).add(p);
+    }
+  };
+  for (const line of end) if (!start.has(line)) consider(line);
+  // Job artifacts (already computed) can surface paths the porcelain delta missed.
+  for (const a of job.artifacts || []) { if (a && a.path && protoIdFromPath(a.path)) consider('   ' + a.path); }
+  return map;
+}
+
+/** A human title for a run event, derived from the tool/agent/kind. */
+function runEventTitle(job) {
+  if (job.toolId) return `${titleCase(job.toolId)} run`;
+  if (job.agent) return `${titleCase(job.agent)} agent`;
+  if (job.kind === 'stage') return 'Stage run';
+  return 'Sub-task run';
+}
+
+/** Record version events for every prototype a completed run changed. */
+async function recordJobVersionEvents(job) {
+  if (!job || job._manual) return;             // manual jobs (e.g. Figma send) don't edit source
+  if (job.status !== 'done') return;           // only successful runs mint a version event
+  const changed = changedPrototypesForJob(job);
+  if (!changed.size) return;
+  const ts = job.endedAt || Date.now();
+  const author = gitUserName();
+  const events = [];
+  for (const [id, files] of changed) {
+    events.push({
+      ts,
+      proto: id,
+      source: 'web-run',
+      jobId: job.id,
+      taskId: job.taskId || null,
+      tool: job.toolId || null,
+      agent: job.agent || null,
+      kind: job.kind || 'run',
+      title: runEventTitle(job),
+      author: author || null,
+      files: Array.from(files).slice(0, 200),
+    });
+    // Mint a real snapshot so the run surfaces as a distinct, viewable version.
+    try {
+      await maybeSnapshotWorkingCopy(id, {
+        source: 'web-run',
+        at: new Date(ts).toISOString(),
+        author: author || null,
+        tool: job.toolId || null,
+        agent: job.agent || null,
+        taskId: job.taskId || null,
+        jobId: job.id,
+        summary: runEventTitle(job),
+      });
+    } catch { /* snapshot best-effort */ }
+  }
+  appendProtoEvents(events);
+  // The list endpoint caches lastUpdate; invalidate so the new version shows up.
+  historyCache.clear();
+}
+
+// Wire the completion hook so runs are versioned automatically.
+jobs._onFinalise = recordJobVersionEvents;
+
+const NUL = '\u0000';
+const RS = '\u001f';
+
+/**
+ * Parse `git log --numstat` output into structured commits scoped to a
+ * prototype. Each commit is prefixed with a NUL byte (see the format string in
+ * buildPrototypeHistory) so commits split cleanly regardless of numstat lines.
+ */
+function parsePrototypeCommits(stdout, id) {
+  const commits = [];
+  if (!stdout) return commits;
+  const blocks = stdout.split(NUL).filter((b) => b.trim());
+  for (const block of blocks) {
+    const lines = block.split('\n');
+    const header = lines.shift() || '';
+    const [hash, an, ae, ad, subject] = header.split(RS);
+    if (!hash) continue;
+    const files = [];
+    let additions = 0;
+    let deletions = 0;
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const m = line.match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
+      if (!m) continue;
+      const add = m[1] === '-' ? 0 : Number(m[1]);
+      const del = m[2] === '-' ? 0 : Number(m[2]);
+      let file = m[3];
+      // rename form "a => b" or "dir/{a => b}/x"
+      const braces = file.match(/\{.*? => (.+?)\}/);
+      if (braces) file = file.replace(/\{.*? => (.+?)\}/, braces[1]);
+      else if (file.includes(' => ')) file = file.split(' => ').pop();
+      if (protoIdFromPath(file) !== id) continue; // only files for this prototype
+      additions += add; deletions += del;
+      files.push({ path: file, additions: add, deletions: del });
+    }
+    if (!files.length) continue; // commit touched other prototypes only
+    commits.push({ hash, shortHash: hash.slice(0, 8), author: an || null, email: ae || null, at: ad || null, subject: subject || '', files, additions, deletions });
+  }
+  return commits;
+}
+
+/** Newest mtime among a prototype's source files (ms epoch), or 0. */
+function protoLatestMtime(id) {
+  let latest = 0;
+  const walk = (dir) => {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (e.name.startsWith('.')) continue;
+      const abs = path.join(dir, e.name);
+      if (e.isDirectory()) walk(abs);
+      else { try { const s = fs.statSync(abs); if (s.mtimeMs > latest) latest = s.mtimeMs; } catch {} }
+    }
+  };
+  walk(path.join(PROTO_DIR, 'app', id));
+  walk(path.join(PROTO_DIR, 'components', 'projects', id));
+  return latest;
+}
+
+/** Working-tree changed files for a single prototype (uncommitted). */
+async function protoWorkingChanges(id) {
+  const scopes = [
+    `prototype-workspace/app/${id}`,
+    `prototype-workspace/components/projects/${id}`,
+  ];
+  const files = new Set();
+  const status = await runGit(['status', '--porcelain', '--', ...scopes]);
+  if (status.code === 0) {
+    for (const line of status.stdout.split('\n')) {
+      if (!line.trim()) continue;
+      // runGit trims the whole output, which can strip the leading status-column
+      // space from the first line — so extract the path by regex instead of a
+      // fixed-width slice. Handles "orig -> new" by taking the last path token.
+      const m = line.match(/(prototype-workspace\/(?:app|components\/projects)\/[^\s"]+)\s*$/);
+      if (!m) continue;
+      const p = m[1];
+      const abs = path.join(ROOT, p);
+      let isDir = false;
+      try { isDir = fs.statSync(abs).isDirectory(); } catch {}
+      if (isDir) {
+        const walk = (dir) => {
+          let entries;
+          try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+          for (const e of entries) {
+            if (e.name.startsWith('.')) continue;
+            const cabs = path.join(dir, e.name);
+            if (e.isDirectory()) walk(cabs);
+            else files.add(path.relative(ROOT, cabs));
+          }
+        };
+        walk(abs);
+      } else if (protoIdFromPath(p) === id) {
+        files.add(p);
+      }
+    }
+  }
+  return Array.from(files);
+}
+
+/** Map a raw event to the timeline "source" descriptor. */
+function eventSourceLabel(ev) {
+  if (!ev) return { source: 'local', sourceLabel: 'Edited locally' };
+  if (ev.source === 'web-run') {
+    const via = ev.tool ? `${titleCase(ev.tool)} sub-task` : ev.agent ? `${titleCase(ev.agent)} agent` : 'web sub-task';
+    return { source: 'web-run', sourceLabel: `Updated via ${via}`, tool: ev.tool || null, agent: ev.agent || null, taskId: ev.taskId || null, jobId: ev.jobId || null };
+  }
+  if (ev.source === 'make-live') return { source: 'make-live', sourceLabel: 'Promoted to Live' };
+  return { source: ev.source || 'local', sourceLabel: 'Edited locally' };
+}
+
+// ---------------------------------------------------------------------------
+// Snapshot store — the source of truth for prototype VERSIONS.
+//
+// Git only records committed state, so prototypes updated via VS Code Copilot
+// Chat (manual edits) or web sub-task runs — which are NOT auto-committed —
+// would collapse into a single commit with no distinct history to switch
+// between. To surface real versions we snapshot the prototype's full source
+// (a gitignored copy under bridge/data/versions/<id>/v<n>/) whenever it changes:
+//   • after a web sub-task run that touched it (recordJobVersionEvents), and
+//   • lazily on read (buildPrototypeHistory with capture) so manual editor
+//     changes become a version the moment someone opens the history/selector.
+// Snapshots are content-hashed so an unchanged prototype never mints duplicates.
+// ---------------------------------------------------------------------------
+const PROTO_VERSIONS_DIR = path.join(__dirname, 'data', 'versions');
+const SNAPSHOT_KEEP = 40; // cap stored snapshots per prototype
+
+function snapshotDir(id) { return path.join(PROTO_VERSIONS_DIR, id); }
+function snapshotIndexPath(id) { return path.join(snapshotDir(id), 'index.json'); }
+
+function readSnapshotIndex(id) {
+  try {
+    const arr = JSON.parse(fs.readFileSync(snapshotIndexPath(id), 'utf8'));
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+function writeSnapshotIndex(id, arr) {
+  try {
+    fs.mkdirSync(snapshotDir(id), { recursive: true });
+    fs.writeFileSync(snapshotIndexPath(id), JSON.stringify(arr, null, 2));
+  } catch { /* best-effort */ }
+}
+
+/** Current working-tree source files for a prototype: [{ rel, abs }]. */
+function collectPrototypeFiles(id) {
+  const out = [];
+  const roots = [
+    path.join(PROTO_DIR, 'app', id),
+    path.join(PROTO_DIR, 'components', 'projects', id),
+  ];
+  const walk = (dir) => {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (e.name.startsWith('.')) continue;
+      const abs = path.join(dir, e.name);
+      if (e.isDirectory()) walk(abs);
+      else out.push({ rel: path.relative(ROOT, abs), abs });
+    }
+  };
+  roots.forEach(walk);
+  out.sort((a, b) => a.rel.localeCompare(b.rel));
+  return out;
+}
+
+/** Content hash of a prototype's current source (order-independent by path). */
+function hashPrototypeFiles(files) {
+  const h = crypto.createHash('sha1');
+  for (const f of files) {
+    let buf;
+    try { buf = fs.readFileSync(f.abs); } catch { buf = Buffer.alloc(0); }
+    h.update(f.rel, 'utf8');
+    h.update('\0');
+    h.update(buf);
+    h.update('\0');
+  }
+  return h.digest('hex');
+}
+
+/** Latest git commit meta touching a prototype (for baseline attribution). */
+async function latestCommitMeta(id) {
+  const scopes = [`prototype-workspace/app/${id}`, `prototype-workspace/components/projects/${id}`];
+  const r = await runGit(['log', '-1', '--pretty=format:%an%x1f%ad%x1f%s', '--date=iso-strict', '--', ...scopes]);
+  if (r.code !== 0 || !r.stdout) return null;
+  const [an, ad, s] = r.stdout.split('\u001f');
+  return { author: an || null, at: ad || null, subject: s || '' };
+}
+
+/** Copy the current source into bridge/data/versions/<id>/v<n>/. */
+function writeSnapshotFiles(id, version, files) {
+  const dir = path.join(snapshotDir(id), `v${version}`);
+  for (const f of files) {
+    const dest = path.join(dir, f.rel);
+    try {
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(f.abs, dest);
+    } catch { /* skip unreadable */ }
+  }
+  return dir;
+}
+
+/**
+ * Create a new snapshot of the prototype's current source. `meta` supplies the
+ * provenance (source, tool, agent, taskId, jobId, author, summary). Returns the
+ * new index entry, or null when the prototype has no source files.
+ */
+function createSnapshot(id, meta = {}) {
+  const files = collectPrototypeFiles(id);
+  if (!files.length) return null;
+  const index = readSnapshotIndex(id);
+  const version = (index.length ? index[index.length - 1].version : 0) + 1;
+  const contentHash = hashPrototypeFiles(files);
+  writeSnapshotFiles(id, version, files);
+  const prev = index[index.length - 1];
+  // Files changed vs the previous snapshot (by per-file content hash).
+  let changed = files.length;
+  if (prev && prev.fileHashes) {
+    changed = 0;
+    for (const f of files) {
+      let cur;
+      try { cur = crypto.createHash('sha1').update(fs.readFileSync(f.abs)).digest('hex'); } catch { cur = ''; }
+      if (prev.fileHashes[f.rel] !== cur) changed++;
+    }
+    for (const p of Object.keys(prev.fileHashes)) if (!files.find((f) => f.rel === p)) changed++;
+  }
+  const fileHashes = {};
+  for (const f of files) {
+    try { fileHashes[f.rel] = crypto.createHash('sha1').update(fs.readFileSync(f.abs)).digest('hex'); } catch {}
+  }
+  const entry = {
+    snapId: `${id}-v${version}-${contentHash.slice(0, 8)}`,
+    version,
+    at: meta.at || new Date().toISOString(),
+    author: meta.author || gitUserName() || null,
+    source: meta.source || 'local',
+    tool: meta.tool || null,
+    agent: meta.agent || null,
+    taskId: meta.taskId || null,
+    jobId: meta.jobId || null,
+    summary: meta.summary || '',
+    contentHash,
+    fileHashes,
+    filesChanged: changed,
+    files: files.map((f) => ({ path: f.rel })),
+  };
+  index.push(entry);
+  // Prune oldest snapshots beyond the cap (keep their metadata trimmed too).
+  while (index.length > SNAPSHOT_KEEP) {
+    const old = index.shift();
+    try { fs.rmSync(path.join(snapshotDir(id), `v${old.version}`), { recursive: true, force: true }); } catch {}
+  }
+  writeSnapshotIndex(id, index);
+  return entry;
+}
+
+/** Seed v1 from the current source, attributed to the latest commit if clean. */
+async function ensureBaselineSnapshot(id) {
+  const index = readSnapshotIndex(id);
+  if (index.length) return index;
+  const files = collectPrototypeFiles(id);
+  if (!files.length) return index;
+  const commit = await latestCommitMeta(id);
+  const dirty = (await protoWorkingChanges(id)).length > 0;
+  createSnapshot(id, {
+    at: commit && !dirty ? commit.at : new Date().toISOString(),
+    author: (commit && commit.author) || gitUserName() || null,
+    source: commit && !dirty ? 'commit' : 'local',
+    summary: commit && !dirty ? (commit.subject || 'Initial version') : 'Initial version',
+  });
+  return readSnapshotIndex(id);
+}
+
+/** If the working copy changed since the last snapshot, mint a new version. */
+async function maybeSnapshotWorkingCopy(id, meta = {}) {
+  await ensureBaselineSnapshot(id);
+  const index = readSnapshotIndex(id);
+  const files = collectPrototypeFiles(id);
+  if (!files.length) return null;
+  const hash = hashPrototypeFiles(files);
+  const latest = index[index.length - 1];
+  if (latest && latest.contentHash === hash) return null; // nothing changed
+  return createSnapshot(id, meta);
+}
+
+/** Human source label for a snapshot entry (mirrors eventSourceLabel). */
+function snapshotSourceLabel(snap) {
+  if (!snap) return { source: 'local', sourceLabel: 'Edited locally' };
+  if (snap.source === 'web-run') {
+    const via = snap.tool ? `${titleCase(snap.tool)} sub-task` : snap.agent ? `${titleCase(snap.agent)} agent` : 'web sub-task';
+    return { source: 'web-run', sourceLabel: `Updated via ${via}` };
+  }
+  if (snap.source === 'commit') return { source: 'commit', sourceLabel: 'Committed' };
+  if (snap.source === 'make-live') return { source: 'make-live', sourceLabel: 'Promoted to Live' };
+  return { source: 'local', sourceLabel: 'Edited locally (VS Code / editor)' };
+}
+
+const historyCache = new Map(); // id -> { ts, data }
+const HISTORY_TTL_MS = 4000;
+
+/**
+ * Build a prototype's full version history from the snapshot store (v1..vN,
+ * oldest→newest numbered, displayed newest-first). Each version records who made
+ * it and via what (web sub-task / local editor / commit). With `capture`, a new
+ * snapshot is minted first if the working copy changed since the last one, so
+ * manual VS Code edits surface as a distinct version on read.
+ */
+async function buildPrototypeHistory(id, { useCache = false, capture = false } = {}) {
+  if (useCache) {
+    const c = historyCache.get(id);
+    if (c && Date.now() - c.ts < HISTORY_TTL_MS) return c.data;
+  }
+
+  if (capture) {
+    await maybeSnapshotWorkingCopy(id, { source: 'local', summary: 'Edited locally' });
+  } else {
+    await ensureBaselineSnapshot(id);
+  }
+
+  const index = readSnapshotIndex(id);
+  const dirty = (await protoWorkingChanges(id)).length > 0;
+
+  // Newest-first for display.
+  const ordered = index.slice().reverse();
+  const versions = ordered.map((snap, i) => {
+    const src = snapshotSourceLabel(snap);
+    return {
+      kind: 'snapshot',
+      snapId: snap.snapId,
+      version: snap.version,
+      label: `v${snap.version}`,
+      author: snap.author || null,
+      at: snap.at || null,
+      summary: snap.summary || src.sourceLabel,
+      source: src.source,
+      sourceLabel: src.sourceLabel,
+      tool: snap.tool || null,
+      agent: snap.agent || null,
+      taskId: snap.taskId || null,
+      jobId: snap.jobId || null,
+      files: Array.isArray(snap.files) ? snap.files : [],
+      filesChanged: typeof snap.filesChanged === 'number' ? snap.filesChanged : (snap.files || []).length,
+      current: i === 0,
+      uncommitted: i === 0 ? dirty : false,
+    };
+  });
+
+  // Contributors aggregated across snapshots.
+  const contribMap = new Map();
+  for (const snap of index) {
+    const name = snap.author || 'Unknown';
+    const e = contribMap.get(name) || { name, commits: 0, runs: 0 };
+    if (snap.source === 'web-run') e.runs += 1; else e.commits += 1;
+    contribMap.set(name, e);
+  }
+  const contributors = Array.from(contribMap.values()).sort((a, b) => (b.commits + b.runs) - (a.commits + a.runs));
+
+  const head = versions[0] || null;
+  const lastUpdate = head
+    ? { at: head.at, author: head.author, source: head.source, summary: head.summary, sourceLabel: head.sourceLabel }
+    : null;
+
+  const data = {
+    id,
+    versionCount: versions.length,
+    committedCount: versions.length,
+    hasUncommitted: dirty,
+    lastUpdate,
+    contributors,
+    versions,
+  };
+  historyCache.set(id, { ts: Date.now(), data });
+  return data;
+}
+
+/** Compact last-update summary for the list endpoint (cached, cheap). */
+async function protoLastUpdate(id) {
+  try {
+    const h = await buildPrototypeHistory(id, { useCache: true });
+    return { lastUpdate: h.lastUpdate, versionCount: h.versionCount };
+  } catch { return { lastUpdate: null, versionCount: 0 }; }
+}
+
+// ---------------------------------------------------------------------------
+// Version-preview mirrors — check out a past commit of a prototype into a
+// temporary, gitignored route so the task page can render it live. Mirrors are
+// created at the SAME directory depth as the original (app/<key> and
+// components/projects/<key>) so every relative import keeps resolving; the only
+// rewrite needed is the project-component folder name (<id> -> <key>).
+// ---------------------------------------------------------------------------
+const VPREVIEW_TTL_MS = 2 * 60 * 60 * 1000; // 2h — reused within, pruned after
+
+function vpreviewKey(id, shortHash) { return `vpr__${id}__${shortHash}`; }
+
+/** Remove temporary version-preview mirrors (stale, or all). Never throws. */
+function pruneVersionPreviews({ all = false } = {}) {
+  const bases = [
+    path.join(PROTO_DIR, 'app'),
+    path.join(PROTO_DIR, 'components', 'projects'),
+  ];
+  const now = Date.now();
+  for (const base of bases) {
+    let entries;
+    try { entries = fs.readdirSync(base, { withFileTypes: true }); } catch { continue; }
+    for (const e of entries) {
+      if (!e.isDirectory() || !e.name.startsWith('vpr__')) continue;
+      const abs = path.join(base, e.name);
+      if (!all) {
+        try { if (now - fs.statSync(abs).mtimeMs < VPREVIEW_TTL_MS) continue; } catch { /* stat failed → remove */ }
+      }
+      try { fs.rmSync(abs, { recursive: true, force: true }); } catch { /* best-effort */ }
+    }
+  }
+}
+
+/**
+ * Materialise a stored SNAPSHOT of a prototype into temporary mirror routes so
+ * the workspace dev server can render that exact version live. `snapId` is the
+ * snapshot id from the version history. Returns { ok, route } or throws so the
+ * caller can fall back to showing source.
+ */
+async function materializeVersionPreview(id, snapId) {
+  const index = readSnapshotIndex(id);
+  const snap = index.find((s) => s.snapId === snapId);
+  if (!snap) throw new Error('Unknown version.');
+  const shortHash = String(snap.contentHash || `v${snap.version}`).slice(0, 12);
+  const key = vpreviewKey(id, shortHash);
+  const appMirror = path.join(PROTO_DIR, 'app', key);
+  const compMirror = path.join(PROTO_DIR, 'components', 'projects', key);
+
+  // Reuse a fresh mirror if it already exists (bumps mtime so it survives prune).
+  const mirrorPage =
+    fs.existsSync(path.join(appMirror, 'page.tsx')) ? path.join(appMirror, 'page.tsx') :
+    (fs.existsSync(path.join(appMirror, 'page.jsx')) ? path.join(appMirror, 'page.jsx') : null);
+  if (mirrorPage) {
+    try { const t = new Date(); fs.utimesSync(appMirror, t, t); } catch {}
+    return { ok: true, route: `/${key}`, key, shortHash, reused: true };
+  }
+
+  const snapRoot = path.join(snapshotDir(id), `v${snap.version}`);
+  const appSrc = path.join(snapRoot, 'prototype-workspace', 'app', id);
+  const compSrc = path.join(snapRoot, 'prototype-workspace', 'components', 'projects', id);
+  if (!fs.existsSync(appSrc)) throw new Error('Snapshot source missing.');
+
+  // Rewrite references to the original component folder so imports resolve to
+  // the mirror. Bounded by a following quote or slash so it won't clobber a
+  // longer id that shares this id as a prefix.
+  const esc = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const rewriteRe = new RegExp(`projects/${esc}(?=["'/])`, 'g');
+
+  let wrote = 0;
+  const copyTree = (srcDir, destDir) => {
+    let entries;
+    try { entries = fs.readdirSync(srcDir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const s = path.join(srcDir, e.name);
+      const d = path.join(destDir, e.name);
+      if (e.isDirectory()) { copyTree(s, d); continue; }
+      try {
+        fs.mkdirSync(path.dirname(d), { recursive: true });
+        if (/\.(tsx|ts|jsx|js|mjs|cjs|css)$/i.test(e.name)) {
+          const content = fs.readFileSync(s, 'utf8').replace(rewriteRe, `projects/${key}`);
+          fs.writeFileSync(d, content, 'utf8');
+        } else {
+          fs.copyFileSync(s, d);
+        }
+        wrote++;
+      } catch { /* skip */ }
+    }
+  };
+  copyTree(appSrc, appMirror);
+  if (fs.existsSync(compSrc)) copyTree(compSrc, compMirror);
+
+  const built =
+    fs.existsSync(path.join(appMirror, 'page.tsx')) ||
+    fs.existsSync(path.join(appMirror, 'page.jsx'));
+  if (!wrote || !built) {
+    try { fs.rmSync(appMirror, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(compMirror, { recursive: true, force: true }); } catch {}
+    throw new Error('Could not reconstruct this version for live preview.');
+  }
+  return { ok: true, route: `/${key}`, key, shortHash };
+}
+
 /**
  * Discover LOCAL prototypes by scanning prototype-workspace/app for route
  * directories that contain a page file. This is the source of truth for the
@@ -1380,7 +2182,7 @@ function discoverLocalPrototypes() {
   for (const e of entries) {
     if (!e.isDirectory()) continue;
     const id = e.name;
-    if (id.startsWith('.') || id.startsWith('_') || RESERVED.has(id) || live.has(id)) continue;
+    if (id.startsWith('.') || id.startsWith('_') || id.startsWith('vpr__') || RESERVED.has(id) || live.has(id)) continue;
     const hasPage =
       fs.existsSync(path.join(appDir, id, 'page.tsx')) ||
       fs.existsSync(path.join(appDir, id, 'page.jsx'));
@@ -1483,10 +2285,60 @@ async function handleApi(req, res, url) {
     let dirty = new Set();
     try { dirty = await dirtyPrototypeIds(); } catch { /* git unavailable */ }
     for (const it of items) it.hasLocalChanges = dirty.has(it.id);
+    // Enrich with a compact last-update summary + version count (cached, cheap).
+    await Promise.all(items.map(async (it) => {
+      const u = await protoLastUpdate(it.id);
+      it.lastUpdate = u.lastUpdate;
+      it.versionCount = u.versionCount;
+    }));
     return sendJson(res, 200, { items });
   }
 
-  // POST /api/prototypes/make-live — promote a locally-created prototype to the
+  // GET /api/prototypes/history?id=<id> — full version timeline for a prototype:
+  // git commits + the uncommitted working copy, annotated with run/edit
+  // provenance, contributors, and a compact lastUpdate.
+  if (req.method === 'GET' && pathname === '/api/prototypes/history') {
+    const id = String(url.searchParams.get('id') || '').trim();
+    if (!/^[a-z0-9][a-z0-9-_]*$/i.test(id)) {
+      return sendJson(res, 400, { error: 'Invalid or missing prototype id.' });
+    }
+    const appDir = path.join(PROTO_DIR, 'app', id);
+    const compDir = path.join(PROTO_DIR, 'components', 'projects', id);
+    if (!fs.existsSync(appDir) && !fs.existsSync(compDir)) {
+      return sendJson(res, 404, { error: `Prototype "${id}" not found locally.` });
+    }
+    try {
+      const history = await buildPrototypeHistory(id, { capture: true });
+      return sendJson(res, 200, history);
+    } catch (e) {
+      return sendJson(res, 500, { error: e.message });
+    }
+  }
+
+  // GET /api/prototypes/preview-version?id=<id>&version=<snapId> — materialise a
+  // stored snapshot of a prototype into a temporary route and return it so the
+  // task page can render that version live. Responds 200 { ok:false, error }
+  // (not a hard failure) when reconstruction isn't possible, so the UI can fall
+  // back to showing the version's source instead.
+  if (req.method === 'GET' && pathname === '/api/prototypes/preview-version') {
+    const id = String(url.searchParams.get('id') || '').trim();
+    const version = String(url.searchParams.get('version') || url.searchParams.get('snap') || '').trim();
+    if (!/^[a-z0-9][a-z0-9-_]*$/i.test(id) || id.startsWith('vpr__')) {
+      return sendJson(res, 400, { error: 'Invalid prototype id.' });
+    }
+    if (!/^[a-z0-9][a-z0-9-]*$/i.test(version)) {
+      return sendJson(res, 400, { error: 'Invalid version id.' });
+    }
+    try {
+      pruneVersionPreviews();
+      const result = await materializeVersionPreview(id, version);
+      return sendJson(res, 200, result);
+    } catch (e) {
+      return sendJson(res, 200, { ok: false, error: e.message });
+    }
+  }
+
+
   // repo baseline: commit its route + component files and a committed registry
   // entry, then push so everyone sees it as "Live".
   if (req.method === 'POST' && pathname === '/api/prototypes/make-live') {
@@ -1567,6 +2419,13 @@ async function handleApi(req, res, url) {
         hint: 'Nothing to commit, or git identity is not configured.',
       });
     }
+    // Record the promotion in the version timeline.
+    appendProtoEvents([{
+      ts: Date.now(), proto: id, source: 'make-live', jobId: null, taskId: null,
+      tool: null, agent: null, kind: 'make-live', title: 'Promoted to Live',
+      author: gitUserName() || null, files: [],
+    }]);
+    historyCache.delete(id);
     const push = await runGit(['push']);
     if (push.code !== 0) {
       return sendJson(res, 200, {
@@ -1942,23 +2801,26 @@ async function handleApi(req, res, url) {
       return sendJson(res, 400, { error: 'No Figma file target. Provide a figmaUrl.', needsUrl: true });
     }
 
-    const envRunner = (process.env.FIGMA_RUNNER || 'plugin').toLowerCase();
-    const runner = ['plugin', 'copilot', 'claude'].includes(envRunner) ? envRunner : 'plugin';
+    const envRunner = (process.env.FIGMA_RUNNER || 'agent').toLowerCase();
+    const runner = ['agent', 'plugin', 'copilot', 'claude'].includes(envRunner) ? envRunner : 'agent';
 
-    // Default path: the DesignLoop Figma plugin rebuilds the design natively.
-    if (runner === 'plugin') {
+    // Default paths ("agent" = compose real Fluent 2 components via the
+    // fluent-to-figma agent; "plugin" = deterministic DOM-snapshot rebuild).
+    // Both render through the connected DesignLoop Figma plugin.
+    if (runner === 'agent' || runner === 'plugin') {
       if (figmaPluginClients.size === 0) {
         return sendJson(res, 409, {
           error: 'The DesignLoop Figma plugin is not connected.',
-          hint: 'In Figma: Plugins → Development → DesignLoop (import figma-plugin/manifest.json once), run it, and keep it open. Then try again.',
+          hint: 'In Figma: Plugins → Development → DesignLoop (import figma-plugin/manifest.json once), run it, and keep it open. Enable the Azure UI Kit, Pattern Templates, and Icons libraries in the target file. Then try again.',
           needsPlugin: true,
         });
       }
-      const job = jobs.createManualJob({ taskId: taskId || null, kind: 'figma', prototypeId, runner: 'plugin' });
+      const job = jobs.createManualJob({ taskId: taskId || null, kind: 'figma', prototypeId, runner });
       figmaBuildJobs.set(job.id, { job, target, timer: null });
       jobs.manualLog(job, `▶ Sending “${prototypeId}” to Figma…`);
       // Kick off asynchronously; the card subscribes to the job stream.
-      runFigmaPluginBuild(job, prototypeId, target);
+      if (runner === 'agent') runFigmaAgentBuild(job, prototypeId, target);
+      else runFigmaPluginBuild(job, prototypeId, target);
       return sendJson(res, 202, { jobId: job.id, status: job.status, taskId: taskId || null, runner, target });
     }
 
@@ -2318,10 +3180,25 @@ attachWss(server, '/figma-plugin', (conn) => {
   });
 });
 
+server.on('error', (err) => {
+  if (err && err.code === 'EADDRINUSE') {
+    console.error(`\n✖ Port ${PORT} is already in use — the DesignLoop bridge is likely already running.`);
+    console.error(`  If it isn't, another process is using ${HOST}:${PORT}. Free it, then retry:`);
+    console.error(`    lsof -ti tcp:${PORT} | xargs kill`);
+    console.error(`  Or run this bridge on a different port:`);
+    console.error(`    PORT=8100 node bridge/server.js\n`);
+    process.exit(1);
+  }
+  console.error(`\n✖ Bridge failed to start: ${err && err.message ? err.message : err}\n`);
+  process.exit(1);
+});
+
 server.listen(PORT, HOST, () => {
   console.log(`DesignLoop Bridge running at http://${HOST}:${PORT}`);
   console.log(`  Serving:  ${ROOT}`);
   console.log(`  Copilot:  ${COPILOT_BIN}`);
+  // Clear any leftover version-preview mirrors from a previous run.
+  try { pruneVersionPreviews({ all: true }); } catch { /* best-effort */ }
   // Auto-start the Fluent prototype workspace so prototypes are always live.
   startPrototypeServer().catch((e) => console.log('  Prototypes:', e.message));
 });

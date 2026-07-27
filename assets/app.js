@@ -680,6 +680,7 @@ function loadTask(taskId) {
   wireTaskTimeline();
   wireComposer('lifecycle');
   loadReportCard(taskId);
+  wireVersionPreviews();
 }
 
 /* ── Prototype report card (Test-stage checks) ──────────────────────────
@@ -824,17 +825,24 @@ function renderTaskPhases(task) {
       </div>
       ${(phase.fluentPreviewRoute || phase.fluentPreview) ? (() => {
         const src = prototypePreviewSrc(phase);
-        return src ? `
-        <div class="phase-live-preview">
+        if (!src) return '';
+        const protoId = phase.fluentPreviewRoute
+          ? phase.fluentPreviewRoute.replace(/^\/+|\/+$/g, '').split('/')[0]
+          : '';
+        const base = `http://${prototypeHost()}:${PROTO.port}`;
+        return `
+        <div class="phase-live-preview" data-proto-id="${escapeHtml(protoId)}" data-live-src="${escapeHtml(src)}" data-proto-base="${escapeHtml(base)}">
           <div class="phase-live-preview-head">
             <span class="proto-badge">Live prototype</span>
+            ${protoId ? `<label class="version-picker"><span class="version-picker-label">Version</span><select class="version-select" aria-label="Choose a version to preview"><option value="">Current (live)</option></select></label>` : ''}
+            <span class="version-status" role="status" aria-live="polite"></span>
             <a class="preview-open-new" href="${src}" target="_blank" rel="noopener">Open in new tab ↗</a>
           </div>
           <div class="preview-iframe-wrapper">
             <iframe class="preview-iframe preview-iframe--app" src="${src}" title="${task.title} — live prototype" loading="lazy" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
           </div>
         </div>
-      ` : '';
+      `;
       })() : ''}
     </div>
   `).join('');
@@ -851,6 +859,7 @@ async function refreshTaskPhases(taskId) {
   host.innerHTML = `${renderTaskTimeline(task)}${renderTaskPhases(task)}`;
   wireTaskTimeline();
   loadReportCard(taskId);
+  wireVersionPreviews();
 }
 
 /* =================================================================
@@ -2940,6 +2949,112 @@ function prototypePreviewSrc(phase) {
   return phase.fluentPreview || null;
 }
 
+/* Wire the version selector(s) on the task page's live-preview block(s): fetch
+   the prototype's version history from the bridge, populate the dropdown, and
+   swap the iframe to a checked-out snapshot when an older version is chosen.
+   Falls back gracefully (message + Open History link) when a version can't be
+   reconstructed for live preview. No-op when the bridge/history is unavailable. */
+function wireVersionPreviews() {
+  document.querySelectorAll('.phase-live-preview[data-proto-id]').forEach(async (wrap) => {
+    const protoId = wrap.getAttribute('data-proto-id');
+    const liveSrc = wrap.getAttribute('data-live-src');
+    const base = wrap.getAttribute('data-proto-base');
+    const select = wrap.querySelector('.version-select');
+    const statusEl = wrap.querySelector('.version-status');
+    const iframe = wrap.querySelector('.preview-iframe');
+    if (!protoId || !select || !iframe || select.dataset.wired) return;
+    select.dataset.wired = '1';
+
+    let history;
+    try {
+      const r = await fetch(`/api/prototypes/history?id=${encodeURIComponent(protoId)}`, { cache: 'no-store' });
+      if (!r.ok) throw new Error('history unavailable');
+      history = await r.json();
+    } catch {
+      // Bridge offline or no history — hide the picker, keep the live preview.
+      const picker = wrap.querySelector('.version-picker');
+      if (picker) picker.style.display = 'none';
+      return;
+    }
+
+    const snaps = (history.versions || []).filter((v) => v.snapId);
+    // Need at least two versions for switching to be meaningful.
+    if (snaps.length < 2) {
+      const picker = wrap.querySelector('.version-picker');
+      if (picker) picker.style.display = 'none';
+      return;
+    }
+
+    // Newest first; the first snapshot is the current live baseline.
+    snaps.forEach((v, i) => {
+      const opt = document.createElement('option');
+      opt.value = v.snapId;
+      const rel = typeof relativeTimeShort === 'function' ? relativeTimeShort(v.at) : '';
+      const who = v.author ? ` · ${v.author}` : '';
+      opt.textContent = `${v.label}${i === 0 ? ' (latest)' : ''}${who}${rel ? ` · ${rel}` : ''}`;
+      select.appendChild(opt);
+    });
+
+    const setStatus = (msg, kind) => {
+      if (!statusEl) return;
+      statusEl.textContent = msg || '';
+      statusEl.className = `version-status${kind ? ` version-status--${kind}` : ''}`;
+    };
+
+    select.addEventListener('change', async () => {
+      const snapId = select.value;
+      if (!snapId) {
+        iframe.src = liveSrc;
+        setStatus('', '');
+        return;
+      }
+      setStatus('Loading version…', 'loading');
+      select.disabled = true;
+      try {
+        const r = await fetch(`/api/prototypes/preview-version?id=${encodeURIComponent(protoId)}&version=${encodeURIComponent(snapId)}`, { cache: 'no-store' });
+        const d = await r.json();
+        if (d && d.ok && d.route) {
+          iframe.src = `${base}${d.route}/?auditBridge=1`;
+          const label = select.options[select.selectedIndex]?.textContent || 'version';
+          setStatus(`Viewing ${label.split(' · ')[0]}`, 'ok');
+        } else {
+          throw new Error((d && d.error) || 'Could not build this version.');
+        }
+      } catch (e) {
+        // Graceful fallback: keep the current frame, point the user to the source.
+        setStatus('Live preview unavailable for this version — view its source in History.', 'error');
+        iframe.src = liveSrc;
+        select.value = '';
+      } finally {
+        select.disabled = false;
+      }
+    });
+  });
+}
+
+/* Compact relative time for version option labels (mirrors lib/versions.ts). */
+function relativeTimeShort(iso) {
+  if (!iso) return '';
+  const then = new Date(iso).getTime();
+  if (isNaN(then)) return '';
+  const diff = Date.now() - then;
+  if (diff < 0) return 'just now';
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day === 1) return 'yesterday';
+  if (day < 7) return `${day}d ago`;
+  const wk = Math.floor(day / 7);
+  if (wk < 5) return `${wk}w ago`;
+  const mo = Math.floor(day / 30);
+  if (mo < 12) return `${mo}mo ago`;
+  return `${Math.floor(day / 365)}y ago`;
+}
+
+
 async function bridgeHealth() {
   try {
     const r = await fetch('/api/health', { cache: 'no-store' });
@@ -3396,7 +3511,10 @@ async function finishRun(mountEl, { ok, flagged, cancelled, artifacts = [], erro
       </a>`;
   }
 
-  if (artifacts.length) {
+  // When we can navigate to the task (the "Open task" card above), the artifact
+  // list is redundant — the task page lets users browse everything. Only fall
+  // back to listing artifacts inline when there's no task to open.
+  if (!tid && artifacts.length) {
     const items = artifacts.map(a => {
       const href = artifactLink(a.path);
       const name = baseName(a.path);

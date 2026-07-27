@@ -1,11 +1,28 @@
 # DesignLoop Figma plugin
 
-Rebuilds a DesignLoop prototype inside Figma as **editable native layers** —
-frames (fills, strokes, corner radius), real editable text nodes, and — when you
-teach it your Fluent kit — **real instances of your published Fluent components**.
-This is the plugin half of the workspace **"Send to Figma"** button. No Claude, no
-MCP, no OAuth: the DesignLoop bridge renders the live prototype, serializes its
-layout, and streams it to this plugin over a local WebSocket.
+Rebuilds a DesignLoop prototype inside Figma. The preferred output is **real
+Azure Fluent 2 component instances** (Blade header, Site header, Data grid,
+Essentials, Toolbar, Search box, Card, …) with the correct variants, property
+values, and library text styles — for high-fidelity engineering handoff. When a
+component can't be matched it falls back to editable native layers (auto-layout
+frames, fills, strokes, corner radius, real text). This is the plugin half of the
+workspace **"Send to Figma"** button. No Claude, no MCP, no OAuth: the DesignLoop
+bridge sends the plugin a build spec over a local WebSocket and the plugin
+instantiates it via the Figma Plugin API.
+
+## Two send modes
+
+- **Agent (default, `FIGMA_RUNNER=agent`)** — the bridge runs the
+  `fluent-to-figma` Copilot agent, which reads the prototype source plus
+  `figma-plugin/azure-fluent2-kit.json` and the Azure Fluent 2 guidelines and
+  **authors a build spec** of real component instances. Best fidelity for
+  Azure-portal-style pages.
+- **Deterministic (`FIGMA_RUNNER=plugin`)** — the bridge serializes the live
+  prototype DOM and maps detected Fluent v9 components to Azure kit keys
+  automatically (no agent run). Faster, simpler, lower fidelity.
+
+Both modes require the DesignLoop plugin to be connected, and both render through
+the same build-spec executor in `code.js`.
 
 ## Install (one time)
 
@@ -13,27 +30,33 @@ layout, and streams it to this plugin over a local WebSocket.
 2. Menu → **Plugins → Development → Import plugin from manifest…**
 3. Choose `figma-plugin/manifest.json` from this repository.
 
-## Teach it your Fluent kit (one time, recommended)
+## Enable the Azure Fluent 2 libraries (one time)
 
-Sending as real Fluent component instances (instead of redrawn primitives) needs
-the component **keys** from your kit. The Figma Plugin API can't read a team
-library's catalog, so you capture the keys once from the kit file itself:
+The Azure Fluent 2 component **keys are global** — you do **not** need to run
+"Learn kit" for them. In the Figma file you send into, enable these libraries via
+**Assets → Libraries** so instances can be imported by key:
 
-1. Open your **Fluent UI kit** Figma file (the one that defines Button, Card,
-   Input, etc.). Its components must be **published as a library**.
+- **Azure UI Kit** (`q2TdO4dVcMhNWYp0N6Bc05`)
+- **Pattern Templates** (`TXALL9CS0727dvGcZo84Bg`)
+- **Icons — Azure Fluent Extension** (`fQO2yNBwr773QI4ANvb1Z4`)
+
+## Teach it a custom kit (optional)
+
+If you send into a file that uses a **custom/private** Fluent kit whose keys are
+not the global Azure ones, capture them once:
+
+1. Open the **kit** Figma file; its components must be **published as a library**.
 2. Run **Plugins → Development → DesignLoop** and click **Learn kit**.
 3. The status line shows e.g. *“Kit: 42 components learned”*. The keys are saved
-   to `bridge/data/figma-kit.json` and reused for every send.
-
-Skip this and sends still work — every detected component just falls back to
-redrawn frames/text. Re-run **Learn kit** whenever your kit changes.
+   to `bridge/data/figma-kit.json` and used as a fallback when a component isn't
+   in the global Azure map. Re-run whenever your kit changes.
 
 ## Use
 
 1. Make sure the **DesignLoop bridge** is running (`node bridge/server.js`, port 8099).
-2. Open (or create) the Figma file you want to send designs into. If you learned a
-   kit, **enable that library** in this file (Assets → Libraries) so instances can
-   be imported by key.
+2. Open (or create) the Figma file you want to send designs into, and **enable the
+   three Azure Fluent 2 libraries** (Assets → Libraries) so instances can be
+   imported by key.
 3. Run **Plugins → Development → DesignLoop**. A small panel appears and should
    show **“Connected to DesignLoop bridge”** — keep it open.
 4. In the DesignLoop prototype workspace, click **Send to Figma** on a prototype
@@ -52,15 +75,19 @@ redrawn frames/text. Re-run **Learn kit** whenever your kit changes.
   (`figma.root.findAllWithCriteria`), collects each `{ set, name, key, props }`,
   and posts them over the WS. The bridge groups them by normalized set name into
   `bridge/data/figma-kit.json` and acks with the learned count.
-- **Send:** the bridge serializes the live prototype's DOM (Fluent v9 components
-  are detected by their `fui-<Component>` class), resolves each detected component
-  to the best kit variant key, and sends `{ type: "build", jobId, pageName, tree }`.
-  `code.js` instances matched components via `figma.importComponentByKeyAsync` +
-  `createInstance()` (overriding the first text sublayer with the detected label),
-  and rebuilds everything else with `figma.createFrame` / `figma.createText`
-  (fonts fall back to **Inter** when a prototype font isn't installed). It posts
-  `progress` / `done` / `error` back; `done` includes the page node id so the
-  bridge can build a `…?node-id=…` deep link.
+- **Send:** the bridge produces a **build spec** — either the `fluent-to-figma`
+  agent authors it (agent mode) or the bridge serializes the live prototype DOM
+  and maps detected Fluent v9 components to Azure kit keys (deterministic mode) —
+  and sends `{ type: "build", jobId, pageName, spec }`. `code.js` executes the
+  spec: each `instance` op is imported by `key` (or `setKey` → default variant)
+  via `figma.importComponentByKeyAsync` + `createInstance()`, then configured
+  (variant + `Name#ID` property overrides, named-text overrides, icon swaps, and
+  library text styles via `figma.importStyleByKeyAsync`); `frame` ops become
+  auto-layout frames and `text` ops become text nodes (fonts fall back to
+  **Inter** when a prototype font isn't installed). Components that can't be
+  imported fall back to primitives. It posts `progress` / `done` / `error` back;
+  `done` includes the page node id (for the `…?node-id=…` deep link) and the
+  instanced-vs-fallback counts.
 - The allow-listed origins live in `manifest.json → networkAccess` (`"*"` so any
   localhost port works during development).
 
