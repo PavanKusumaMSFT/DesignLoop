@@ -33,10 +33,12 @@ import {
   ImageMultiple16Regular,
   DocumentCheckmark16Regular,
   CheckmarkCircle12Filled,
+  Share16Regular,
 } from "@fluentui/react-icons";
 import { projects } from "../data/projects";
 import liveExtras from "../data/live-prototypes.json";
 import { msalInstance } from "../components/auth/auth-providers";
+import ShareDialog from "../components/share/share-dialog";
 
 type SafeTokens = { [key: string]: any };
 const tokens: SafeTokens = fluentTokens;
@@ -632,6 +634,7 @@ function PrototypeCard({
   const styles = useStyles();
   const router = useRouter();
   const [reportOpen, setReportOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   // Local copy so "Mark completed" updates the card immediately without a reload.
   const [card, setCard] = useState<ReportCard | undefined>(report);
   const [savingPath, setSavingPath] = useState<string | null>(null);
@@ -698,6 +701,14 @@ function PrototypeCard({
   const SEND_FIGMA_ENABLED = false;
   const canSendFigma =
     SEND_FIGMA_ENABLED && !!onSendFigma && !!item.route && item.sourceType !== "fork";
+
+  // External password-protected sharing is available for any workspace-rendered
+  // prototype (has a local route). Forks (external deploy only) are excluded.
+  const canShare = !!item.route && item.sourceType !== "fork";
+  // The share id must match the route's first path segment, which is what the
+  // auth gate uses to resolve a shared link.
+  const shareId =
+    (item.route || "").split("/").filter(Boolean)[0] || item.id;
 
   return (
     <div
@@ -958,6 +969,36 @@ function PrototypeCard({
               Send to Figma
             </Button>
           )}
+        </div>
+      )}
+
+      {canShare && (
+        <div
+          className={styles.figmaWrap}
+          onClick={(e) => e.stopPropagation()}
+          role="presentation"
+        >
+          <Button
+            className={styles.figmaBtn}
+            appearance="secondary"
+            size="small"
+            icon={<Share16Regular />}
+            onClick={() => setShareOpen(true)}
+          >
+            Share
+          </Button>
+        </div>
+      )}
+
+      {canShare && shareOpen && (
+        <div onClick={(e) => e.stopPropagation()} role="presentation">
+          <ShareDialog
+            open={shareOpen}
+            onClose={() => setShareOpen(false)}
+            prototypeId={shareId}
+            route={item.route || `/${shareId}`}
+            title={item.title}
+          />
         </div>
       )}
 

@@ -20,6 +20,10 @@ prototype-workspace/.next/
 prototype-workspace/storybook-static/
 prototype-workspace/out/
 
+# Shares Functions API (local only)
+prototype-workspace/api/node_modules/
+prototype-workspace/api/local.settings.json
+
 # Local environment files (never commit — values are injected via CI variables)
 prototype-workspace/.env.local
 prototype-workspace/.env*.local

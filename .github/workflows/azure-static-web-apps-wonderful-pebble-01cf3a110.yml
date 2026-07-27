@@ -76,7 +76,7 @@ jobs:
           # must point directly at the folder containing index.html (out/).
           skip_app_build: true
           app_location: "prototype-workspace/out" # Pre-built static export
-          api_location: "" # Api source code path - optional
+          api_location: "prototype-workspace/api" # Azure Functions (prototype shares API)
           output_location: "" # Not used when skip_app_build is true
 
   close_pull_request_job:

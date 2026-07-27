@@ -225,6 +225,45 @@ a **status badge**, and a **link to open the full report**.
 
 ---
 
+## External prototype sharing (password-protected)
+
+Owners can share a live prototype **externally** — no Microsoft sign-in required
+— behind a password and a time window, and lock/revoke it at any time.
+
+**Using it (in the deployed workspace):**
+
+1. On a prototype card, click **Share**.
+2. Set a **password** and an **access window** (1 hour → 30 days), optionally a
+   label, then **Create share link** and copy it.
+3. Send the link + password to your external testers. It works publicly until it
+   expires or you **Lock** it from the same dialog.
+
+**Architecture:** an Azure Functions API (`prototype-workspace/api/`) deployed
+alongside the Static Web App. Share records (bcrypt-hashed password, expiry,
+locked flag) live in **Azure Table Storage**. Create/list/lock require an owner
+MSAL token; `verify` is public. The workspace routes `…/<prototype>?share=<token>`
+through a public password gate instead of Microsoft sign-in.
+
+**One-time deploy setup** — in the Static Web App → **Settings → Environment
+variables** (Application settings), add:
+
+| Setting | Value |
+| --- | --- |
+| `SHARES_TABLE_CONNECTION` | Connection string of your Azure Storage account (Portal → Storage account → **Access keys**, or `az storage account show-connection-string`). |
+| `AUTH_CLIENT_ID` | The app registration **Application (client) ID** (must match `NEXT_PUBLIC_MICROSOFT_CLIENT_ID`) so owner tokens validate. |
+| `AUTH_ALLOWED_DOMAIN` | *(optional)* restrict share management to one email domain, e.g. `microsoft.com`. |
+
+The API deploys automatically on the next Static Web Apps build (the workflow's
+`api_location` points at `prototype-workspace/api`). No storage secret is ever
+committed.
+
+**Local development:** run the Functions host separately (`cd prototype-workspace/api
+&& func start`) — copy `local.settings.json.example` to `local.settings.json` and
+fill in the values — then set `NEXT_PUBLIC_SHARES_API_BASE` in
+`prototype-workspace/.env.local` to that host (e.g. `http://localhost:7071/api`).
+
+---
+
 ## Troubleshooting
 
 - **Prototype home is blank after a change** — the bridge auto-manages the Next
