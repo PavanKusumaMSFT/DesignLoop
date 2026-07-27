@@ -286,6 +286,41 @@ const useStyles = makeStyles({
     right: tokens.spacingHorizontalXXL,
     zIndex: 2,
   },
+  helpPill: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalSNudge,
+    paddingTop: "8px",
+    paddingBottom: "8px",
+    paddingLeft: "14px",
+    paddingRight: "14px",
+    borderRadius: tokens.borderRadiusCircular,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    color: tokens.colorNeutralForeground1,
+    fontFamily: tokens.fontFamilyBase,
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightSemibold,
+    lineHeight: tokens.lineHeightBase300,
+    cursor: "pointer",
+    boxShadow: tokens.shadow4,
+    transitionProperty: "background-color, border-color, transform, box-shadow",
+    transitionDuration: tokens.durationNormal,
+    transitionTimingFunction: tokens.curveEasyEase,
+    ":hover": {
+      backgroundColor: tokens.colorNeutralBackground1Hover,
+      borderColor: tokens.colorNeutralStroke1,
+      transform: "translateY(-1px)",
+      boxShadow: tokens.shadow8,
+    },
+    ":active": { transform: "translateY(0)" },
+  },
+  helpPillIcon: {
+    display: "flex",
+    alignItems: "center",
+    fontSize: "18px",
+    color: tokens.colorNeutralForeground2,
+  },
   helpList: {
     display: "flex",
     flexDirection: "column",
@@ -1568,13 +1603,16 @@ function WorkspaceContent() {
       <div className={styles.gradientAccent} />
 
       <div className={styles.helpCta}>
-        <Button
-          appearance="subtle"
-          icon={<QuestionCircle20Regular />}
+        <button
+          type="button"
+          className={styles.helpPill}
           onClick={() => setHelpOpen(true)}
         >
+          <span className={styles.helpPillIcon}>
+            <QuestionCircle20Regular />
+          </span>
           How to host my prototype?
-        </Button>
+        </button>
       </div>
 
       <Dialog open={helpOpen} onOpenChange={(_, d) => setHelpOpen(d.open)}>
