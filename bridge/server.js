@@ -1816,7 +1816,7 @@ function writeSnapshotIndex(id, arr) {
   } catch { /* best-effort */ }
 }
 
-/** Current working-tree source files for a prototype: [{ rel, abs }]. */
+/** List the working-tree source paths for a prototype: [{ rel, abs }]. */
 function collectPrototypeFiles(id) {
   const out = [];
   const roots = [
@@ -1838,15 +1838,44 @@ function collectPrototypeFiles(id) {
   return out;
 }
 
-/** Content hash of a prototype's current source (order-independent by path). */
-function hashPrototypeFiles(files) {
-  const h = crypto.createHash('sha1');
-  for (const f of files) {
+const SNAP_TEXT_RE = /\.(tsx|ts|jsx|js|mjs|cjs|css|scss|json|md|txt|svg|html)$/i;
+
+/** Read the CURRENT working-tree source of a prototype as [{ rel, buf }]. */
+function readWorkingFiles(id) {
+  return collectPrototypeFiles(id).map((f) => {
     let buf;
     try { buf = fs.readFileSync(f.abs); } catch { buf = Buffer.alloc(0); }
+    return { rel: f.rel, buf };
+  });
+}
+
+/** Read a prototype's source AS OF the last git commit as [{ rel, buf }]. */
+async function readCommittedFiles(id) {
+  const scopes = [`prototype-workspace/app/${id}`, `prototype-workspace/components/projects/${id}`];
+  const ls = await runGit(['ls-tree', '-r', '--name-only', 'HEAD', '--', ...scopes]);
+  if (ls.code !== 0 || !ls.stdout) return [];
+  const rels = ls.stdout.split('\n').map((s) => s.trim()).filter(Boolean);
+  const out = [];
+  for (const rel of rels) {
+    if (SNAP_TEXT_RE.test(rel)) {
+      const show = await runGit(['show', `HEAD:${rel}`]);
+      if (show.code === 0) out.push({ rel, buf: Buffer.from(show.stdout, 'utf8') });
+    } else {
+      // Binary (e.g. image): fall back to the working copy if present.
+      try { out.push({ rel, buf: fs.readFileSync(path.join(ROOT, rel)) }); } catch { /* skip */ }
+    }
+  }
+  out.sort((a, b) => a.rel.localeCompare(b.rel));
+  return out;
+}
+
+/** Order-independent content hash over a [{ rel, buf }] file list. */
+function hashFileList(files) {
+  const h = crypto.createHash('sha1');
+  for (const f of files) {
     h.update(f.rel, 'utf8');
     h.update('\0');
-    h.update(buf);
+    h.update(f.buf);
     h.update('\0');
   }
   return h.digest('hex');
@@ -1861,46 +1890,38 @@ async function latestCommitMeta(id) {
   return { author: an || null, at: ad || null, subject: s || '' };
 }
 
-/** Copy the current source into bridge/data/versions/<id>/v<n>/. */
-function writeSnapshotFiles(id, version, files) {
+/** Write a [{ rel, buf }] file list into bridge/data/versions/<id>/v<n>/. */
+function writeSnapshotFileList(id, version, files) {
   const dir = path.join(snapshotDir(id), `v${version}`);
   for (const f of files) {
     const dest = path.join(dir, f.rel);
     try {
       fs.mkdirSync(path.dirname(dest), { recursive: true });
-      fs.copyFileSync(f.abs, dest);
-    } catch { /* skip unreadable */ }
+      fs.writeFileSync(dest, f.buf);
+    } catch { /* skip unwritable */ }
   }
   return dir;
 }
 
 /**
- * Create a new snapshot of the prototype's current source. `meta` supplies the
- * provenance (source, tool, agent, taskId, jobId, author, summary). Returns the
- * new index entry, or null when the prototype has no source files.
+ * Create a snapshot from an in-memory [{ rel, buf }] file list. `meta` supplies
+ * provenance (source, tool, agent, taskId, jobId, author, summary, at). Returns
+ * the new index entry, or null when there are no files.
  */
-function createSnapshot(id, meta = {}) {
-  const files = collectPrototypeFiles(id);
-  if (!files.length) return null;
+function createSnapshotFromFiles(id, files, meta = {}) {
+  if (!files || !files.length) return null;
   const index = readSnapshotIndex(id);
   const version = (index.length ? index[index.length - 1].version : 0) + 1;
-  const contentHash = hashPrototypeFiles(files);
-  writeSnapshotFiles(id, version, files);
+  const contentHash = hashFileList(files);
+  writeSnapshotFileList(id, version, files);
+  const fileHashes = {};
+  for (const f of files) fileHashes[f.rel] = crypto.createHash('sha1').update(f.buf).digest('hex');
   const prev = index[index.length - 1];
-  // Files changed vs the previous snapshot (by per-file content hash).
   let changed = files.length;
   if (prev && prev.fileHashes) {
     changed = 0;
-    for (const f of files) {
-      let cur;
-      try { cur = crypto.createHash('sha1').update(fs.readFileSync(f.abs)).digest('hex'); } catch { cur = ''; }
-      if (prev.fileHashes[f.rel] !== cur) changed++;
-    }
-    for (const p of Object.keys(prev.fileHashes)) if (!files.find((f) => f.rel === p)) changed++;
-  }
-  const fileHashes = {};
-  for (const f of files) {
-    try { fileHashes[f.rel] = crypto.createHash('sha1').update(fs.readFileSync(f.abs)).digest('hex'); } catch {}
+    for (const f of files) if (prev.fileHashes[f.rel] !== fileHashes[f.rel]) changed++;
+    for (const p of Object.keys(prev.fileHashes)) if (!(p in fileHashes)) changed++;
   }
   const entry = {
     snapId: `${id}-v${version}-${contentHash.slice(0, 8)}`,
@@ -1919,7 +1940,6 @@ function createSnapshot(id, meta = {}) {
     files: files.map((f) => ({ path: f.rel })),
   };
   index.push(entry);
-  // Prune oldest snapshots beyond the cap (keep their metadata trimmed too).
   while (index.length > SNAPSHOT_KEEP) {
     const old = index.shift();
     try { fs.rmSync(path.join(snapshotDir(id), `v${old.version}`), { recursive: true, force: true }); } catch {}
@@ -1928,15 +1948,47 @@ function createSnapshot(id, meta = {}) {
   return entry;
 }
 
-/** Seed v1 from the current source, attributed to the latest commit if clean. */
+/** Create a snapshot from the CURRENT working-tree source. */
+function createSnapshot(id, meta = {}) {
+  return createSnapshotFromFiles(id, readWorkingFiles(id), meta);
+}
+
+/**
+ * Seed the baseline so genuine history exists even on first read:
+ *  - clean tree: one snapshot (v1) = the committed/current source;
+ *  - dirty tree: v1 = the COMMITTED source, v2 = the current working copy, so
+ *    the uncommitted VS Code / editor edits surface as a distinct version the
+ *    user can switch away from (this is the core of "show me the old version").
+ */
 async function ensureBaselineSnapshot(id) {
   const index = readSnapshotIndex(id);
   if (index.length) return index;
-  const files = collectPrototypeFiles(id);
-  if (!files.length) return index;
+  const working = readWorkingFiles(id);
+  if (!working.length) return index;
   const commit = await latestCommitMeta(id);
   const dirty = (await protoWorkingChanges(id)).length > 0;
-  createSnapshot(id, {
+
+  if (commit && dirty) {
+    const committed = await readCommittedFiles(id);
+    if (committed.length) {
+      createSnapshotFromFiles(id, committed, {
+        at: commit.at,
+        author: commit.author || gitUserName() || null,
+        source: 'commit',
+        summary: commit.subject || 'Committed version',
+      });
+      if (hashFileList(working) !== hashFileList(committed)) {
+        createSnapshotFromFiles(id, working, {
+          source: 'local',
+          summary: 'Edited locally (VS Code / editor)',
+        });
+      }
+      return readSnapshotIndex(id);
+    }
+  }
+
+  // Clean tree, or no commit yet: a single baseline from the current source.
+  createSnapshotFromFiles(id, working, {
     at: commit && !dirty ? commit.at : new Date().toISOString(),
     author: (commit && commit.author) || gitUserName() || null,
     source: commit && !dirty ? 'commit' : 'local',
@@ -1949,12 +2001,12 @@ async function ensureBaselineSnapshot(id) {
 async function maybeSnapshotWorkingCopy(id, meta = {}) {
   await ensureBaselineSnapshot(id);
   const index = readSnapshotIndex(id);
-  const files = collectPrototypeFiles(id);
-  if (!files.length) return null;
-  const hash = hashPrototypeFiles(files);
+  const working = readWorkingFiles(id);
+  if (!working.length) return null;
+  const hash = hashFileList(working);
   const latest = index[index.length - 1];
   if (latest && latest.contentHash === hash) return null; // nothing changed
-  return createSnapshot(id, meta);
+  return createSnapshotFromFiles(id, working, meta);
 }
 
 /** Human source label for a snapshot entry (mirrors eventSourceLabel). */
