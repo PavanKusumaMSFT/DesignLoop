@@ -1,6 +1,6 @@
 'use strict';
 
-// Validate the MSAL ID/access token that the DesignLoop workspace obtains
+// Validate the MSAL ID token that the DesignLoop workspace obtains
 // client-side. The app is multi-tenant, so we do NOT pin the issuer tenant;
 // instead we verify the signature against the common AAD JWKS and require the
 // audience to be our app registration.
@@ -12,17 +12,10 @@ const JWKS_URI = 'https://login.microsoftonline.com/common/discovery/v2.0/keys';
 const jwks = jwksClient({
   jwksUri: JWKS_URI,
   cache: true,
-  cacheMaxage: 12 * 60 * 60 * 1000,
+  cacheMaxAge: 12 * 60 * 60 * 1000,
   rateLimit: true,
   jwksRequestsPerMinute: 10,
 });
-
-function getKey(header, callback) {
-  jwks.getSigningKey(header.kid, (err, key) => {
-    if (err) return callback(err);
-    callback(null, key.getPublicKey());
-  });
-}
 
 function bearer(request) {
   const raw = request.headers.get('authorization') || '';
@@ -40,6 +33,22 @@ function issuerOk(iss) {
   );
 }
 
+// Resolve candidate public keys. Prefer the key named by the token header's
+// `kid`; if that is missing or unresolved, fall back to every signing key
+// published by Microsoft so a valid signature still verifies.
+async function candidatePublicKeys(kid) {
+  if (kid) {
+    try {
+      const key = await jwks.getSigningKey(kid);
+      return [key.getPublicKey()];
+    } catch {
+      /* fall through to all keys */
+    }
+  }
+  const keys = await jwks.getSigningKeys();
+  return keys.map((k) => k.getPublicKey());
+}
+
 // Returns the decoded claims on success, or throws.
 async function requireUser(request) {
   const token = bearer(request);
@@ -48,16 +57,33 @@ async function requireUser(request) {
   const clientId = process.env.AUTH_CLIENT_ID;
   if (!clientId) throw Object.assign(new Error('AUTH_CLIENT_ID not configured'), { status: 500 });
 
-  const claims = await new Promise((resolve, reject) => {
-    jwt.verify(
-      token,
-      getKey,
-      { audience: clientId, algorithms: ['RS256'] },
-      (err, decoded) => (err ? reject(err) : resolve(decoded)),
+  const decoded = jwt.decode(token, { complete: true });
+  if (!decoded || !decoded.header) {
+    throw Object.assign(new Error('Invalid token: malformed'), { status: 401 });
+  }
+
+  const pubKeys = await candidatePublicKeys(decoded.header.kid);
+
+  let claims = null;
+  let lastError = null;
+  for (const pk of pubKeys) {
+    try {
+      claims = jwt.verify(token, pk, {
+        audience: clientId,
+        algorithms: ['RS256'],
+      });
+      break;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+
+  if (!claims) {
+    throw Object.assign(
+      new Error('Invalid token: ' + (lastError ? lastError.message : 'signature')),
+      { status: 401 },
     );
-  }).catch((e) => {
-    throw Object.assign(new Error('Invalid token: ' + e.message), { status: 401 });
-  });
+  }
 
   if (!issuerOk(claims.iss)) {
     throw Object.assign(new Error('Untrusted token issuer'), { status: 401 });
