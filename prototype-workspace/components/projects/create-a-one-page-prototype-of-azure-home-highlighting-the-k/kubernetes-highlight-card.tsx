@@ -218,7 +218,7 @@ export default function KubernetesHighlightCard({
   eyebrow = "Featured service",
   title = "Azure Kubernetes Service",
   description = "Deploy, scale, and operate containerized applications with a fully managed Kubernetes offering — without managing the control plane yourself.",
-  badge = "Popular",
+  badge = "Trending",
   features = DEFAULT_FEATURES,
   stats = DEFAULT_STATS,
   primaryLabel = "Create Kubernetes cluster",

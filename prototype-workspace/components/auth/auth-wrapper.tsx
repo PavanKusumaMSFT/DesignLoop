@@ -12,6 +12,10 @@ import {
 import { LoginPage } from "./login-page";
 import ShareGate from "@/components/share/share-gate";
 import { getShareSession } from "@/lib/shares";
+import FeedbackLayer from "@/components/feedback/feedback-layer";
+
+/** Reserved first-segment routes that are not prototypes (no feedback layer). */
+const NON_PROTOTYPE_ROUTES = new Set(["workspace", "fre-experiments"]);
 
 /** Routes that bypass authentication (shareable preview links) */
 const PUBLIC_ROUTES = ["/fre-experiments"];
@@ -130,8 +134,23 @@ function AuthWrapperMsal({ children }: { children: React.ReactNode }) {
     checkAuth();
   }, [accounts, inProgress, instance, isPublicRoute, isAuditBypassRoute, isShareRoute, allowedDomain]);
 
-  if (isPublicRoute || isAuditBypassRoute) {
+  if (isPublicRoute) {
     return <>{children}</>;
+  }
+
+  if (isAuditBypassRoute) {
+    return (
+      <>
+        {children}
+        {routeId && !NON_PROTOTYPE_ROUTES.has(routeId) && (
+          <FeedbackLayer
+            prototypeId={routeId}
+            route={pathname || `/${routeId}`}
+            context={{ kind: "internal", email: accounts[0]?.username }}
+          />
+        )}
+      </>
+    );
   }
 
   // Wait until we know whether this is a shared link before deciding auth.
@@ -169,5 +188,16 @@ function AuthWrapperMsal({ children }: { children: React.ReactNode }) {
     return <LoginPage />;
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {routeId && !NON_PROTOTYPE_ROUTES.has(routeId) && (
+        <FeedbackLayer
+          prototypeId={routeId}
+          route={pathname || `/${routeId}`}
+          context={{ kind: "internal", email: accounts[0]?.username }}
+        />
+      )}
+    </>
+  );
 }

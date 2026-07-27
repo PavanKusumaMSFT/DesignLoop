@@ -24,6 +24,7 @@ import {
   setShareSession,
   type ShareSession,
 } from "@/lib/shares";
+import FeedbackLayer from "@/components/feedback/feedback-layer";
 
 type SafeTokens = { [key: string]: any };
 const tokens: SafeTokens = fluentTokens;
@@ -178,7 +179,20 @@ export default function ShareGate({
   }
 
   if (session) {
-    return <>{children}</>;
+    return (
+      <>
+        {children}
+        <FeedbackLayer
+          prototypeId={prototypeId}
+          route={
+            typeof window !== "undefined"
+              ? window.location.pathname
+              : `/${prototypeId}`
+          }
+          context={{ kind: "external", token }}
+        />
+      </>
+    );
   }
 
   if (blocked) {

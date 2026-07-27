@@ -794,6 +794,46 @@ const figmaBuildJobs = new Map();         // jobId -> { job, deepLink }
  * Persisted to bridge/data/figma-kit.json (gitignored). */
 const FIGMA_KIT = path.join(__dirname, 'data', 'figma-kit.json');
 
+/* ── Prototype feedback / comments (local dev backend) ──────────────────────
+ * Mirrors the deployed SWA Functions feedback API. Comments for each prototype
+ * are stored as an array in bridge/data/feedback/<prototypeId>.json (gitignored).
+ * No auth locally — the bridge only runs on the developer's machine. */
+const FEEDBACK_DIR = path.join(__dirname, 'data', 'feedback');
+
+function feedbackFile(prototypeId) {
+  return path.join(FEEDBACK_DIR, `${prototypeId}.json`);
+}
+
+function readFeedback(prototypeId) {
+  try {
+    const raw = fs.readFileSync(feedbackFile(prototypeId), 'utf8');
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeFeedback(prototypeId, comments) {
+  fs.mkdirSync(FEEDBACK_DIR, { recursive: true });
+  fs.writeFileSync(feedbackFile(prototypeId), JSON.stringify(comments, null, 2) + '\n');
+}
+
+function cleanFeedbackAnchor(a) {
+  a = a && typeof a === 'object' ? a : {};
+  const num = (v, d = 0) => (typeof v === 'number' && isFinite(v) ? v : d);
+  return {
+    selector: String(a.selector || '').slice(0, 2000),
+    text: String(a.text || '').slice(0, 200),
+    relX: num(a.relX, 0.5),
+    relY: num(a.relY, 0.5),
+    docX: num(a.docX, 0),
+    docY: num(a.docY, 0),
+    label: String(a.label || 'element').slice(0, 120),
+  };
+}
+
+
 function normalizeKitName(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
@@ -2389,6 +2429,106 @@ async function handleApi(req, res, url) {
       return sendJson(res, 200, { ok: false, error: e.message });
     }
   }
+
+  // ── Prototype feedback / comments ─────────────────────────────────────────
+  // Local mirror of the deployed SWA feedback API. No auth (bridge is local).
+
+  // GET /api/feedback/list?prototypeId=&page=
+  if (req.method === 'GET' && pathname === '/api/feedback/list') {
+    const prototypeId = String(url.searchParams.get('prototypeId') || '').trim();
+    const page = String(url.searchParams.get('page') || '').trim();
+    if (!prototypeId) return sendJson(res, 400, { error: 'prototypeId is required' });
+    let comments = readFeedback(prototypeId);
+    if (page) comments = comments.filter((c) => c.page === page);
+    comments.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    return sendJson(res, 200, { comments });
+  }
+
+  // POST /api/feedback/create
+  if (req.method === 'POST' && pathname === '/api/feedback/create') {
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const prototypeId = String(body.prototypeId || '').trim();
+    const text = String(body.text || '').trim();
+    if (!prototypeId) return sendJson(res, 400, { error: 'prototypeId is required' });
+    if (!text) return sendJson(res, 400, { error: 'Comment text is required' });
+    if (text.length > 4000) return sendJson(res, 400, { error: 'Comment is too long' });
+    const source = body.token ? 'external' : 'internal';
+    const author = String(body.author || (source === 'internal' ? 'Reviewer' : 'Anonymous')).slice(0, 80);
+    const now = new Date().toISOString();
+    const comment = {
+      id: `c_${Date.now().toString(36)}_${crypto.randomBytes(4).toString('hex')}`,
+      prototypeId,
+      route: String(body.route || '').slice(0, 400),
+      page: String(body.page || body.route || '').slice(0, 400),
+      author,
+      authorSource: source,
+      text,
+      status: 'open',
+      anchor: cleanFeedbackAnchor(body.anchor),
+      replies: [],
+      createdAt: now,
+      updatedAt: now,
+      resolvedBy: null,
+    };
+    const comments = readFeedback(prototypeId);
+    comments.push(comment);
+    writeFeedback(prototypeId, comments);
+    return sendJson(res, 200, { comment });
+  }
+
+  // POST /api/feedback/update  { prototypeId, id, action, ... }
+  if (req.method === 'POST' && pathname === '/api/feedback/update') {
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const prototypeId = String(body.prototypeId || '').trim();
+    const id = String(body.id || '').trim();
+    const action = String(body.action || '').trim();
+    if (!prototypeId || !id) return sendJson(res, 400, { error: 'prototypeId and id are required' });
+    const comments = readFeedback(prototypeId);
+    const comment = comments.find((c) => c.id === id);
+    if (!comment) return sendJson(res, 404, { error: 'Comment not found' });
+    const source = body.token ? 'external' : 'internal';
+    const who = String(body.author || (source === 'internal' ? 'Reviewer' : 'Anonymous')).slice(0, 80);
+    if (action === 'reply') {
+      const text = String(body.text || '').trim();
+      if (!text) return sendJson(res, 400, { error: 'Reply text is required' });
+      if (text.length > 4000) return sendJson(res, 400, { error: 'Reply is too long' });
+      comment.replies = comment.replies || [];
+      comment.replies.push({ author: who, text, at: new Date().toISOString() });
+    } else if (action === 'resolve') {
+      comment.status = 'resolved';
+      comment.resolvedBy = who;
+    } else if (action === 'reopen') {
+      comment.status = 'open';
+      comment.resolvedBy = null;
+    } else if (action === 'edit') {
+      const text = String(body.text || '').trim();
+      if (!text) return sendJson(res, 400, { error: 'Comment text is required' });
+      comment.text = text.slice(0, 4000);
+    } else {
+      return sendJson(res, 400, { error: `Unknown action: ${action}` });
+    }
+    comment.updatedAt = new Date().toISOString();
+    writeFeedback(prototypeId, comments);
+    return sendJson(res, 200, { comment });
+  }
+
+  // POST /api/feedback/delete  { prototypeId, id }
+  if (req.method === 'POST' && pathname === '/api/feedback/delete') {
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const prototypeId = String(body.prototypeId || '').trim();
+    const id = String(body.id || '').trim();
+    if (!prototypeId || !id) return sendJson(res, 400, { error: 'prototypeId and id are required' });
+    // Locally, deletion is permitted (owner machine); externally-shared tokens
+    // don't reach the bridge. The deployed Functions API restricts this to owners.
+    const comments = readFeedback(prototypeId);
+    const next = comments.filter((c) => c.id !== id);
+    writeFeedback(prototypeId, next);
+    return sendJson(res, 200, { ok: true });
+  }
+
 
 
   // repo baseline: commit its route + component files and a committed registry
