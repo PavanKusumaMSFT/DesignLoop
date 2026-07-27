@@ -1,0 +1,1733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Architecture — Design Loop</title>
+  <link rel="icon" type="image/svg+xml" href="designloop-logo.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080808;
+      --bg-2:      #0d0d0d;
+      --surface:   #111111;
+      --border:    rgba(255,255,255,0.07);
+      --text:      #f0ede8;
+      --text-dim:  rgba(240,237,232,0.45);
+      --text-muted:rgba(240,237,232,0.25);
+
+      --teal-bg-a: #091d2a;
+      --teal-bg-b: #0e3448;
+      --teal-glow: #1683ff;
+      --teal-rim:  rgba(10,180,200,0.35);
+
+      --amber-bg-a:#180c04;
+      --amber-bg-b:#4a2410;
+      --amber-glow:#c46830;
+      --amber-rim: rgba(196,104,48,0.35);
+
+      --violet-bg-a:#0c0820;
+      --violet-bg-b:#261450;
+      --violet-glow:#7848d8;
+      --violet-rim: rgba(120,72,216,0.40);
+
+      --radius-card: 22px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* ── NOISE GRAIN OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.4;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 48px;
+      background: linear-gradient(to bottom, rgba(8,8,8,0.95) 0%, rgba(8,8,8,0) 100%);
+    }
+
+    .nav-logo {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 17px;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .nav-logo .logo-icon {
+      height: 22px;
+      width: auto;
+      flex-shrink: 0;
+      display: block;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: 0.02em;
+      color: var(--text-dim);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); }
+    .nav-links a.active { color: var(--text); }
+
+    .nav-cta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 18px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      text-decoration: none;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .nav-cta:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(255,255,255,0.18);
+    }
+
+    .nav-cta svg { width: 14px; height: 14px; }
+
+    /* ── PAGE WRAPPER ── */
+    .page {
+      padding-top: 120px;
+      padding-bottom: 120px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 48px;
+    }
+
+    /* ── SECTION LABEL ── */
+    .section-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 18px;
+    }
+
+    /* ── FADE-IN ── */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .fade-in.visible {
+      opacity: 1;
+      transform: none;
+    }
+
+    /* ── SECTION DIVIDER ── */
+    .section-gap { margin-top: 100px; }
+    .section-gap-sm { margin-top: 64px; }
+
+    /* ── PAGE HERO ── */
+    .page-hero {
+      margin-bottom: 80px;
+      position: relative;
+    }
+
+    .page-hero h1 {
+      font-family: 'Instrument Serif', serif;
+      font-size: clamp(42px, 5.5vw, 72px);
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+      color: var(--text);
+      max-width: 760px;
+      margin-bottom: 24px;
+    }
+
+    .page-hero h1 .accent-teal { color: #0ab4c8; }
+    .page-hero h1 .accent-dim  { color: rgba(240,237,232,0.4); }
+
+    .page-hero-sub {
+      font-size: 17px;
+      color: var(--text-dim);
+      max-width: 540px;
+      line-height: 1.65;
+    }
+
+    /* ── PRINCIPLE QUOTE ── */
+    .principle-card {
+      position: relative;
+      background: linear-gradient(135deg, var(--teal-bg-a) 0%, #060f14 100%);
+      border: 1px solid rgba(10,180,200,0.2);
+      border-radius: var(--radius-card);
+      padding: 48px 52px;
+      margin-bottom: 100px;
+      overflow: hidden;
+    }
+
+    .principle-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(10,180,200,0.5), transparent);
+    }
+
+    .principle-card blockquote {
+      font-family: 'Instrument Serif', serif;
+      font-size: clamp(20px, 2.5vw, 26px);
+      font-weight: 500;
+      font-style: italic;
+      line-height: 1.5;
+      color: var(--text);
+      position: relative;
+      z-index: 1;
+    }
+
+    .principle-card blockquote::before {
+      content: '"';
+      font-size: 80px;
+      line-height: 0;
+      position: absolute;
+      top: 24px;
+      left: -8px;
+      color: rgba(10,180,200,0.18);
+      font-family: 'Instrument Serif', serif;
+    }
+
+    .principle-card .principle-note {
+      margin-top: 20px;
+      font-size: 13px;
+      color: var(--text-muted);
+      font-style: normal;
+    }
+
+    .principle-glow {
+      position: absolute;
+      width: 400px;
+      height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(10,180,200,0.07) 0%, transparent 70%);
+      top: -100px;
+      right: -80px;
+      pointer-events: none;
+    }
+
+    /* ── SECTION HEADING ── */
+    .section-heading {
+      margin-bottom: 48px;
+    }
+
+    .section-heading h2 {
+      font-family: 'Instrument Serif', serif;
+      font-size: clamp(32px, 4vw, 48px);
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      color: var(--text);
+      margin-bottom: 14px;
+    }
+
+    .section-heading p {
+      font-size: 16px;
+      color: var(--text-dim);
+      max-width: 520px;
+      line-height: 1.65;
+    }
+
+    /* ── INVOCATION CARDS (System Overview) ── */
+    .invocation-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .invocation-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 32px 28px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.25s, transform 0.25s;
+    }
+
+    .invocation-card:hover {
+      transform: translateY(-3px);
+    }
+
+    .invocation-card.card-teal {
+      background: linear-gradient(145deg, var(--teal-bg-a) 0%, #060e16 100%);
+      border-color: var(--teal-rim);
+    }
+    .invocation-card.card-amber {
+      background: linear-gradient(145deg, var(--amber-bg-a) 0%, #0c0604 100%);
+      border-color: var(--amber-rim);
+    }
+    .invocation-card.card-violet {
+      background: linear-gradient(145deg, var(--violet-bg-a) 0%, #080612 100%);
+      border-color: var(--violet-rim);
+    }
+
+    .invocation-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+    }
+    .invocation-card.card-teal::before { background: linear-gradient(90deg, transparent, rgba(10,180,200,0.5), transparent); }
+    .invocation-card.card-amber::before { background: linear-gradient(90deg, transparent, rgba(196,104,48,0.5), transparent); }
+    .invocation-card.card-violet::before { background: linear-gradient(90deg, transparent, rgba(120,72,216,0.5), transparent); }
+
+    .invocation-card .card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      font-size: 20px;
+    }
+
+    .card-teal .card-icon  { background: rgba(10,180,200,0.1); }
+    .card-amber .card-icon { background: rgba(196,104,48,0.1); }
+    .card-violet .card-icon { background: rgba(120,72,216,0.1); }
+
+    .invocation-card .card-kicker {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .card-teal .card-kicker  { color: #0ab4c8; }
+    .card-amber .card-kicker { color: var(--amber-glow); }
+    .card-violet .card-kicker { color: #9b6fee; }
+
+    .invocation-card h3 {
+      font-family: 'Inter', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    .invocation-card p {
+      font-size: 14px;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    .invocation-card .card-arrow {
+      margin-top: 20px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .card-teal .card-arrow  { color: rgba(10,180,200,0.6); }
+    .card-amber .card-arrow { color: rgba(196,104,48,0.6); }
+    .card-violet .card-arrow { color: rgba(120,72,216,0.6); }
+
+    .invocation-card .card-agent {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 16px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .card-teal .card-agent  { background: rgba(10,180,200,0.08); color: #0ab4c8; border: 1px solid rgba(10,180,200,0.15); }
+    .card-amber .card-agent { background: rgba(196,104,48,0.08); color: var(--amber-glow); border: 1px solid rgba(196,104,48,0.15); }
+    .card-violet .card-agent { background: rgba(120,72,216,0.08); color: #9b6fee; border: 1px solid rgba(120,72,216,0.15); }
+
+    /* ── HIERARCHY DIAGRAM ── */
+    .hierarchy {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 48px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hierarchy::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(22,131,255,0.4), transparent);
+    }
+
+    .h-tier {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .h-node {
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+    }
+
+    .h-node-indent {
+      display: flex;
+      align-items: flex-start;
+    }
+
+    .h-line-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 40px;
+      flex-shrink: 0;
+    }
+
+    .h-vert {
+      width: 1px;
+      flex: 1;
+      min-height: 20px;
+      background: var(--border);
+    }
+
+    .h-branch {
+      width: 40px;
+      height: 24px;
+      border-left: 1px solid rgba(255,255,255,0.08);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      border-bottom-left-radius: 6px;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    .h-card {
+      border-radius: 14px;
+      padding: 16px 22px;
+      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+
+    .h-card.tier-1 {
+      background: linear-gradient(135deg, rgba(22,131,255,0.12) 0%, rgba(10,180,200,0.06) 100%);
+      border: 1px solid rgba(22,131,255,0.25);
+      min-width: 280px;
+    }
+
+    .h-card.tier-2 {
+      background: linear-gradient(135deg, rgba(196,104,48,0.1) 0%, rgba(180,80,20,0.04) 100%);
+      border: 1px solid rgba(196,104,48,0.2);
+      min-width: 240px;
+    }
+
+    .h-card.tier-3 {
+      background: linear-gradient(135deg, rgba(120,72,216,0.1) 0%, rgba(100,50,200,0.04) 100%);
+      border: 1px solid rgba(120,72,216,0.2);
+      min-width: 200px;
+    }
+
+    .h-card.tier-verify {
+      background: linear-gradient(135deg, rgba(10,180,200,0.07) 0%, rgba(10,180,200,0.02) 100%);
+      border: 1px solid rgba(10,180,200,0.12);
+      min-width: 160px;
+    }
+
+    .h-card-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .tier-1 .h-card-label { color: #4da8ff; }
+    .tier-2 .h-card-label { color: var(--amber-glow); }
+    .tier-3 .h-card-label { color: #9b6fee; }
+    .tier-verify .h-card-label { color: #0ab4c8; }
+
+    .h-card-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .h-card-desc {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 3px;
+      line-height: 1.5;
+    }
+
+    .h-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding-left: 80px;
+      margin-bottom: 10px;
+      align-items: flex-start;
+    }
+
+    .h-indent {
+      padding-left: 40px;
+    }
+
+    .h-connect-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-left: 80px;
+      margin-bottom: 10px;
+    }
+
+    .h-arrow {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .h-note {
+      font-size: 12px;
+      color: var(--text-dim);
+      padding: 12px 16px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-top: 28px;
+    }
+
+    .h-note strong { color: var(--text); }
+
+    /* ── TOOL FILES CARDS ── */
+    .tool-files-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+
+    .tool-file-card {
+      border-radius: 18px;
+      padding: 28px 24px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.25s;
+    }
+
+    .tool-file-card:hover { transform: translateY(-3px); }
+
+    .tool-file-card.f-json {
+      background: linear-gradient(145deg, rgba(22,131,255,0.1) 0%, #07111a 100%);
+      border: 1px solid rgba(22,131,255,0.2);
+    }
+    .tool-file-card.f-skill {
+      background: linear-gradient(145deg, rgba(196,104,48,0.1) 0%, #0f0804 100%);
+      border: 1px solid rgba(196,104,48,0.2);
+    }
+    .tool-file-card.f-verify {
+      background: linear-gradient(145deg, rgba(120,72,216,0.1) 0%, #090612 100%);
+      border: 1px solid rgba(120,72,216,0.2);
+    }
+
+    .tool-file-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+    }
+    .f-json::before   { background: linear-gradient(90deg, transparent, rgba(22,131,255,0.5), transparent); }
+    .f-skill::before  { background: linear-gradient(90deg, transparent, rgba(196,104,48,0.5), transparent); }
+    .f-verify::before { background: linear-gradient(90deg, transparent, rgba(120,72,216,0.5), transparent); }
+
+    .file-name {
+      font-family: 'Inter', monospace;
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .f-json .file-name   { color: #4da8ff; }
+    .f-skill .file-name  { color: var(--amber-glow); }
+    .f-verify .file-name { color: #9b6fee; }
+
+    .file-role {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .file-desc {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    /* ── CODE BLOCK ── */
+    .code-block {
+      background: #0a0a0a;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 32px;
+      overflow-x: auto;
+      margin-bottom: 24px;
+    }
+
+    .code-block pre {
+      font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text-dim);
+      white-space: pre;
+    }
+
+    .code-block .token-key   { color: #4da8ff; }
+    .code-block .token-str   { color: #f0a070; }
+    .code-block .token-bool  { color: #9b6fee; }
+    .code-block .token-num   { color: #0ab4c8; }
+    .code-block .token-comment { color: rgba(240,237,232,0.2); }
+
+    /* ── DATA TABLE ── */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .data-table th {
+      text-align: left;
+      padding: 12px 16px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: var(--text-dim);
+      line-height: 1.55;
+      vertical-align: top;
+    }
+
+    .data-table td:first-child {
+      font-family: 'SF Mono', 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: #4da8ff;
+      white-space: nowrap;
+    }
+
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* ── VERIFY FLOW ── */
+    .verify-flow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      max-width: 560px;
+      margin: 0 auto 48px;
+    }
+
+    .vf-node {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px 24px;
+      text-align: center;
+      position: relative;
+    }
+
+    .vf-node.vf-tool {
+      border-color: rgba(22,131,255,0.25);
+      background: linear-gradient(135deg, rgba(22,131,255,0.08) 0%, var(--surface) 100%);
+    }
+    .vf-node.vf-verifier {
+      border-color: rgba(10,180,200,0.25);
+      background: linear-gradient(135deg, rgba(10,180,200,0.07) 0%, var(--surface) 100%);
+    }
+    .vf-node.vf-accept {
+      border-color: rgba(80,200,120,0.3);
+      background: linear-gradient(135deg, rgba(80,200,120,0.07) 0%, var(--surface) 100%);
+    }
+    .vf-node.vf-stop {
+      border-color: rgba(220,80,60,0.3);
+      background: linear-gradient(135deg, rgba(220,80,60,0.07) 0%, var(--surface) 100%);
+    }
+
+    .vf-node-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .vf-tool .vf-node-label     { color: #4da8ff; }
+    .vf-verifier .vf-node-label { color: #0ab4c8; }
+    .vf-accept .vf-node-label   { color: #50c878; }
+    .vf-stop .vf-node-label     { color: #e55040; }
+
+    .vf-node-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .vf-node-sub {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .vf-arrow {
+      width: 1px;
+      height: 28px;
+      background: var(--border);
+      position: relative;
+    }
+
+    .vf-arrow::after {
+      content: '▼';
+      position: absolute;
+      bottom: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 8px;
+      color: var(--text-muted);
+    }
+
+    .vf-branch {
+      display: flex;
+      width: 100%;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .vf-branch-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    .vf-branch-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .vf-branch-label.accept { color: rgba(80,200,120,0.7); }
+    .vf-branch-label.rerun  { color: rgba(196,104,48,0.7); }
+
+    .vf-divider {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      gap: 0;
+    }
+
+    .vf-divider-line {
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.06);
+    }
+
+    .vf-divider-arrow-left,
+    .vf-divider-arrow-right {
+      width: 1px;
+      height: 28px;
+      background: rgba(255,255,255,0.06);
+    }
+
+    .vf-rerun-note {
+      font-size: 12px;
+      color: var(--text-dim);
+      text-align: center;
+      padding: 10px 16px;
+      background: rgba(196,104,48,0.06);
+      border: 1px solid rgba(196,104,48,0.12);
+      border-radius: 10px;
+      line-height: 1.5;
+      width: 100%;
+    }
+
+    /* ── VERIFY METRICS ── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .metric-card {
+      border-radius: 18px;
+      padding: 28px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric-card.m-teal {
+      background: linear-gradient(145deg, rgba(10,180,200,0.09) 0%, #060d10 100%);
+      border: 1px solid rgba(10,180,200,0.18);
+    }
+    .metric-card.m-amber {
+      background: linear-gradient(145deg, rgba(196,104,48,0.09) 0%, #0c0604 100%);
+      border: 1px solid rgba(196,104,48,0.18);
+    }
+    .metric-card.m-violet {
+      background: linear-gradient(145deg, rgba(120,72,216,0.09) 0%, #080512 100%);
+      border: 1px solid rgba(120,72,216,0.18);
+    }
+
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+    }
+    .m-teal::before   { background: linear-gradient(90deg, transparent, rgba(10,180,200,0.5), transparent); }
+    .m-amber::before  { background: linear-gradient(90deg, transparent, rgba(196,104,48,0.5), transparent); }
+    .m-violet::before { background: linear-gradient(90deg, transparent, rgba(120,72,216,0.5), transparent); }
+
+    .metric-weight {
+      font-size: 38px;
+      font-family: 'Instrument Serif', serif;
+      font-weight: 500;
+      line-height: 1;
+      margin-bottom: 12px;
+    }
+    .m-teal .metric-weight   { color: #0ab4c8; }
+    .m-amber .metric-weight  { color: var(--amber-glow); }
+    .m-violet .metric-weight { color: #9b6fee; }
+
+    .metric-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .metric-desc {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.55;
+    }
+
+    .metric-bar {
+      margin-top: 16px;
+      height: 3px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden;
+    }
+
+    .metric-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+    }
+    .m-teal .metric-bar-fill   { background: #0ab4c8; width: 35%; }
+    .m-amber .metric-bar-fill  { background: var(--amber-glow); width: 25%; }
+    .m-violet .metric-bar-fill { background: #9b6fee; width: 40%; }
+
+    /* ── STAGE AGENT LOGIC ── */
+    .agent-decisions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .decision-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 28px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .decision-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    }
+
+    .decision-icon {
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
+
+    .decision-action {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .dc-skip .decision-action  { color: var(--text-muted); }
+    .dc-run .decision-action   { color: #0ab4c8; }
+    .dc-para .decision-action  { color: #9b6fee; }
+
+    .decision-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .decision-cond {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.55;
+    }
+
+    /* ── TOOLS PER STAGE ── */
+    .stages-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    @media (max-width: 1000px) {
+      .stages-grid { grid-template-columns: repeat(2, 1fr); }
+      .invocation-grid { grid-template-columns: 1fr; }
+      .tool-files-grid { grid-template-columns: 1fr; }
+      .metrics-grid { grid-template-columns: 1fr; }
+      .agent-decisions { grid-template-columns: 1fr; }
+      .decisions-table-grid { grid-template-columns: 1fr; }
+    }
+
+    .stage-col-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stage-col-card:nth-child(1) { border-top-color: rgba(10,180,200,0.3); }
+    .stage-col-card:nth-child(2) { border-top-color: rgba(196,104,48,0.3); }
+    .stage-col-card:nth-child(3) { border-top-color: rgba(120,72,216,0.3); }
+    .stage-col-card:nth-child(4) { border-top-color: rgba(22,131,255,0.3); }
+    .stage-col-card:nth-child(5) { border-top-color: rgba(10,180,200,0.2); }
+    .stage-col-card:nth-child(6) { border-top-color: rgba(196,104,48,0.2); }
+    .stage-col-card:nth-child(7) { border-top-color: rgba(120,72,216,0.2); }
+
+    .stage-col-name {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .stage-col-card:nth-child(1) .stage-col-name { color: #0ab4c8; }
+    .stage-col-card:nth-child(2) .stage-col-name { color: var(--amber-glow); }
+    .stage-col-card:nth-child(3) .stage-col-name { color: #9b6fee; }
+    .stage-col-card:nth-child(4) .stage-col-name { color: #4da8ff; }
+    .stage-col-card:nth-child(5) .stage-col-name { color: rgba(10,180,200,0.7); }
+    .stage-col-card:nth-child(6) .stage-col-name { color: rgba(196,104,48,0.7); }
+    .stage-col-card:nth-child(7) .stage-col-name { color: rgba(120,72,216,0.7); }
+
+    .stage-tool-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .stage-tool-list li {
+      font-size: 13px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      line-height: 1.45;
+    }
+
+    .stage-tool-list li::before {
+      content: '○';
+      font-size: 10px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* ── CONTRIBUTION ── */
+    .contrib-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      align-items: start;
+    }
+
+    .contrib-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .contrib-step {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .step-num {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .step-content h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .step-content p {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.55;
+    }
+
+    /* ── KEY DECISIONS TABLE ── */
+    .decisions-table-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+
+    .decision-row-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px 22px;
+      transition: border-color 0.2s;
+    }
+
+    .decision-row-card:hover {
+      border-color: rgba(255,255,255,0.12);
+    }
+
+    .dr-decision {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .dr-choice {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .dr-reason {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.55;
+    }
+
+    /* ── FOOTER ── */
+    .arch-footer {
+      margin-top: 120px;
+      padding: 48px 0 48px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+    }
+
+    .arch-footer p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .arch-footer a {
+      color: var(--text-dim);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .arch-footer a:hover { color: var(--text); }
+
+    @media (max-width: 900px) {
+      nav { padding: 18px 24px; }
+      .nav-links { display: none; }
+      .container { padding: 0 24px; }
+      .contrib-layout { grid-template-columns: 1fr; }
+      .decisions-table-grid { grid-template-columns: 1fr; }
+      .stages-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a href="index.html" class="nav-logo">
+      <img src="designloop-logo.svg" alt="Design Loop Logo" class="logo-icon">
+      Design Loop
+    </a>
+
+    <ul class="nav-links">
+      <li><a href="index.html#about">About</a></li>
+      <li><a href="index.html#start">Get Started</a></li>
+      <li><a href="index.html#contribute">Contribute</a></li>
+      <li><a href="architecture.html" class="active">Architecture</a></li>
+    </ul>
+
+    <a href="https://github.com/PavanKusumaMSFT/DesignLoop.git" class="nav-cta">
+      <svg viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+      </svg>
+      GitHub
+    </a>
+  </nav>
+
+  <!-- PAGE -->
+  <div class="page">
+    <div class="container">
+
+      <!-- PAGE HERO -->
+      <div class="page-hero fade-in">
+        <div class="section-label">System Architecture</div>
+        <h1>How Design Loop<br><span class="accent-teal">thinks and runs.</span></h1>
+        <p class="page-hero-sub">A three-tier agent system where every stage of the design process is powered by tools that can be invoked at any granularity — full lifecycle, a single stage, or a single tool directly.</p>
+      </div>
+
+      <!-- CORE PRINCIPLE -->
+      <div class="principle-card fade-in">
+        <div class="principle-glow"></div>
+        <blockquote>
+          Every tool must produce specific, evidenced, task-grounded output —
+          or it re-runs once with surgical precision before the user is involved.
+        </blockquote>
+        <p class="principle-note">No slop. No generic output. Every artifact is verified before it leaves a tool.</p>
+      </div>
+
+      <!-- SYSTEM OVERVIEW -->
+      <div class="section-gap">
+        <div class="section-heading fade-in">
+          <div class="section-label">System Overview</div>
+          <h2>Three ways to invoke the system</h2>
+          <p>Users choose their entry point. The system adapts — orchestrating the full lifecycle, a single stage, or routing directly to a tool.</p>
+        </div>
+
+        <div class="invocation-grid fade-in">
+
+          <div class="invocation-card card-teal">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:#0ab4c8">
+                <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+              </svg>
+            </div>
+            <div class="card-kicker">Full Lifecycle</div>
+            <h3>Run All Stages</h3>
+            <p>Trigger the complete design process from Discover through Deliver. The orchestrator sequences all stage agents in order.</p>
+            <div class="card-agent">Design Lead Agent</div>
+          </div>
+
+          <div class="invocation-card card-amber">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:#c46830">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+              </svg>
+            </div>
+            <div class="card-kicker">Single Stage.</div>
+            <h3>Run One Stage</h3>
+            <p>Run only the Discover, Define, or any other stage. The stage agent selects and orders relevant tools, skipping what's already done.</p>
+            <div class="card-agent">Stage Agent</div>
+          </div>
+
+          <div class="invocation-card card-violet">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:#9b6fee">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+            </div>
+            <div class="card-kicker">Single Tool</div>
+            <h3>Run One Tool</h3>
+            <p>Invoke any tool directly on your artifacts — competitive analysis, persona creation, wireframe spec — without running a full stage.</p>
+            <div class="card-agent">Tool Sub-agent</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- THREE-TIER HIERARCHY -->
+      <div class="section-gap">
+        <div class="section-heading fade-in">
+          <div class="section-label">Agent Hierarchy</div>
+          <h2>Three tiers. Every tool its own agent.</h2>
+          <p>The hierarchy ensures independent invocation, parallelism, and modular upgrades — each tier has a single, well-defined responsibility.</p>
+        </div>
+
+        <div class="hierarchy fade-in">
+          <!-- Tier 1: Design Lead -->
+          <div style="margin-bottom: 8px;">
+            <div class="h-card tier-1" style="display:inline-block; margin-bottom: 16px;">
+              <div class="h-card-label">Tier 1 — Orchestrator</div>
+              <div class="h-card-name">Design Lead Agent</div>
+              <div class="h-card-desc">Runs all stages in sequence across the full lifecycle</div>
+            </div>
+          </div>
+
+          <!-- Tier 2: Stage Agents -->
+          <div style="padding-left: 32px; margin-bottom: 8px; border-left: 1px solid rgba(255,255,255,0.07); margin-left: 20px;">
+            <div style="display:flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; padding-top: 12px;">
+              <div class="h-card tier-2">
+                <div class="h-card-label">Tier 2 — Coordinator</div>
+                <div class="h-card-name">Researcher Agent</div>
+                <div class="h-card-desc">Discover stage</div>
+              </div>
+              <div class="h-card tier-2">
+                <div class="h-card-label">Tier 2 — Coordinator</div>
+                <div class="h-card-name">Strategist Agent</div>
+                <div class="h-card-desc">Define stage</div>
+              </div>
+              <div class="h-card tier-2" style="opacity: 0.55;">
+                <div class="h-card-label">Tier 2 — Coordinator</div>
+                <div class="h-card-name">+ 5 more agents</div>
+                <div class="h-card-desc">Ideate → Deliver</div>
+              </div>
+            </div>
+
+            <!-- Tier 3: Tool Sub-agents -->
+            <div style="padding-left: 32px; border-left: 1px solid rgba(255,255,255,0.05); margin-left: 20px;">
+              <div style="display:flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; padding-top: 12px;">
+                <div class="h-card tier-3">
+                  <div class="h-card-label">Tier 3 — Worker</div>
+                  <div class="h-card-name">Competitive Analysis</div>
+                  <div class="h-card-desc">Runs SKILL.md → Verifier</div>
+                </div>
+                <div style="display:flex; align-items:center; gap: 8px; margin-top: 14px;">
+                  <span style="font-size:12px; color:var(--text-muted);">→</span>
+                  <div class="h-card tier-verify">
+                    <div class="h-card-label">Verify</div>
+                    <div class="h-card-name">Verifier</div>
+                    <div class="h-card-desc">ACCEPT or RE-RUN</div>
+                  </div>
+                </div>
+                <div class="h-card tier-3" style="opacity: 0.6;">
+                  <div class="h-card-label">Tier 3 — Worker</div>
+                  <div class="h-card-name">User Interviews</div>
+                  <div class="h-card-desc">Runs SKILL.md → Verifier</div>
+                </div>
+                <div class="h-card tier-3" style="opacity: 0.4;">
+                  <div class="h-card-label">Tier 3 — Worker</div>
+                  <div class="h-card-name">+ N more tools</div>
+                  <div class="h-card-desc">One sub-agent each</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="h-note">
+            <strong>Every tool has its own dedicated sub-agent</strong> — regardless of complexity. This enables independent invocation, parallelism, and independent upgrades without touching any other part of the system.
+          </div>
+        </div>
+      </div>
+
+      <!-- ATOMIC TOOL -->
+      <div class="section-gap">
+        <div class="section-heading fade-in">
+          <div class="section-label">Atomic Unit</div>
+          <h2>Three files. One folder. One tool.</h2>
+          <p>Every capability in the system is a tool — self-describing, self-sufficient, and independently invocable.</p>
+        </div>
+
+        <div class="tool-files-grid fade-in">
+
+          <div class="tool-file-card f-json">
+            <div class="file-name">tool.json</div>
+            <div class="file-role">Contribution Contract</div>
+            <div class="file-desc">Declares the tool's identity — which stage it belongs to, what inputs it needs, what outputs it produces, and which tools must run before it.</div>
+          </div>
+
+          <div class="tool-file-card f-skill">
+            <div class="file-name">SKILL.md</div>
+            <div class="file-role">Execution Instructions</div>
+            <div class="file-desc">How to run the tool. Self-sufficient — works standalone without any other context. Contains the full prompt and step-by-step instructions for the sub-agent.</div>
+          </div>
+
+          <div class="tool-file-card f-verify">
+            <div class="file-name">VERIFY.md</div>
+            <div class="file-role">Quality Rubric</div>
+            <div class="file-desc">Dimensions, weights, and thresholds for scoring output. The verifier uses this to decide ACCEPT or RE-RUN — with tool-specific failure instructions baked in.</div>
+          </div>
+
+        </div>
+
+        <div class="code-block fade-in">
+          <pre><span class="token-comment">// tool.json — example: competitive-analysis</span>
+{
+  <span class="token-key">"id"</span>:          <span class="token-str">"competitive-analysis"</span>,
+  <span class="token-key">"name"</span>:        <span class="token-str">"Competitive Analysis"</span>,
+  <span class="token-key">"description"</span>: <span class="token-str">"Analyse competing products to identify gaps and opportunities"</span>,
+  <span class="token-key">"stages"</span>:      [<span class="token-str">"discover"</span>],
+  <span class="token-key">"agent"</span>:       <span class="token-str">"competitive-analysis"</span>,
+  <span class="token-key">"inputs"</span>: [
+    { <span class="token-key">"type"</span>: <span class="token-str">"task-description"</span>, <span class="token-key">"required"</span>: <span class="token-bool">true</span> },
+    { <span class="token-key">"type"</span>: <span class="token-str">"artifact"</span>, <span class="token-key">"from"</span>: <span class="token-str">"research-brief"</span>, <span class="token-key">"required"</span>: <span class="token-bool">false</span> }
+  ],
+  <span class="token-key">"outputs"</span>:      [<span class="token-str">"research/competitive-analysis.md"</span>],
+  <span class="token-key">"dependencies"</span>: [],
+  <span class="token-key">"required"</span>:     <span class="token-bool">false</span>
+}</pre>
+        </div>
+
+        <div class="fade-in" style="background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>What it declares</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>`stages`</td><td>Which stage(s) this tool belongs to — tools can span multiple stages</td></tr>
+              <tr><td>`agent`</td><td>The sub-agent that runs this tool</td></tr>
+              <tr><td>`inputs`</td><td>What it needs — from user or from another tool's output artifact</td></tr>
+              <tr><td>`outputs`</td><td>Artifacts it produces, written to specific file paths</td></tr>
+              <tr><td>`dependencies`</td><td>Tool IDs that must complete before this one runs</td></tr>
+              <tr><td>`required`</td><td>Whether this tool is mandatory for the stage to be considered complete</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- VERIFY LAYER -->
+      <div class="section-gap">
+        <div class="section-heading fade-in">
+          <div class="section-label">Quality Gate</div>
+          <h2>Every output is verified before it leaves.</h2>
+          <p>The verifier is an autonomous decision-maker — it scores the output and decides ACCEPT or RE-RUN. Only one re-run is allowed.</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start;">
+
+          <!-- Flow -->
+          <div class="fade-in">
+            <div class="verify-flow" style="margin: 0;">
+              <div class="vf-node vf-tool">
+                <div class="vf-node-label">Step 1</div>
+                <div class="vf-node-name">Tool runs SKILL.md</div>
+                <div class="vf-node-sub">Produces an artifact</div>
+              </div>
+              <div class="vf-arrow"></div>
+              <div class="vf-node vf-verifier">
+                <div class="vf-node-label">Step 2</div>
+                <div class="vf-node-name">Verifier scores output</div>
+                <div class="vf-node-sub">Runs VERIFY.md rubric</div>
+              </div>
+              <div class="vf-arrow"></div>
+
+              <!-- Branch -->
+              <div style="display: flex; width: 100%; gap: 14px;">
+                <div style="flex:1; display:flex; flex-direction: column; align-items: center; gap: 8px;">
+                  <div class="vf-branch-label accept">ACCEPT ✓</div>
+                  <div class="vf-node vf-accept" style="width:100%;">
+                    <div class="vf-node-name" style="font-size:13px;">Output ready</div>
+                    <div class="vf-node-sub">Passes to next tool</div>
+                  </div>
+                </div>
+                <div style="flex:1; display:flex; flex-direction: column; align-items: center; gap: 8px;">
+                  <div class="vf-branch-label rerun">RE-RUN ↺</div>
+                  <div class="vf-rerun-note">
+                    Inject surgical brief:<br>
+                    failure instructions + score specifics
+                  </div>
+                  <div class="vf-arrow" style="height:20px;"></div>
+                  <div class="vf-node vf-tool" style="width:100%;">
+                    <div class="vf-node-name" style="font-size:13px;">Tool re-runs once</div>
+                    <div class="vf-node-sub">One attempt only</div>
+                  </div>
+                  <div class="vf-arrow" style="height:20px;"></div>
+                  <div class="vf-node vf-verifier" style="width:100%;">
+                    <div class="vf-node-name" style="font-size:13px;">Verifier scores again</div>
+                  </div>
+                  <div style="display:flex; width:100%; gap:10px; margin-top:8px;">
+                    <div class="vf-node vf-accept" style="flex:1; padding: 12px 10px;">
+                      <div class="vf-node-name" style="font-size:12px;">ACCEPT ✓</div>
+                    </div>
+                    <div class="vf-node vf-stop" style="flex:1; padding: 12px 10px;">
+                      <div class="vf-node-name" style="font-size:12px;">HARD STOP ⚑</div>
+                      <div class="vf-node-sub" style="font-size:11px;">Flag to user</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Metrics -->
+          <div class="fade-in">
+            <div style="margin-bottom: 20px;">
+              <div style="font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px;">Re-run injection — surgical, not vague</div>
+              <p style="font-size: 13px; color: var(--text-dim); line-height: 1.6; margin-bottom: 20px;">When RE-RUN is triggered, the verifier builds a precise brief from two sources: the pre-defined failure instructions from VERIFY.md (contributor's intent), plus dynamic specifics from the actual scoring run.</p>
+              <div class="code-block" style="margin-bottom: 0;">
+                <pre style="font-size:12px;"><span class="token-comment">// Example RE-RUN brief</span>
+<span class="token-key">Specificity score</span>: <span class="token-num">42/100</span>.
+Reference the actual product, user,
+and context from the task. The output
+mentions no specific product names,
+teams, or constraints.</pre>
+              </div>
+            </div>
+
+            <div style="margin-top: 32px;">
+              <div class="section-label" style="margin-bottom: 16px;">Scoring Dimensions</div>
+              <div class="metrics-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+                <div class="metric-card m-violet">
+                  <div class="metric-weight">40%</div>
+                  <div class="metric-name">Specificity</div>
+                  <div class="metric-desc">Output grounded in this actual task — not boilerplate</div>
+                  <div class="metric-bar"><div class="metric-bar-fill" style="width:40%;"></div></div>
+                </div>
+                <div class="metric-card m-amber">
+                  <div class="metric-weight">35%</div>
+                  <div class="metric-name">Evidence</div>
+                  <div class="metric-desc">Claims backed by sources or data — not assertions</div>
+                  <div class="metric-bar"><div class="metric-bar-fill" style="background:var(--amber-glow); width:35%;"></div></div>
+                </div>
+                <div class="metric-card m-teal">
+                  <div class="metric-weight">25%</div>
+                  <div class="metric-name">Completeness</div>
+                  <div class="metric-desc">All required sections and criteria are present</div>
+                  <div class="metric-bar"><div class="metric-bar-fill" style="width:25%;"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- STAGE AGENT LOGIC -->
+      <div class="section-gap">
+        <div class="section-heading fade-in">
+          <div class="section-label">Stage Agent</div>
+          <h2>Coordinator, not worker.</h2>
+          <p>The stage agent reads context and selects tools intelligently — it doesn't always run everything. It skips what's already done and parallelises what it can.</p>
+        </div>
+
+        <div class="agent-decisions fade-in">
+
+          <div class="decision-card dc-skip">
+            <div class="decision-icon">⟳</div>
+            <div class="decision-action">Decision · Skip</div>
+            <div class="decision-title">Artifact exists and looks complete</div>
+            <div class="decision-cond">The stage agent checks what's already on disk. If a tool's output artifact exists and appears complete, the tool is skipped — no redundant work.</div>
+          </div>
+
+          <div class="decision-card dc-run">
+            <div class="decision-icon">▶</div>
+            <div class="decision-action">Decision · Run</div>
+            <div class="decision-title">Output is missing or stale</div>
+            <div class="decision-cond">If the artifact is absent or its dependencies have changed since it was last run, the stage agent queues the tool for execution and tracks its completion.</div>
+          </div>
+
+          <div class="decision-card dc-para">
+            <div class="decision-icon">⇉</div>
+            <div class="decision-action">Decision · Parallel</div>
+            <div class="decision-title">No dependency between tools</div>
+            <div class="decision-cond">Parallelism is inferred from <code style="font-size:12px; color:#9b6fee;">dependencies</code> in tool.json. If two tools declare no shared dependency, the stage agent runs them concurrently — no explicit parallel flag needed.</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- TOOLS PER STAGE -->
+      <div class="section-gap">
+        <div class="section-heading fade-in">
+          <div class="section-label">Tools Per Stage</div>
+          <h2>Seven stages. Growing continuously.</h2>
+          <p>This is the starting set. The tool registry is directory-based — new tools and stages are added by contributing a folder.</p>
+        </div>
+
+        <div class="stages-grid fade-in">
+
+          <div class="stage-col-card">
+            <div class="stage-col-name">Discover</div>
+            <ul class="stage-tool-list">
+              <li>Research Brief</li>
+              <li>Competitive Analysis</li>
+              <li>User Interviews</li>
+              <li>Findings Synthesis</li>
+            </ul>
+          </div>
+
+          <div class="stage-col-card">
+            <div class="stage-col-name">Define</div>
+            <ul class="stage-tool-list">
+              <li>Problem Statements</li>
+              <li>User Personas</li>
+              <li>Journey Map</li>
+              <li>PRD / Requirements</li>
+            </ul>
+          </div>
+
+          <div class="stage-col-card">
+            <div class="stage-col-name">Ideate</div>
+            <ul class="stage-tool-list">
+              <li>HMW Reframing</li>
+              <li>Concept Brainstorm</li>
+              <li>Concept Evaluation</li>
+              <li>Decision Log</li>
+            </ul>
+          </div>
+
+          <div class="stage-col-card">
+            <div class="stage-col-name">Design</div>
+            <ul class="stage-tool-list">
+              <li>Wireframe Spec</li>
+              <li>Design Tokens</li>
+              <li>Component Specs</li>
+              <li>Design System</li>
+            </ul>
+          </div>
+
+          <div class="stage-col-card">
+            <div class="stage-col-name">Prototype</div>
+            <ul class="stage-tool-list">
+              <li>Component Impl.</li>
+              <li>Demo Pages</li>
+              <li>Storybook Stories</li>
+              <li>Visual Verification</li>
+            </ul>
+          </div>
+
+          <div class="stage-col-card">
+            <div class="stage-col-name">Test</div>
+            <ul class="stage-tool-list">
+              <li>Tenets &amp; Traps Eval</li>
+              <li>Accessibility Audit</li>
+              <li>Usability Test Plan</li>
+              <li>Test Execution</li>
+            </ul>
+          </div>
+
+          <div class="stage-col-card">
+            <div class="stage-col-name">Deliver</div>
+            <ul class="stage-tool-list">
+              <li>Implementation Guide</li>
+              <li>Component API Reference</li>
+              <li>Design-Eng Changelog</li>
+              <li>Handoff Checklist</li>
+            </ul>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- CONTRIBUTION MODEL -->
+      <div class="section-gap">
+        <div class="section-heading fade-in">
+          <div class="section-label">Open-Source Model</div>
+          <h2>Contributing a tool is adding a folder.</h2>
+          <p>The tool registry is directory-based. No central file to edit. No merge conflicts. The system discovers new tools automatically.</p>
+        </div>
+
+        <div class="contrib-layout fade-in">
+
+          <div class="contrib-steps">
+            <div class="contrib-step">
+              <div class="step-num">1</div>
+              <div class="step-content">
+                <h4>Create a folder under <code style="font-size:13px; color:#4da8ff;">.github/skills/</code></h4>
+                <p>Name it after your tool. This is the complete unit of contribution — self-contained, self-describing.</p>
+              </div>
+            </div>
+            <div class="contrib-step">
+              <div class="step-num">2</div>
+              <div class="step-content">
+                <h4>Add <code style="font-size:13px; color:#4da8ff;">tool.json</code></h4>
+                <p>Fill out the contribution contract — stages, inputs, outputs, dependencies, agent name.</p>
+              </div>
+            </div>
+            <div class="contrib-step">
+              <div class="step-num">3</div>
+              <div class="step-content">
+                <h4>Write <code style="font-size:13px; color:#c46830;">SKILL.md</code></h4>
+                <p>Write precise, standalone execution instructions. Must be specific enough to pass on first try — the re-run is a safety net, not a crutch.</p>
+              </div>
+            </div>
+            <div class="contrib-step">
+              <div class="step-num">4</div>
+              <div class="step-content">
+                <h4>Write <code style="font-size:13px; color:#9b6fee;">VERIFY.md</code></h4>
+                <p>Define quality dimensions, weights, and thresholds. Include pre-defined failure instructions — you know your tool's failure modes best.</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="code-block" style="margin-bottom: 0;">
+              <pre><span class="token-comment"># That's it. The system discovers it automatically.</span>
+
+.github/skills/
+  └── my-new-tool/
+        ├── <span class="token-key">tool.json</span>   <span class="token-comment">← contribution contract</span>
+        ├── <span class="token-str">SKILL.md</span>    <span class="token-comment">← how to run me</span>
+        └── <span class="token-num">VERIFY.md</span>   <span class="token-comment">← how to judge my output</span>
+
+<span class="token-comment"># New stages work the same way:</span>
+
+.github/skills/
+  └── my-new-stage/
+        └── <span class="token-key">STAGE.md</span>    <span class="token-comment">← stage playbook</span></pre>
+            </div>
+            <p style="font-size:13px; color:var(--text-muted); margin-top: 16px; line-height:1.6;">Mirrors how successful open-source ecosystems work — VS Code extensions, GitHub Actions, npm packages. Each unit is self-describing.</p>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- KEY DECISIONS -->
+      <div class="section-gap">
+        <div class="section-heading fade-in">
+          <div class="section-label">Design Decisions</div>
+          <h2>Eight choices that define the system.</h2>
+          <p>Each architectural decision was made to balance open-source contribution ease, system reliability, and user control.</p>
+        </div>
+
+        <div class="decisions-table-grid fade-in">
+
+          <div class="decision-row-card">
+            <div class="dr-decision">Tool Registry</div>
+            <div class="dr-choice">Directory-based discovery</div>
+            <div class="dr-reason">Open-source friendly — no central file, no merge conflicts. Scans <code style="font-size:12px; color:#4da8ff;">.github/skills/</code> and builds the registry dynamically.</div>
+          </div>
+
+          <div class="decision-row-card">
+            <div class="dr-decision">Agent Per Tool</div>
+            <div class="dr-choice">One sub-agent per tool, always</div>
+            <div class="dr-reason">Uniform architecture enables independent invocation, parallelism, and independent upgrades regardless of tool complexity.</div>
+          </div>
+
+          <div class="decision-row-card">
+            <div class="dr-decision">Stage Agent Role</div>
+            <div class="dr-choice">Coordinator, not worker</div>
+            <div class="dr-reason">Context-aware selection means it skips what's already done, parallelises what's independent, and runs only what's needed.</div>
+          </div>
+
+          <div class="decision-row-card">
+            <div class="dr-decision">Dependencies</div>
+            <div class="dr-choice">Dual declaration — STAGE.md + SKILL.md</div>
+            <div class="dr-reason">Supports both invocation paths equally — running a full stage reads STAGE.md, running a single tool reads its own SKILL.md.</div>
+          </div>
+
+          <div class="decision-row-card">
+            <div class="dr-decision">Verify Re-runs</div>
+            <div class="dr-choice">Strictly 1 re-run allowed</div>
+            <div class="dr-reason">SKILL.md must be precise enough to get it right first. The re-run is a safety net, not a loop — prevents runaway retries.</div>
+          </div>
+
+          <div class="decision-row-card">
+            <div class="dr-decision">Failure Instructions</div>
+            <div class="dr-choice">Pre-defined in VERIFY.md + dynamic from verifier</div>
+            <div class="dr-reason">Contributors know their tool's failure modes best. Pre-defined instructions take priority; dynamic specifics fill in the actual numbers.</div>
+          </div>
+
+          <div class="decision-row-card">
+            <div class="dr-decision">Metric Dimensions</div>
+            <div class="dr-choice">Tool-specific, weighted per tool</div>
+            <div class="dr-reason">Different tools have different quality signatures — a competitive analysis weights evidence heavily; a persona weights specificity.</div>
+          </div>
+
+          <div class="decision-row-card">
+            <div class="dr-decision">Hard Stop Behaviour</div>
+            <div class="dr-choice">Flag user with best output + specific failures</div>
+            <div class="dr-reason">User stays in control. Not overwhelmed by retry noise. Receives the best output produced so far alongside the exact failure reasons.</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- FOOTER -->
+      <div class="arch-footer fade-in">
+        <p>Design Loop Architecture · <a href="index.html">Back to home</a> · <a href="https://github.com/PavanKusumaMSFT/DesignLoop.git">GitHub</a></p>
+      </div>
+
+    </div><!-- /container -->
+  </div><!-- /page -->
+
+  <script>
+    // Intersection Observer for fade-in
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.08 });
+
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+  </script>
+
+</body>
+</html>
