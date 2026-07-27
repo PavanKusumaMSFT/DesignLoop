@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   FluentProvider,
@@ -35,6 +35,9 @@ import {
   CheckmarkCircle12Filled,
   Share16Regular,
   History16Regular,
+  ArrowUpload20Regular,
+  ArrowUpload24Regular,
+  Delete16Regular,
 } from "@fluentui/react-icons";
 import { projects } from "../data/projects";
 import liveExtras from "../data/live-prototypes.json";
@@ -127,6 +130,7 @@ type LocalPrototypeEntry = {
   author?: string;
   createdBy?: string;
   route?: string;
+  sourceType?: string;
   hasLocalChanges?: boolean;
   lastUpdate?: PrototypeLastUpdate | null;
   versionCount?: number;
@@ -144,6 +148,7 @@ type LivePrototypeEntry = {
   status?: string;
   author?: string;
   route?: string;
+  sourceType?: string;
 };
 
 /** Live (repo baseline) prototypes as flat card items. */
@@ -176,7 +181,7 @@ const LIVE_ITEMS: CardItem[] = (() => {
       author: e.author,
       origin: "live" as const,
       route: e.route || `/${e.id}`,
-      sourceType: "local",
+      sourceType: e.sourceType || "local",
     }));
   const seen = new Set(fromRegistry.map((p) => p.id));
   return [...fromRegistry, ...fromPromoted.filter((p) => !seen.has(p.id))];
@@ -193,7 +198,7 @@ function toLocalCard(e: LocalPrototypeEntry): CardItem {
     createdBy: e.createdBy,
     origin: "local" as const,
     route: e.route || `/${e.id}`,
-    sourceType: "local",
+    sourceType: e.sourceType || "local",
     hasLocalChanges: e.hasLocalChanges,
     lastUpdate: e.lastUpdate,
     versionCount: e.versionCount,
@@ -337,6 +342,77 @@ const useStyles = makeStyles({
     width: "100%",
     maxWidth: "360px",
     borderRadius: tokens.borderRadiusLarge,
+  },
+  toolbar: {
+    display: "flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalM,
+    flexWrap: "wrap",
+  },
+  uploadStatus: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalXS,
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground3,
+  },
+  uploadError: {
+    color: tokens.colorPaletteRedForeground1,
+  },
+  dropOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9000,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: tokens.spacingVerticalXXL,
+    backgroundColor: "rgba(15, 23, 42, 0.28)",
+    backdropFilter: "blur(2px)",
+    pointerEvents: "none",
+  },
+  dropInner: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: tokens.spacingVerticalS,
+    textAlign: "center",
+    paddingTop: tokens.spacingVerticalXXL,
+    paddingBottom: tokens.spacingVerticalXXL,
+    paddingLeft: tokens.spacingHorizontalXXXL,
+    paddingRight: tokens.spacingHorizontalXXXL,
+    borderRadius: tokens.borderRadiusXLarge,
+    borderTopWidth: "2px",
+    borderRightWidth: "2px",
+    borderBottomWidth: "2px",
+    borderLeftWidth: "2px",
+    borderTopStyle: "dashed",
+    borderRightStyle: "dashed",
+    borderBottomStyle: "dashed",
+    borderLeftStyle: "dashed",
+    borderTopColor: tokens.colorBrandStroke1,
+    borderRightColor: tokens.colorBrandStroke1,
+    borderBottomColor: tokens.colorBrandStroke1,
+    borderLeftColor: tokens.colorBrandStroke1,
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow28,
+    minWidth: "320px",
+  },
+  dropIcon: {
+    fontSize: "40px",
+    color: tokens.colorBrandForeground1,
+  },
+  dropTitle: {
+    fontSize: tokens.fontSizeBase500,
+    fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorNeutralForeground1,
+  },
+  dropHint: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground3,
   },
   card: {
     position: "relative",
@@ -657,6 +733,7 @@ function PrototypeCard({
   onSendFigma,
   figmaState,
   report,
+  onDelete,
 }: {
   item: CardItem;
   currentEmail: string | null;
@@ -665,6 +742,7 @@ function PrototypeCard({
   onSendFigma?: (item: CardItem) => void;
   figmaState?: { phase: "working" | "error" | "done"; detail?: string; link?: string };
   report?: ReportCard;
+  onDelete?: (item: CardItem) => void;
 }) {
   const styles = useStyles();
   const router = useRouter();
@@ -727,7 +805,9 @@ function PrototypeCard({
     item.createdBy.toLowerCase() === currentEmail.toLowerCase();
 
   const canGoLive =
-    !!onGoLive && item.origin === "local" && !!item.hasLocalChanges;
+    !!onGoLive &&
+    item.origin === "local" &&
+    (item.sourceType === "uploaded" || !!item.hasLocalChanges);
 
   // Send-to-Figma is available for any workspace-rendered prototype (has a
   // local route), regardless of live/local status. Forks (external deploy only)
@@ -736,15 +816,26 @@ function PrototypeCard({
   // local DesignLoop plugin instantiates them into the target file.
   const SEND_FIGMA_ENABLED = true;
   const canSendFigma =
-    SEND_FIGMA_ENABLED && !!onSendFigma && !!item.route && item.sourceType !== "fork";
+    SEND_FIGMA_ENABLED &&
+    !!onSendFigma &&
+    !!item.route &&
+    item.sourceType !== "fork" &&
+    item.sourceType !== "uploaded";
 
   // External password-protected sharing is available for any workspace-rendered
-  // prototype (has a local route). Forks (external deploy only) are excluded.
-  const canShare = !!item.route && item.sourceType !== "fork";
+  // prototype (has a local route). Forks (external deploy only) and uploaded
+  // (non-GitHub, no reconstructable route source) are excluded.
+  const canShare =
+    !!item.route && item.sourceType !== "fork" && item.sourceType !== "uploaded";
   // Version history is git-backed and served by the local bridge, so it is
   // available for any workspace-rendered prototype (has a local route). Forks
-  // (external deploy only) have no local git source.
-  const canViewHistory = !!item.route && item.sourceType !== "fork";
+  // (external deploy only) and uploaded prototypes have no local git source.
+  const canViewHistory =
+    !!item.route && item.sourceType !== "fork" && item.sourceType !== "uploaded";
+  // Uploaded (non-GitHub) prototypes can be removed while still local (before
+  // they are promoted to Live and committed to the repo).
+  const canDelete =
+    item.sourceType === "uploaded" && item.origin === "local" && !!onDelete;
   // The share id must match the route's first path segment, which is what the
   // auth gate uses to resolve a shared link.
   const shareId =
@@ -1075,6 +1166,24 @@ function PrototypeCard({
         </div>
       )}
 
+      {canDelete && (
+        <div
+          className={styles.figmaWrap}
+          onClick={(e) => e.stopPropagation()}
+          role="presentation"
+        >
+          <Button
+            className={styles.figmaBtn}
+            appearance="subtle"
+            size="small"
+            icon={<Delete16Regular />}
+            onClick={() => onDelete?.(item)}
+          >
+            Remove
+          </Button>
+        </div>
+      )}
+
       <button
         type="button"
         className={styles.chevronBtn}
@@ -1112,6 +1221,110 @@ function WorkspaceContent() {
 
   // Per-card report card (Test-stage checks), keyed by prototype id.
   const [reports, setReports] = useState<Record<string, ReportCard>>({});
+
+  // Non-GitHub upload (drag-and-drop .html / .zip) state.
+  const [dragActive, setDragActive] = useState(false);
+  const [uploadState, setUploadState] = useState<
+    { phase: "idle" } | { phase: "working"; name: string } | { phase: "error"; detail: string }
+  >({ phase: "idle" });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragDepth = useRef(0);
+
+  const refreshLocal = useCallback(() => {
+    loadLocalItems().then(setLocalItems);
+  }, []);
+
+  const uploadPrototype = useCallback(
+    async (file: File, email: string | null) => {
+      if (!/\.(html?|zip)$/i.test(file.name)) {
+        setUploadState({
+          phase: "error",
+          detail: "Only .html and .zip files can be uploaded.",
+        });
+        return;
+      }
+      setUploadState({ phase: "working", name: file.name });
+      try {
+        const title = file.name.replace(/\.[a-z0-9]+$/i, "");
+        const qs = new URLSearchParams({ filename: file.name, title });
+        if (email) qs.set("by", email);
+        const res = await fetch(
+          `${BRIDGE_URL}/api/prototypes/upload?${qs.toString()}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/octet-stream" },
+            body: file,
+          },
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.ok === false) {
+          setUploadState({
+            phase: "error",
+            detail: data.error || `The bridge returned ${res.status}.`,
+          });
+          return;
+        }
+        setUploadState({ phase: "idle" });
+        refreshLocal();
+      } catch {
+        setUploadState({
+          phase: "error",
+          detail: `Couldn't reach the local bridge at ${BRIDGE_URL}. Start it and try again.`,
+        });
+      }
+    },
+    [refreshLocal],
+  );
+
+  const deletePrototype = useCallback(
+    async (item: CardItem) => {
+      if (
+        typeof window !== "undefined" &&
+        !window.confirm(`Remove "${item.title}" from the workspace?`)
+      ) {
+        return;
+      }
+      try {
+        await fetch(
+          `${BRIDGE_URL}/api/prototypes/uploaded?id=${encodeURIComponent(item.id)}`,
+          { method: "DELETE" },
+        );
+      } catch {
+        /* bridge unreachable — refresh will show it still present */
+      }
+      refreshLocal();
+    },
+    [refreshLocal],
+  );
+
+  const onDrop = useCallback(
+    (e: ReactDragEvent) => {
+      e.preventDefault();
+      dragDepth.current = 0;
+      setDragActive(false);
+      const file = e.dataTransfer?.files?.[0];
+      if (file) void uploadPrototype(file, currentEmail);
+    },
+    [uploadPrototype, currentEmail],
+  );
+
+  const onDragOver = useCallback((e: ReactDragEvent) => {
+    if (Array.from(e.dataTransfer?.types || []).includes("Files")) {
+      e.preventDefault();
+    }
+  }, []);
+
+  const onDragEnter = useCallback((e: ReactDragEvent) => {
+    if (!Array.from(e.dataTransfer?.types || []).includes("Files")) return;
+    dragDepth.current += 1;
+    setDragActive(true);
+  }, []);
+
+  const onDragLeave = useCallback((e: ReactDragEvent) => {
+    if (!Array.from(e.dataTransfer?.types || []).includes("Files")) return;
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDragActive(false);
+  }, []);
 
   useEffect(() => {
     loadLocalItems().then(setLocalItems);
@@ -1278,8 +1491,26 @@ function WorkspaceContent() {
   }, [query, allItems]);
 
   return (
-    <div className={styles.container}>
+    <div
+      className={styles.container}
+      onDragEnter={bridgeReady ? onDragEnter : undefined}
+      onDragOver={bridgeReady ? onDragOver : undefined}
+      onDragLeave={bridgeReady ? onDragLeave : undefined}
+      onDrop={bridgeReady ? onDrop : undefined}
+    >
       <div className={styles.gradientAccent} />
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".html,.htm,.zip"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void uploadPrototype(file, currentEmail);
+          e.target.value = "";
+        }}
+      />
 
       <div className={styles.content}>
         <div className={styles.header}>
@@ -1294,21 +1525,44 @@ function WorkspaceContent() {
 
         </div>
 
-        {allItems.length > 0 && (
-          <SearchBox
-            className={styles.searchBox}
-            size="large"
-            placeholder="Search prototypes by name"
-            value={query}
-            onChange={(_, data) => setQuery(data.value)}
-            aria-label="Search prototypes by name"
-          />
-        )}
+        <div className={styles.toolbar}>
+          {allItems.length > 0 && (
+            <SearchBox
+              className={styles.searchBox}
+              size="large"
+              placeholder="Search prototypes by name"
+              value={query}
+              onChange={(_, data) => setQuery(data.value)}
+              aria-label="Search prototypes by name"
+            />
+          )}
+          {bridgeReady && (
+            <Button
+              appearance="secondary"
+              icon={<ArrowUpload20Regular />}
+              disabled={uploadState.phase === "working"}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Upload prototype
+            </Button>
+          )}
+          {uploadState.phase === "working" && (
+            <span className={styles.uploadStatus}>
+              <Spinner size="tiny" />
+              Uploading {uploadState.name}…
+            </span>
+          )}
+          {uploadState.phase === "error" && (
+            <span className={`${styles.uploadStatus} ${styles.uploadError}`}>
+              {uploadState.detail}
+            </span>
+          )}
+        </div>
 
         {allItems.length === 0 ? (
           <div className={styles.empty}>
-            No prototypes yet. Generate one from a design task and it will appear
-            here.
+            No prototypes yet. Generate one from a design task, or drag an HTML
+            file or a .zip project here to add one.
           </div>
         ) : filtered.length === 0 ? (
           <div className={styles.empty}>
@@ -1326,11 +1580,24 @@ function WorkspaceContent() {
                 onSendFigma={bridgeReady ? runSendFigma : undefined}
                 figmaState={figmaState[p.id]}
                 report={reports[p.id]}
+                onDelete={bridgeReady ? deletePrototype : undefined}
               />
             ))}
           </div>
         )}
       </div>
+
+      {dragActive && (
+        <div className={styles.dropOverlay}>
+          <div className={styles.dropInner}>
+            <ArrowUpload24Regular className={styles.dropIcon} />
+            <Text className={styles.dropTitle}>Drop to add a prototype</Text>
+            <Text className={styles.dropHint}>
+              An HTML file or a .zip of a static project
+            </Text>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

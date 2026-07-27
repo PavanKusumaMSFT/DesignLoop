@@ -52,7 +52,21 @@ const MIME = {
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.eot': 'application/vnd.ms-fontobject',
   '.map': 'application/json; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
+  '.bmp': 'image/bmp',
+  '.webmanifest': 'application/manifest+json',
+  '.wasm': 'application/wasm',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
 };
 
 /* ───────────────────────────── helpers ───────────────────────────── */
@@ -115,7 +129,28 @@ function readBody(req) {
   });
 }
 
-/** Map a custom agent display name (e.g. "@Tester") to its CLI slug. */
+/**
+ * Read a raw binary request body into a Buffer (for file uploads). The generic
+ * readBody() above accumulates a UTF-8 string and JSON-parses it, which corrupts
+ * binary payloads — this preserves bytes and enforces a larger limit for zips.
+ */
+function readRawBody(req, limit = 64 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    let tooBig = false;
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > limit) { tooBig = true; req.destroy(); return; }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      if (tooBig) return reject(new Error('Upload too large'));
+      resolve(Buffer.concat(chunks));
+    });
+    req.on('error', reject);
+  });
+}
 function agentSlug(input) {
   if (!input) return null;
   return String(input)
@@ -833,6 +868,253 @@ function cleanFeedbackAnchor(a) {
   };
 }
 
+/* ── Uploaded prototypes (non-GitHub: dropped .html file or .zip project) ────
+ * A user drags a single .html file or a .zip of a small static project onto the
+ * workspace home; it becomes a live, openable prototype without any git flow.
+ * Extracted files live under bridge/data/uploads/<id>/ (gitignored) and are
+ * served same-machine at http://<bridge>/uploaded/<id>/<entry>. A registry at
+ * bridge/data/uploads/index.json tracks metadata; entries are merged into
+ * GET /api/prototypes/list with sourceType "uploaded". */
+const UPLOADS_DIR = path.join(__dirname, 'data', 'uploads');
+const UPLOADS_REGISTRY = path.join(UPLOADS_DIR, 'index.json');
+
+function readUploads() {
+  try {
+    const arr = JSON.parse(fs.readFileSync(UPLOADS_REGISTRY, 'utf8'));
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+
+function writeUploads(list) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  fs.writeFileSync(UPLOADS_REGISTRY, JSON.stringify(list, null, 2) + '\n');
+}
+
+/** Kebab-case a title or filename into a safe route id (extension stripped). */
+function uploadSlug(s) {
+  return String(s || '')
+    .toLowerCase()
+    .trim()
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || 'prototype';
+}
+
+/** Pick an id that doesn't collide with app routes, live ids, or prior uploads. */
+function uniqueUploadId(base) {
+  const reserved = new Set(['workspace', 'uploaded', 'api', 'share']);
+  const taken = new Set(readUploads().map((e) => e.id));
+  try {
+    fs.readdirSync(path.join(PROTO_DIR, 'app'), { withFileTypes: true })
+      .forEach((d) => { if (d.isDirectory()) taken.add(d.name); });
+  } catch { /* app dir unreadable */ }
+  try { liveIdSet().forEach((x) => taken.add(x)); } catch { /* no live registry */ }
+  let id = base;
+  let n = 2;
+  while (reserved.has(id) || taken.has(id)) id = `${base}-${n++}`;
+  return id;
+}
+
+/**
+ * Strip junk and dangerous entries from an extracted upload: macOS resource
+ * forks (__MACOSX, .DS_Store) and any nested VCS directory (.git). A nested
+ * .git in particular must never survive into the committed public/uploaded/
+ * tree, where it would corrupt the outer repository. Recurses through subdirs.
+ */
+function sanitizeUploadDir(dir) {
+  const JUNK = new Set(['__MACOSX', '.DS_Store', '.git']);
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  for (const e of entries) {
+    const abs = path.join(dir, e.name);
+    if (JUNK.has(e.name)) {
+      try { fs.rmSync(abs, { recursive: true, force: true }); } catch {}
+      continue;
+    }
+    if (e.isDirectory()) sanitizeUploadDir(abs);
+  }
+}
+
+/** Locate the entry HTML inside an extracted upload, relative to its root.
+ *  Prefers an index.html (any depth) and otherwise the shallowest *.html. */
+function findEntryHtml(dir) {
+  let best = null;
+  let bestScore = Infinity;
+  const walk = (abs, rel, depth) => {
+    let entries;
+    try { entries = fs.readdirSync(abs, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (e.name.startsWith('.') || e.name === '__MACOSX') continue;
+      const childRel = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) { walk(path.join(abs, e.name), childRel, depth + 1); continue; }
+      if (!/\.html?$/i.test(e.name)) continue;
+      const indexRank = /^index\.html?$/i.test(e.name) ? 0 : 1;
+      const score = indexRank * 1000 + depth;
+      if (score < bestScore) { bestScore = score; best = childRel; }
+    }
+  };
+  walk(dir, '', 0);
+  return best;
+}
+
+/** Uploaded prototypes as flat list items for GET /api/prototypes/list. */
+function uploadedListItems() {
+  return readUploads().map((e) => ({
+    id: e.id,
+    title: e.title,
+    description: e.description,
+    status: e.status || 'ready',
+    origin: 'local',
+    route: e.route || `/uploaded/?id=${e.id}`,
+    sourceType: 'uploaded',
+    createdBy: e.createdBy,
+    lastUpdate: e.createdAt
+      ? { at: e.createdAt, by: e.createdBy || null, kind: 'upload' }
+      : null,
+  }));
+}
+
+/** Stream a file under bridge/data/uploads/<id>/ for /uploaded/<id>/<path>. */
+function serveUploaded(req, res) {
+  const urlPath = decodeURIComponent((req.url.split('?')[0]) || '');
+  const rest = urlPath.replace(/^\/uploaded\//, '');
+  const slash = rest.indexOf('/');
+  const id = slash === -1 ? rest : rest.slice(0, slash);
+  let sub = slash === -1 ? '' : rest.slice(slash + 1);
+  if (!/^[a-z0-9][a-z0-9-_]*$/i.test(id)) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    return res.end('404 Not Found');
+  }
+  if (!sub || sub.endsWith('/')) sub += 'index.html';
+  const base = path.join(UPLOADS_DIR, id);
+  const abs = path.normalize(path.join(base, sub));
+  if (!abs.startsWith(base + path.sep) && abs !== base) {
+    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+    return res.end('403 Forbidden');
+  }
+  fs.stat(abs, (err, stat) => {
+    if (err || !stat.isFile()) {
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end('404 Not Found');
+    }
+    const ext = path.extname(abs).toLowerCase();
+    res.writeHead(200, {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
+      'Cache-Control': 'no-cache',
+      ...CORS_HEADERS,
+    });
+    fs.createReadStream(abs).pipe(res);
+  });
+}
+
+/**
+ * Promote an uploaded (non-GitHub) prototype to Live. Uploaded files live under
+ * the gitignored bridge/data/uploads/<id>/ and are normally served by the local
+ * bridge — neither works on the hosted static site. Going Live therefore copies
+ * the files into the committed prototype-workspace/public/uploaded/<id>/ (served
+ * same-origin by the static export), writes a committed manifest so the viewer
+ * can resolve the entry without the bridge, registers the prototype in the live
+ * registry, then commits and pushes. Returns { status, body } for the caller.
+ */
+async function promoteUploadedLive(rec) {
+  const id = rec.id;
+  const srcDir = path.join(UPLOADS_DIR, id);
+  if (!fs.existsSync(srcDir)) {
+    return { status: 404, body: { error: `Uploaded prototype "${id}" files are missing.` } };
+  }
+  const pubUploads = path.join(PROTO_DIR, 'public', 'uploaded');
+  const destDir = path.join(pubUploads, id);
+  try {
+    fs.rmSync(destDir, { recursive: true, force: true });
+    fs.mkdirSync(pubUploads, { recursive: true });
+    fs.cpSync(srcDir, destDir, { recursive: true });
+    sanitizeUploadDir(destDir);
+  } catch (e) {
+    return { status: 500, body: { error: `Could not copy prototype files: ${e.message}` } };
+  }
+
+  // Committed manifest: id → { entry, title }, so the viewer resolves the entry
+  // HTML same-origin (works hosted + after Go Live) without calling the bridge.
+  const manifestPath = path.join(pubUploads, 'manifest.json');
+  let manifest = {};
+  try {
+    const parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) manifest = parsed;
+  } catch { manifest = {}; }
+  manifest[id] = { entry: rec.entry || 'index.html', title: rec.title || titleCase(id) };
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+
+  // Upsert the committed live registry (drops the personal createdBy email).
+  const liveRegistryPath = path.join(PROTO_DIR, 'data', 'live-prototypes.json');
+  let liveEntries = [];
+  try {
+    const parsed = JSON.parse(fs.readFileSync(liveRegistryPath, 'utf8'));
+    if (Array.isArray(parsed)) liveEntries = parsed;
+  } catch { liveEntries = []; }
+  const liveEntry = {
+    id,
+    title: rec.title || titleCase(id),
+    description: rec.description,
+    status: 'ready',
+    route: `/uploaded/?id=${id}`,
+    sourceType: 'uploaded',
+    promotedAt: new Date().toISOString(),
+  };
+  liveEntries = liveEntries.filter((e) => e && e.id !== id);
+  liveEntries.push(liveEntry);
+  fs.mkdirSync(path.dirname(liveRegistryPath), { recursive: true });
+  fs.writeFileSync(liveRegistryPath, JSON.stringify(liveEntries, null, 2) + '\n');
+
+  // It is now live, not a local upload — drop it from the uploads registry and
+  // remove the bridge-local copy (public/uploaded is the source of truth now).
+  writeUploads(readUploads().filter((e) => e.id !== id));
+  try { fs.rmSync(srcDir, { recursive: true, force: true }); } catch {}
+
+  // Stage, commit, and push the static files + manifest + live registry.
+  const relPaths = [
+    `prototype-workspace/public/uploaded/${id}`,
+    'prototype-workspace/public/uploaded/manifest.json',
+    'prototype-workspace/data/live-prototypes.json',
+  ];
+  const add = await runGit(['add', '-f', ...relPaths]);
+  if (add.code !== 0) {
+    return { status: 500, body: { error: 'git add failed', detail: add.stderr || add.stdout } };
+  }
+  const commitMsg =
+    `Make "${liveEntry.title}" prototype live\n\n` +
+    `Promotes the uploaded ${id} prototype to the repo baseline so it is visible to everyone.\n\n` +
+    `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`;
+  const commit = await runGit(['commit', '-m', commitMsg]);
+  if (commit.code !== 0) {
+    return {
+      status: 500,
+      body: {
+        error: 'git commit failed',
+        detail: commit.stderr || commit.stdout,
+        hint: 'Nothing to commit, or git identity is not configured.',
+      },
+    };
+  }
+  appendProtoEvents([{
+    ts: Date.now(), proto: id, source: 'make-live', jobId: null, taskId: null,
+    tool: null, agent: null, kind: 'make-live', title: 'Promoted to Live',
+    author: gitUserName() || null, files: [],
+  }]);
+  historyCache.delete(id);
+  const push = await runGit(['push']);
+  if (push.code !== 0) {
+    return {
+      status: 200,
+      body: {
+        ok: true, pushed: false, committed: true, id,
+        warning: 'Committed locally but push failed — push manually.',
+        detail: push.stderr || push.stdout,
+      },
+    };
+  }
+  return { status: 200, body: { ok: true, pushed: true, committed: true, id } };
+}
 
 function normalizeKitName(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -2383,7 +2665,103 @@ async function handleApi(req, res, url) {
       it.lastUpdate = u.lastUpdate;
       it.versionCount = u.versionCount;
     }));
-    return sendJson(res, 200, { items });
+    // Uploaded (non-GitHub) prototypes are surfaced first — they are the most
+    // recently added and have no git provenance to enrich.
+    return sendJson(res, 200, { items: [...uploadedListItems(), ...items] });
+  }
+
+  // POST /api/prototypes/upload?filename=&title= — create a non-GitHub prototype
+  // from a dropped .html file or a .zip of a static project. The request body is
+  // the raw file bytes (application/octet-stream).
+  if (req.method === 'POST' && pathname === '/api/prototypes/upload') {
+    const filename = String(url.searchParams.get('filename') || '').trim();
+    const titleRaw = String(url.searchParams.get('title') || '').trim();
+    if (!/\.(html?|zip)$/i.test(filename)) {
+      return sendJson(res, 400, { error: 'Only .html and .zip files are supported.' });
+    }
+    const isZip = /\.zip$/i.test(filename);
+    let buf;
+    try { buf = await readRawBody(req); } catch (e) { return sendJson(res, 413, { error: e.message }); }
+    if (!buf || !buf.length) return sendJson(res, 400, { error: 'The file is empty.' });
+
+    const title = titleRaw || titleCase(uploadSlug(filename));
+    const id = uniqueUploadId(uploadSlug(titleRaw || filename));
+    const destDir = path.join(UPLOADS_DIR, id);
+    try {
+      fs.mkdirSync(destDir, { recursive: true });
+      let entry;
+      if (!isZip) {
+        fs.writeFileSync(path.join(destDir, 'index.html'), buf);
+        entry = 'index.html';
+      } else {
+        const tmpZip = path.join(UPLOADS_DIR, `.tmp-${id}.zip`);
+        fs.writeFileSync(tmpZip, buf);
+        const un = await new Promise((resolve) => {
+          let err = '';
+          let proc;
+          try { proc = spawn('unzip', ['-o', '-q', tmpZip, '-d', destDir]); }
+          catch (e) { return resolve({ code: -1, err: e.message }); }
+          proc.stderr.on('data', (d) => { err += d; });
+          proc.on('error', (e) => resolve({ code: -1, err: e.message }));
+          proc.on('close', (code) => resolve({ code, err }));
+        });
+        try { fs.unlinkSync(tmpZip); } catch { /* already gone */ }
+        if (un.code !== 0) {
+          try { fs.rmSync(destDir, { recursive: true, force: true }); } catch {}
+          return sendJson(res, 400, { error: `Could not extract the zip. ${un.err || ''}`.trim() });
+        }
+        sanitizeUploadDir(destDir);
+        entry = findEntryHtml(destDir);
+        if (!entry) {
+          try { fs.rmSync(destDir, { recursive: true, force: true }); } catch {}
+          return sendJson(res, 400, { error: 'No HTML file was found in the zip.' });
+        }
+      }
+      const rec = {
+        id,
+        title,
+        entry,
+        kind: isZip ? 'zip' : 'html',
+        origin: 'local',
+        sourceType: 'uploaded',
+        route: `/uploaded/?id=${id}`,
+        createdBy: String(url.searchParams.get('by') || '').trim() || undefined,
+        createdAt: new Date().toISOString(),
+      };
+      const list = readUploads().filter((e) => e.id !== id);
+      list.unshift(rec);
+      writeUploads(list);
+      return sendJson(res, 200, { ok: true, id, title, entry, route: rec.route });
+    } catch (e) {
+      try { fs.rmSync(destDir, { recursive: true, force: true }); } catch {}
+      return sendJson(res, 500, { error: e.message });
+    }
+  }
+
+  // GET /api/prototypes/uploaded — registry of uploaded (non-GitHub) prototypes.
+  if (req.method === 'GET' && pathname === '/api/prototypes/uploaded') {
+    return sendJson(res, 200, { items: readUploads() });
+  }
+
+  // GET /api/prototypes/uploaded-entry?id= — resolve an uploaded prototype's
+  // entry HTML so the /uploaded viewer route can iframe it.
+  if (req.method === 'GET' && pathname === '/api/prototypes/uploaded-entry') {
+    const id = String(url.searchParams.get('id') || '').trim();
+    const rec = readUploads().find((e) => e.id === id);
+    if (!rec) return sendJson(res, 404, { error: 'That prototype was not found.' });
+    return sendJson(res, 200, { ok: true, id: rec.id, title: rec.title, entry: rec.entry });
+  }
+
+  // DELETE /api/prototypes/uploaded?id= — remove an uploaded prototype.
+  if (req.method === 'DELETE' && pathname === '/api/prototypes/uploaded') {
+    const id = String(url.searchParams.get('id') || '').trim();
+    const list = readUploads();
+    if (!list.some((e) => e.id === id)) {
+      return sendJson(res, 404, { error: 'That prototype was not found.' });
+    }
+    try { fs.rmSync(path.join(UPLOADS_DIR, id), { recursive: true, force: true }); } catch {}
+    writeUploads(list.filter((e) => e.id !== id));
+    return sendJson(res, 200, { ok: true });
   }
 
   // GET /api/prototypes/history?id=<id> — full version timeline for a prototype:
@@ -2537,6 +2915,13 @@ async function handleApi(req, res, url) {
     let body;
     try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
     const id = String(body.id || '').trim();
+    // Uploaded (non-GitHub) prototypes promote via a different path: copy their
+    // static files into committed public/uploaded/<id>/ + manifest, then push.
+    const uploadRec = readUploads().find((e) => e.id === id);
+    if (uploadRec) {
+      const result = await promoteUploadedLive(uploadRec);
+      return sendJson(res, result.status, result.body);
+    }
     if (!/^[a-z][a-z0-9-]*$/.test(id)) {
       return sendJson(res, 400, { error: 'Invalid prototype id (must be kebab-case).' });
     }
@@ -3357,6 +3742,10 @@ const server = http.createServer((req, res) => {
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return sendJson(res, 405, { error: 'Method not allowed' });
+  }
+  // Non-GitHub uploaded prototypes are served from bridge/data/uploads/<id>/.
+  if (url.pathname.startsWith('/uploaded/')) {
+    return serveUploaded(req, res);
   }
   serveStatic(req, res);
 });

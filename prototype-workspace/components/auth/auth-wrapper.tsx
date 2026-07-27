@@ -15,7 +15,7 @@ import { getShareSession } from "@/lib/shares";
 import FeedbackLayer from "@/components/feedback/feedback-layer";
 
 /** Reserved first-segment routes that are not prototypes (no feedback layer). */
-const NON_PROTOTYPE_ROUTES = new Set(["workspace", "fre-experiments"]);
+const NON_PROTOTYPE_ROUTES = new Set(["workspace", "fre-experiments", "uploaded"]);
 
 /** Routes that bypass authentication (shareable preview links) */
 const PUBLIC_ROUTES = ["/fre-experiments"];
