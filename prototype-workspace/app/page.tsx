@@ -19,6 +19,7 @@ import {
   DialogBody,
   DialogContent,
   DialogActions,
+  Tooltip,
 } from "@fluentui/react-components";
 import {
   ArrowRight20Regular,
@@ -732,6 +733,7 @@ function PrototypeCard({
   goLiveState,
   onSendFigma,
   figmaState,
+  figmaReady,
   report,
   onDelete,
 }: {
@@ -741,6 +743,7 @@ function PrototypeCard({
   goLiveState?: { phase: "working" | "error"; detail?: string };
   onSendFigma?: (item: CardItem) => void;
   figmaState?: { phase: "working" | "error" | "done"; detail?: string; link?: string };
+  figmaReady?: boolean;
   report?: ReportCard;
   onDelete?: (item: CardItem) => void;
 }) {
@@ -813,11 +816,12 @@ function PrototypeCard({
   // local route), regardless of live/local status. Forks (external deploy only)
   // have no reconstructable source, so they are excluded. The bridge composes a
   // build spec of real Azure Fluent 2 components (fluent-to-figma agent) and the
-  // local DesignLoop plugin instantiates them into the target file.
+  // local DesignLoop plugin instantiates them into the target file. The CTA is
+  // always shown for eligible prototypes; when the local bridge is unavailable
+  // (e.g. the hosted site) it renders disabled with an explanatory tooltip.
   const SEND_FIGMA_ENABLED = true;
   const canSendFigma =
     SEND_FIGMA_ENABLED &&
-    !!onSendFigma &&
     !!item.route &&
     item.sourceType !== "fork" &&
     item.sourceType !== "uploaded";
@@ -1094,15 +1098,22 @@ function PrototypeCard({
               </Button>
             </>
           ) : (
-            <Button
-              className={styles.figmaBtn}
-              appearance="secondary"
-              size="small"
-              icon={<ArrowExport16Regular />}
-              onClick={() => onSendFigma?.(item)}
+            <Tooltip
+              content="Send to Figma runs the local DesignLoop bridge and Figma plugin. Start the prototype workspace locally to use it."
+              relationship="label"
+              visible={figmaReady ? false : undefined}
             >
-              Send to Figma
-            </Button>
+              <Button
+                className={styles.figmaBtn}
+                appearance="secondary"
+                size="small"
+                icon={<ArrowExport16Regular />}
+                disabled={!figmaReady}
+                onClick={() => onSendFigma?.(item)}
+              >
+                Send to Figma
+              </Button>
+            </Tooltip>
           )}
         </div>
       )}
@@ -1577,8 +1588,9 @@ function WorkspaceContent() {
                 currentEmail={currentEmail}
                 onGoLive={bridgeReady ? runGoLive : undefined}
                 goLiveState={goLiveState[p.id]}
-                onSendFigma={bridgeReady ? runSendFigma : undefined}
+                onSendFigma={runSendFigma}
                 figmaState={figmaState[p.id]}
+                figmaReady={bridgeReady}
                 report={reports[p.id]}
                 onDelete={bridgeReady ? deletePrototype : undefined}
               />
