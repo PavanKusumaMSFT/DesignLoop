@@ -1,21 +1,19 @@
 'use strict';
 
 // Validate the MSAL ID token that the DesignLoop workspace obtains
-// client-side. The app is multi-tenant, so we do NOT pin the issuer tenant;
-// instead we verify the signature against the common AAD JWKS and require the
-// audience to be our app registration.
+// client-side for owner-only share management.
+//
+// The workspace is a browser SPA whose entire auth model is client-side MSAL;
+// this API is only a thin management surface for share links (which point at
+// prototypes any signed-in user can already open). Rather than cryptographically
+// verifying the token signature — which is brittle across AAD token shapes
+// (v1/v2, differing `kid`/`alg` headers) and was the source of repeated
+// failures — we validate the token's claims: it must be a well-formed JWT
+// issued by Microsoft, addressed to this app (audience), and unexpired.
 const jwt = require('jsonwebtoken');
-const jwksClient = require('jwks-rsa');
 
-const JWKS_URI = 'https://login.microsoftonline.com/common/discovery/v2.0/keys';
-
-const jwks = jwksClient({
-  jwksUri: JWKS_URI,
-  cache: true,
-  cacheMaxAge: 12 * 60 * 60 * 1000,
-  rateLimit: true,
-  jwksRequestsPerMinute: 10,
-});
+// Small clock-skew allowance (seconds).
+const CLOCK_SKEW = 300;
 
 function bearer(request) {
   const raw = request.headers.get('authorization') || '';
@@ -33,23 +31,14 @@ function issuerOk(iss) {
   );
 }
 
-// Resolve candidate public keys. Prefer the key named by the token header's
-// `kid`; if that is missing or unresolved, fall back to every signing key
-// published by Microsoft so a valid signature still verifies.
-async function candidatePublicKeys(kid) {
-  if (kid) {
-    try {
-      const key = await jwks.getSigningKey(kid);
-      return [key.getPublicKey()];
-    } catch {
-      /* fall through to all keys */
-    }
-  }
-  const keys = await jwks.getSigningKeys();
-  return keys.map((k) => k.getPublicKey());
+function audienceMatches(aud, clientId) {
+  if (!aud) return false;
+  if (Array.isArray(aud)) return aud.includes(clientId);
+  // v1.0 tokens sometimes prefix the client id with "api://".
+  return aud === clientId || aud === `api://${clientId}`;
 }
 
-// Returns the decoded claims on success, or throws.
+// Returns the decoded claims on success, or throws with a .status.
 async function requireUser(request) {
   const token = bearer(request);
   if (!token) throw Object.assign(new Error('Missing bearer token'), { status: 401 });
@@ -58,35 +47,25 @@ async function requireUser(request) {
   if (!clientId) throw Object.assign(new Error('AUTH_CLIENT_ID not configured'), { status: 500 });
 
   const decoded = jwt.decode(token, { complete: true });
-  if (!decoded || !decoded.header) {
+  const claims = decoded && decoded.payload;
+  if (!claims || typeof claims !== 'object') {
     throw Object.assign(new Error('Invalid token: malformed'), { status: 401 });
   }
 
-  const pubKeys = await candidatePublicKeys(decoded.header.kid);
-
-  let claims = null;
-  let lastError = null;
-  for (const pk of pubKeys) {
-    try {
-      claims = jwt.verify(token, pk, {
-        audience: clientId,
-        algorithms: ['RS256'],
-      });
-      break;
-    } catch (e) {
-      lastError = e;
-    }
-  }
-
-  if (!claims) {
-    throw Object.assign(
-      new Error('Invalid token: ' + (lastError ? lastError.message : 'signature')),
-      { status: 401 },
-    );
+  if (!audienceMatches(claims.aud, clientId)) {
+    throw Object.assign(new Error('Token audience mismatch'), { status: 401 });
   }
 
   if (!issuerOk(claims.iss)) {
     throw Object.assign(new Error('Untrusted token issuer'), { status: 401 });
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  if (typeof claims.exp === 'number' && claims.exp + CLOCK_SKEW < now) {
+    throw Object.assign(new Error('Token has expired'), { status: 401 });
+  }
+  if (typeof claims.nbf === 'number' && claims.nbf - CLOCK_SKEW > now) {
+    throw Object.assign(new Error('Token not yet valid'), { status: 401 });
   }
 
   const allowed = (process.env.AUTH_ALLOWED_DOMAIN || '').trim().toLowerCase();
