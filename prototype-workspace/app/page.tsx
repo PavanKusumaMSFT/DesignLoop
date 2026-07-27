@@ -39,6 +39,9 @@ import {
   ArrowUpload20Regular,
   ArrowUpload24Regular,
   Delete16Regular,
+  QuestionCircle20Regular,
+  Rocket20Regular,
+  CloudArrowUp20Regular,
 } from "@fluentui/react-icons";
 import { projects } from "../data/projects";
 import liveExtras from "../data/live-prototypes.json";
@@ -276,6 +279,58 @@ const useStyles = makeStyles({
     display: "flex",
     flexDirection: "column",
     gap: tokens.spacingVerticalS,
+  },
+  helpCta: {
+    position: "absolute",
+    top: tokens.spacingVerticalXL,
+    right: tokens.spacingHorizontalXXL,
+    zIndex: 2,
+  },
+  helpList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: tokens.spacingVerticalL,
+    margin: 0,
+    padding: 0,
+    listStyleType: "none",
+  },
+  helpStep: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: tokens.spacingHorizontalM,
+  },
+  helpStepIcon: {
+    flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "32px",
+    height: "32px",
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorBrandBackground2,
+    color: tokens.colorBrandForeground1,
+  },
+  helpStepTitle: {
+    display: "block",
+    fontWeight: tokens.fontWeightSemibold,
+    fontSize: tokens.fontSizeBase300,
+    color: tokens.colorNeutralForeground1,
+  },
+  helpStepBody: {
+    display: "block",
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground3,
+    lineHeight: tokens.lineHeightBase200,
+  },
+  helpCode: {
+    fontFamily: tokens.fontFamilyMonospace,
+    fontSize: tokens.fontSizeBase200,
+    backgroundColor: tokens.colorNeutralBackground3,
+    paddingTop: "1px",
+    paddingBottom: "1px",
+    paddingLeft: tokens.spacingHorizontalXS,
+    paddingRight: tokens.spacingHorizontalXS,
+    borderRadius: tokens.borderRadiusSmall,
   },
   backLink: {
     display: "inline-flex",
@@ -1219,6 +1274,7 @@ function WorkspaceContent() {
   const [promotedItems, setPromotedItems] = useState<CardItem[]>([]);
   const [currentEmail, setCurrentEmail] = useState<string | null>(null);
   const [bridgeReady, setBridgeReady] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   // Per-card "Go Live" progress, keyed by prototype id.
   const [goLiveState, setGoLiveState] = useState<
@@ -1510,6 +1566,73 @@ function WorkspaceContent() {
       onDrop={bridgeReady ? onDrop : undefined}
     >
       <div className={styles.gradientAccent} />
+
+      <div className={styles.helpCta}>
+        <Button
+          appearance="subtle"
+          icon={<QuestionCircle20Regular />}
+          onClick={() => setHelpOpen(true)}
+        >
+          How to host my prototype?
+        </Button>
+      </div>
+
+      <Dialog open={helpOpen} onOpenChange={(_, d) => setHelpOpen(d.open)}>
+        <DialogSurface style={{ maxWidth: "520px" }}>
+          <DialogBody>
+            <DialogTitle>How to host your prototype</DialogTitle>
+            <DialogContent>
+              <ul className={styles.helpList}>
+                <li className={styles.helpStep}>
+                  <span className={styles.helpStepIcon}>
+                    <Rocket20Regular />
+                  </span>
+                  <span>
+                    <span className={styles.helpStepTitle}>1 · Run Proto Loop locally</span>
+                    <span className={styles.helpStepBody}>
+                      From <span className={styles.helpCode}>prototype-workspace/</span> run{" "}
+                      <span className={styles.helpCode}>npm run dev</span>. The local bridge starts
+                      automatically and unlocks upload, Go Live, and Send to Figma.
+                    </span>
+                  </span>
+                </li>
+                <li className={styles.helpStep}>
+                  <span className={styles.helpStepIcon}>
+                    <ArrowUpload24Regular style={{ fontSize: "20px" }} />
+                  </span>
+                  <span>
+                    <span className={styles.helpStepTitle}>2 · Add a prototype</span>
+                    <span className={styles.helpStepBody}>
+                      Task prototypes appear automatically. For anything else, drag an{" "}
+                      <span className={styles.helpCode}>.html</span> file or a{" "}
+                      <span className={styles.helpCode}>.zip</span> project onto this page (or use
+                      Upload prototype).
+                    </span>
+                  </span>
+                </li>
+                <li className={styles.helpStep}>
+                  <span className={styles.helpStepIcon}>
+                    <CloudArrowUp20Regular />
+                  </span>
+                  <span>
+                    <span className={styles.helpStepTitle}>3 · Go Live</span>
+                    <span className={styles.helpStepBody}>
+                      Click <strong>Go Live</strong> on a card to commit and publish it to the
+                      hosted site — shareable without the local bridge.
+                    </span>
+                  </span>
+                </li>
+              </ul>
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="primary" onClick={() => setHelpOpen(false)}>
+                Got it
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
+
 
       <input
         ref={fileInputRef}
