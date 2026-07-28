@@ -490,85 +490,173 @@ function fmtTimelineDate(s) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-/* Build the interactive process-timeline block for a task. Returns '' when the
-   task has no phases. Nodes carry their metadata in data-* attributes; hover
-   cards are wired up separately by wireTaskTimeline(). */
-function renderTaskTimeline(task) {
-  const phases = (task.phases || []).filter(p => (p.files && p.files.length) || (p.components && p.components.length));
-  if (!phases.length) return '';
+/* ----- Executed-tool detection ----------------------------------------------
+   Map a task's produced artifacts back to the specific tools/frameworks in each
+   stage so the timeline can colour "executed" tools and grey the rest. */
+const TL_STOP = new Set(['the','and','for','with','to','of','doc','document','page','pages','index','readme','notes','draft','final','review','plan','guide','file','files','template','templates','v1','v2','r1','r2','r3']);
+const TL_STAGEWORDS = new Set(['research','strategy','ideation','designs','design','prototype','prototypes','test','tests','handoff','deliver','discover','define','ideate','deliverables']);
 
-  const segW = 100 / phases.length;
-  const legend = phases.map(p =>
-    `<span><i style="background:${PHASE_COLORS[p.id] || '#86868B'}"></i>${escapeHtml(p.label)}</span>`
-  ).join('');
+function tlNormPath(p) {
+  return String(p || '').replace(/^tasks\/[^/]+\//, '').replace(/^\/+/, '');
+}
+function tlTokens(s) {
+  return String(s || '').toLowerCase().replace(/\.[a-z0-9]+$/, '').split(/[^a-z0-9]+/).filter(Boolean);
+}
+function tlSignif(tokens) {
+  return tokens.filter(t => t.length >= 4 && !TL_STOP.has(t) && !TL_STAGEWORDS.has(t));
+}
+function tlTokenHit(aTokens, tTokens) {
+  for (const a of aTokens) for (const t of tTokens) {
+    if (a === t) return true;
+    if (a.length >= 5 && t.length >= 5 && (a.startsWith(t) || t.startsWith(a))) return true;
+  }
+  return false;
+}
+/* Turn an output pattern (with {placeholders}, * and **) into an anchored regex. */
+function tlOutputRegex(pattern) {
+  const p = tlNormPath(pattern);
+  // Skip non-path descriptors like "Figma file (new page per prototype)".
+  if (/\s/.test(p.replace(/\{[^}]*\}/g, 'x'))) return null;
+  if (!/[/.]/.test(p)) return null;
+  const parts = p.split(/(\{[^}]*\}|\*\*|\*)/).filter(s => s !== '');
+  let rx = '';
+  for (const tk of parts) {
+    if (tk === '**') rx += '.*';
+    else if (tk === '*') rx += '[^/]*';
+    else if (/^\{[^}]*\}$/.test(tk)) rx += '[^/]*';
+    else rx += tk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+  try { return new RegExp('^' + rx + (p.endsWith('/') ? '' : '$')); }
+  catch { return null; }
+}
 
-  let nodesHtml = '';
-  phases.forEach((phase, pi) => {
-    const color = PHASE_COLORS[phase.id] || '#86868B';
-    const items = [];
-    (phase.files || []).forEach(f => {
-      const m = f.meta || {};
-      items.push({
-        kind: 'file', path: f.path,
-        title: m.title || f.label, label: f.label,
-        status: m.status || '', created: m.created || '', updated: m.updated || '',
-        author: m.author || '', excerpt: m.excerpt || '',
-      });
-    });
-    (phase.components || []).forEach(c => {
-      items.push({
-        kind: 'component', name: c.name, demo: c.demo || '',
-        sources: c.sources || [], title: c.name, label: c.name,
-        status: '', created: '', updated: '', author: '',
-        excerpt: 'Live React prototype with a runnable demo.',
-      });
-    });
-
-    items.forEach((it, ii) => {
-      const within = (ii + 1) / (items.length + 1);
-      const raw = (pi * segW) + (within * segW);
-      const leftPct = 3 + raw * 0.94; // inset so edge chips don't clip
-      const level = ii % 4;
-      const stemH = 30 + level * 28;
-      const onclick = it.kind === 'file'
-        ? `loadFile('${task.id}', '${it.path}', '${phase.id}')`
-        : `loadComponent('${task.id}', '${it.name}', '${it.demo}', ${JSON.stringify(it.sources).replace(/"/g, '&quot;')})`;
-      nodesHtml += `
-        <div class="tl-node" role="button" tabindex="0"
-          style="left:${leftPct.toFixed(3)}%;color:${color}"
-          aria-label="${escapeHtml(it.title)} — ${escapeHtml(phase.label)}"
-          data-phase="${escapeHtml(phase.label)}" data-color="${color}"
-          data-title="${escapeHtml(it.title)}" data-status="${escapeHtml(it.status)}"
-          data-created="${escapeHtml(it.created)}" data-updated="${escapeHtml(it.updated)}"
-          data-author="${escapeHtml(it.author)}" data-excerpt="${escapeHtml(it.excerpt)}"
-          onclick="${onclick}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-          <span class="chip">${escapeHtml(it.label)}</span>
-          <span class="dot"></span>
-          <span class="stem" style="height:${stemH}px"></span>
-        </div>`;
+/* Given a task, return { toolId: matchedArtifactPath } for every tool whose
+   declared outputs (or a same-stage filename match) exist among the artifacts. */
+function tlExecutedTools(task) {
+  const phases = task.phases || [];
+  const artifacts = []; // { path, dir, tokens }
+  phases.forEach(ph => {
+    (ph.files || []).forEach(f => {
+      const np = tlNormPath(f.path);
+      artifacts.push({ path: f.path, np, dir: np.split('/')[0], tokens: tlSignif(tlTokens(np.split('/').pop())) });
     });
   });
+  const dirToStage = {};
+  STAGES.forEach(s => { dirToStage[s.dir] = s.id; });
+  const stageToDir = {};
+  STAGES.forEach(s => { stageToDir[s.id] = s.dir; });
 
-  const segments = phases.map(p =>
-    `<div class="tl-seg ${p.id}"><span class="seg-label">${escapeHtml(p.label)}</span></div>`
-  ).join('');
+  const executed = {};
+  TOOL_REGISTRY.forEach(tool => {
+    let hit = null;
+    // 1) Strong signal: output-pattern match.
+    const outs = Array.isArray(tool.outputs) ? tool.outputs : [];
+    for (const o of outs) {
+      const rx = tlOutputRegex(o);
+      if (!rx) continue;
+      const m = artifacts.find(a => rx.test(a.np));
+      if (m) { hit = m.path; break; }
+    }
+    // 2) Fallback: same-stage filename-token overlap with the tool id.
+    if (!hit) {
+      const idTokens = tlSignif(tlTokens(tool.id));
+      const dirs = (tool.stages || []).map(s => stageToDir[s]).filter(Boolean);
+      const m = artifacts.find(a => dirs.includes(a.dir) && tlTokenHit(a.tokens, idTokens));
+      if (m) hit = m.path;
+    }
+    if (hit) executed[tool.id] = hit;
+  });
+  return executed;
+}
+
+/* Deterministic base height (0..1) so idle bars form an organic equalizer. */
+function tlBaseHeight(seed) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 997;
+  return 0.42 + (h % 60) / 100; // 0.42 – 1.01, clamped in CSS
+}
+
+/* Build the interactive process-timeline block for a task. Each stage renders a
+   row of tiny vertical bars — one per available tool/framework — coloured when
+   executed for this task and grey otherwise, with a dock-style hover wave wired
+   up by wireTaskTimeline(). Returns '' when the task has no artifacts. */
+function renderTaskTimeline(task) {
+  const hasArtifacts = (task.phases || []).some(p => (p.files && p.files.length) || (p.components && p.components.length));
+  if (!hasArtifacts) return '';
+
+  const executed = tlExecutedTools(task);
+  let doneCount = 0, totalCount = 0;
+  let barsHtml = '';
+  let labelsHtml = '';
+
+  STAGES.forEach(stage => {
+    let tools = getToolsForStage(stage.id)
+      .filter(t => !Array.isArray(t.stages) || t.stages.length < 5); // drop cross-cutting (web-fetch, security-audit)
+
+    // Offline / empty-registry fallback: synthesize bars from the task's own
+    // artifacts so the timeline still renders (all treated as executed).
+    let bars;
+    if (!tools.length) {
+      const phase = (task.phases || []).find(p => p.id === stage.id);
+      const files = phase ? (phase.files || []) : [];
+      if (!files.length) return;
+      bars = files.map(f => ({
+        id: '', name: (f.meta && f.meta.title) || f.label, desc: (f.meta && f.meta.excerpt) || '',
+        done: true, path: f.path,
+      }));
+    } else {
+      bars = tools.map(t => ({
+        id: t.id, name: t.name, desc: t.description || '',
+        done: !!executed[t.id], path: executed[t.id] || '',
+      }));
+    }
+
+    const color = PHASE_COLORS[stage.id] || '#86868B';
+    const stageDone = bars.filter(b => b.done).length;
+    doneCount += stageDone; totalCount += bars.length;
+
+    const groupBars = bars.map(b => {
+      const bh = tlBaseHeight((b.id || b.name) + stage.id).toFixed(3);
+      const onclick = b.done && b.path
+        ? `loadFile('${task.id}', '${b.path}', '${stage.id}')`
+        : '';
+      const cls = b.done ? 'tl-bar is-done' : 'tl-bar is-idle';
+      return `<button type="button" class="${cls}" style="--bh:${bh}"
+        aria-label="${escapeHtml(b.name)} — ${escapeHtml(stage.label)}${b.done ? ' (executed)' : ' (available)'}"
+        data-phase="${escapeHtml(stage.label)}" data-color="${color}"
+        data-title="${escapeHtml(b.name)}" data-excerpt="${escapeHtml(b.desc)}"
+        data-done="${b.done ? '1' : '0'}"${b.path ? ` data-path="${escapeHtml(b.path)}"` : ''}
+        ${onclick ? `onclick="${onclick}"` : 'tabindex="-1"'}><i></i></button>`;
+    }).join('');
+
+    // Bars and labels live in two separate aligned rows so the bars flow as one
+    // continuous equalizer (uniform gap) while each label stays under its group.
+    barsHtml += `<div class="tl-bars" data-stage="${stage.id}" style="--sc:${color};--n:${bars.length}">${groupBars}</div>`;
+    labelsHtml += `<div class="tl-stage-label" style="--sc:${color};--n:${bars.length}"><span class="tl-stage-name">${escapeHtml(stage.label)}</span><span class="tl-stage-count">${stageDone}/${bars.length}</span></div>`;
+  });
+
+  if (!barsHtml) return '';
 
   return `
     <div class="task-timeline" aria-label="Design process timeline">
       <div class="tl-head">
         <div class="tl-title"><span class="spark">✦</span> Process Timeline</div>
-        <div class="tl-legend">${legend}</div>
+        <div class="tl-legend">
+          <span><i class="tl-lg-done"></i>Executed ${doneCount}/${totalCount}</span>
+          <span><i class="tl-lg-idle"></i>Available</span>
+        </div>
       </div>
-      <div class="tl-scroll">
-        <div class="tl-lane">
-          <div class="tl-nodes">${nodesHtml}</div>
-          <div class="tl-track">${segments}</div>
+      <div class="tl-eq-wrap">
+        <div class="tl-eq">
+          <div class="tl-eq-bars">${barsHtml}</div>
+          <div class="tl-eq-labels">${labelsHtml}</div>
         </div>
       </div>
     </div>`;
 }
 
-/* Wire hover/focus cards for the timeline. Uses one shared floating card. */
+/* Wire hover/focus cards + dock-style magnification for the timeline. Uses one
+   shared floating card. */
 function wireTaskTimeline() {
   const timeline = document.querySelector('.task-timeline');
   if (!timeline) return;
@@ -599,44 +687,69 @@ function wireTaskTimeline() {
   const h4 = card.querySelector('h4');
   const desc = card.querySelector('.c-desc');
   const meta = card.querySelector('.c-meta');
+  const open = card.querySelector('.c-open');
 
   function show(node) {
     const d = node.dataset;
-    accent.style.background = d.color;
+    const done = d.done === '1';
+    accent.style.background = done ? d.color : 'var(--color-neutral-300)';
     badge.textContent = d.phase;
-    badge.style.background = d.color;
-    if (d.status) { status.textContent = d.status; status.style.display = ''; }
-    else { status.style.display = 'none'; }
+    badge.style.background = done ? d.color : 'var(--color-neutral-400)';
+    status.textContent = done ? 'Executed' : 'Available';
+    status.style.display = '';
     h4.textContent = d.title;
     if (d.excerpt) { desc.textContent = d.excerpt; desc.style.display = ''; }
     else { desc.style.display = 'none'; }
-    const rows = [];
-    if (d.created) rows.push(`<div class="c-row"><b>Created</b> <span>${escapeHtml(fmtTimelineDate(d.created))}</span></div>`);
-    if (d.updated) rows.push(`<div class="c-row"><b>Updated</b> <span>${escapeHtml(fmtTimelineDate(d.updated))}</span></div>`);
-    if (d.author) rows.push(`<div class="c-row"><b>Author</b> <span>${escapeHtml(d.author)}</span></div>`);
-    meta.innerHTML = rows.join('');
-    meta.style.display = rows.length ? '' : 'none';
+    meta.style.display = 'none';
+    if (done && d.path) { open.style.display = ''; open.firstChild.textContent = 'Open artifact'; }
+    else { open.style.display = 'none'; }
 
     card.classList.add('show');
     const r = node.getBoundingClientRect();
     const cw = card.offsetWidth || 288;
-    const ch = card.offsetHeight || 220;
+    const ch = card.offsetHeight || 160;
     let left = r.left + r.width / 2 - cw / 2;
     left = Math.max(12, Math.min(left, window.innerWidth - cw - 12));
-    let top = r.top - ch - 14;
-    if (top < 12) top = r.bottom + 14;
+    let top = r.top - ch - 16;
+    if (top < 12) top = r.bottom + 16;
     card.style.left = left + 'px';
     card.style.top = top + 'px';
   }
   function hide() { card.classList.remove('show'); }
 
-  timeline.querySelectorAll('.tl-node').forEach(node => {
+  timeline.querySelectorAll('.tl-bar').forEach(node => {
     node.addEventListener('mouseenter', () => show(node));
     node.addEventListener('mouseleave', hide);
     node.addEventListener('focus', () => show(node));
     node.addEventListener('blur', hide);
   });
-  timeline.querySelector('.tl-scroll')?.addEventListener('scroll', hide, { passive: true });
+
+  // Dock-style magnification: bars near the cursor grow, tapering with distance.
+  const eq = timeline.querySelector('.tl-eq');
+  if (eq) {
+    const bars = [...eq.querySelectorAll('.tl-bar')];
+    const R = 74; // influence radius (px)
+    let raf = 0;
+    const apply = (mx) => {
+      raf = 0;
+      bars.forEach(b => {
+        const br = b.getBoundingClientRect();
+        const cx = br.left + br.width / 2;
+        const dist = Math.abs(mx - cx);
+        const mag = dist < R ? 0.5 * (1 + Math.cos(Math.PI * dist / R)) : 0;
+        b.style.setProperty('--mag', mag.toFixed(3));
+      });
+    };
+    eq.addEventListener('mousemove', (e) => {
+      const mx = e.clientX;
+      if (!raf) raf = requestAnimationFrame(() => apply(mx));
+    }, { passive: true });
+    eq.addEventListener('mouseleave', () => {
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      bars.forEach(b => b.style.setProperty('--mag', '0'));
+    });
+    eq.addEventListener('scroll', hide, { passive: true });
+  }
 }
 
 function loadTask(taskId) {
@@ -1741,7 +1854,7 @@ function renderTaskRoute() {
 
 async function initTaskPage() {
   await bridgeHealth();
-  loadToolRegistry();
+  await loadToolRegistry();
   const linkInput = document.getElementById('linkSourceInput');
   if (linkInput) {
     linkInput.addEventListener('keydown', (e) => {
