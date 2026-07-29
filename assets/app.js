@@ -2719,7 +2719,17 @@ function seqCheckpoint(out, state, i) {
     stageId: justDone.stageId || justDone.id || null,
     title: `Checkpoint — ${justDone.label} done`,
     summary,
-    payload: { kind: 'stage', resumeIndex: i + 1 },
+    payload: {
+      kind: 'sequence',
+      resumeIndex: i + 1,
+      mode: state.mode,
+      stepIds: state.steps.map((s) => s.id),
+      statuses: state.statuses.slice(),
+      text: state.text || '',
+      sourcesBlock: state.sourcesBlock || '',
+      runtimeSources: state.runtimeSources || [],
+      taskId: state.taskId || null,
+    },
   }).then((d) => { entryId = d.entry && d.entry.id; refreshReviewInbox(); }).catch(() => {});
 
   return new Promise((resolve) => {
@@ -2773,7 +2783,11 @@ async function openReviewInbox() {
   let data;
   try { data = await reviewApi('/list', 'GET'); } catch { return; }
   const entries = data.entries || [];
-  const rows = entries.map((e) => `
+  const rows = entries.map((e) => {
+    const p = e.payload || {};
+    const resumable = p.kind === 'sequence' && Array.isArray(p.stepIds)
+      && Number(p.resumeIndex) < p.stepIds.length;
+    return `
     <li class="inbox-row" data-id="${e.id}">
       <span class="inbox-type inbox-type-${e.type}">${e.type}</span>
       <span class="inbox-body">
@@ -2782,9 +2796,11 @@ async function openReviewInbox() {
         <span class="inbox-summary">${escapeHtml((e.summary || '').split('\n')[0])}</span>
       </span>
       <span class="inbox-actions">
+        ${resumable ? `<button type="button" class="inbox-resume" onclick="resumeReview('${e.id}')">Resume</button>` : ''}
         <button type="button" class="inbox-dismiss" onclick="dismissReview('${e.id}')">Dismiss</button>
       </span>
-    </li>`).join('');
+    </li>`;
+  }).join('');
   out.innerHTML = `
     <div class="inbox-panel">
       <div class="inbox-head"><strong>Needs your review</strong><span class="inbox-count">${entries.length}</span></div>
@@ -2796,6 +2812,55 @@ async function dismissReview(id) {
   try { await reviewApi(`/${id}`, 'DELETE'); } catch {}
   refreshReviewInbox();
   openReviewInbox();
+}
+
+/* Resume a paused sequence from a stored checkpoint — works across tabs/reloads
+ * since the full resumable state lives in the review entry's payload. */
+async function resumeReview(id) {
+  const out = document.getElementById('commandOutput');
+  if (!out) return;
+  let data;
+  try { data = await reviewApi('/list', 'GET'); } catch { return; }
+  const entry = (data.entries || []).find((e) => e.id === id);
+  const p = entry && entry.payload;
+  if (!p || p.kind !== 'sequence' || !Array.isArray(p.stepIds)) {
+    renderCopyFallback(out, 'This checkpoint can no longer be resumed.');
+    return;
+  }
+  const steps = p.stepIds.map((sid) => {
+    if (p.mode === 'stage') {
+      const s = STAGES.find((x) => x.id === sid) || { id: sid, label: sid };
+      return { id: sid, mode: 'stage', label: s.label, stageId: sid };
+    }
+    const t = TOOL_REGISTRY.find((x) => x.id === sid) || { id: sid, name: sid, agent: null, stages: ['discover'] };
+    return { id: sid, mode: 'tool', label: t.name, tool: t, stage: (t.stages && t.stages[0]) || 'discover' };
+  });
+  const resumeIndex = Math.max(0, Math.min(Number(p.resumeIndex) || 0, steps.length));
+  // Abandon any orphaned in-memory loop before taking over.
+  if (SEQ_STATE) SEQ_STATE.aborted = true;
+  const state = {
+    mode: p.mode,
+    steps,
+    text: p.text || '',
+    sourcesBlock: p.sourcesBlock || '',
+    runtimeSources: p.runtimeSources || [],
+    sourceSnapshot: null,
+    taskId: p.taskId || null,
+    statuses: steps.map((_, i) => (i < resumeIndex ? 'done' : 'pending')),
+    allArtifacts: [],
+    aborted: false,
+    jobId: null,
+    index: resumeIndex,
+    nextNote: '',
+  };
+  SEQ_STATE = state;
+  try { await reviewApi('/resolve', 'POST', { id, decision: 'approve', note: '' }); } catch {}
+  refreshReviewInbox();
+  out.innerHTML = renderSeqPanel(state);
+  const cancelBtn = out.querySelector('.run-seq-cancel');
+  if (cancelBtn) cancelBtn.onclick = () => seqCancel(state);
+  if (resumeIndex >= steps.length) { finishSeq(out, state); return; }
+  runSeqFrom(out, state, resumeIndex);
 }
 
 /* ---------- Sequential multi-step runner (stages / tools) ---------- */
