@@ -14,5 +14,13 @@
     "route": "/uploaded/?id=designloop-website",
     "sourceType": "uploaded",
     "promotedAt": "2026-07-27T18:21:54.564Z"
+  },
+  {
+    "id": "generate-a-fluent-sign-up-page",
+    "title": "Generate A Fluent Sign Up Page",
+    "status": "in-progress",
+    "author": "pavankusuma",
+    "route": "/generate-a-fluent-sign-up-page",
+    "promotedAt": "2026-07-29T09:02:40.890Z"
   }
 ]
