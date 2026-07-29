@@ -868,6 +868,112 @@ function cleanFeedbackAnchor(a) {
   };
 }
 
+/* ── External prototype shares (password-protected, time-boxed links) ───────
+ * Local mirror of the deployed SWA shares API (prototype-workspace/api). The
+ * bridge is same-machine so owner calls need no MSAL token here. Records live
+ * under bridge/data/shares/<prototypeId>.json (gitignored). Passwords are
+ * stored as scrypt hashes, never in plaintext. */
+const SHARES_DIR = path.join(__dirname, 'data', 'shares');
+
+function sharesFile(prototypeId) {
+  return path.join(SHARES_DIR, `${prototypeId}.json`);
+}
+
+function readShares(prototypeId) {
+  try {
+    const arr = JSON.parse(fs.readFileSync(sharesFile(prototypeId), 'utf8'));
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeShares(prototypeId, rows) {
+  fs.mkdirSync(SHARES_DIR, { recursive: true });
+  fs.writeFileSync(sharesFile(prototypeId), JSON.stringify(rows, null, 2) + '\n');
+}
+
+function shareStatus(e) {
+  if (e.locked) return 'locked';
+  if (e.expiresAt && new Date(e.expiresAt).getTime() < Date.now()) return 'expired';
+  return 'active';
+}
+
+function hashSharePassword(pw) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(String(pw), salt, 64).toString('hex');
+  return `scrypt$${salt}$${hash}`;
+}
+
+function verifySharePassword(pw, stored) {
+  try {
+    const [scheme, salt, hash] = String(stored || '').split('$');
+    if (scheme !== 'scrypt' || !salt || !hash) return false;
+    const test = crypto.scryptSync(String(pw), salt, 64);
+    const known = Buffer.from(hash, 'hex');
+    return test.length === known.length && crypto.timingSafeEqual(test, known);
+  } catch {
+    return false;
+  }
+}
+
+/* ── Human-in-the-loop review queue ─────────────────────────────────────────
+ * Durable, resumable gates for supervised runs. Every pending decision (a
+ * pre-run plan, a between-stage checkpoint, or a flagged verifier result) is an
+ * entry here so pauses survive tab close/reload and can be resolved async from
+ * the "Needs your review" inbox. Single JSON file under the gitignored
+ * bridge/data/ tree — volume is tiny (one machine, one operator). */
+const REVIEW_DIR = path.join(__dirname, 'data', 'review');
+const REVIEW_FILE = path.join(REVIEW_DIR, 'index.json');
+
+function readReview() {
+  try {
+    const arr = JSON.parse(fs.readFileSync(REVIEW_FILE, 'utf8'));
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeReview(rows) {
+  fs.mkdirSync(REVIEW_DIR, { recursive: true });
+  fs.writeFileSync(REVIEW_FILE, JSON.stringify(rows, null, 2) + '\n');
+}
+
+// Create a review entry. `payload` carries everything needed to resume the run
+// (the next request body + client state) so any tab — or the inbox — can act.
+function createReviewEntry({ type, taskId, jobId, stageId, title, summary, payload }) {
+  const entry = {
+    id: `rv_${Date.now().toString(36)}_${crypto.randomBytes(4).toString('hex')}`,
+    type: type || 'plan',              // 'plan' | 'stage' | 'flag'
+    taskId: taskId || null,
+    jobId: jobId || null,
+    stageId: stageId || null,
+    title: String(title || '').slice(0, 200),
+    summary: String(summary || '').slice(0, 4000),
+    payload: payload || null,
+    status: 'pending',                 // 'pending' | 'approved' | 'rejected' | 'redo'
+    note: '',
+    createdAt: new Date().toISOString(),
+    resolvedAt: null,
+  };
+  const rows = readReview();
+  rows.push(entry);
+  writeReview(rows);
+  return entry;
+}
+
+// Detect irreversible actions in a run so the plan can flag them for the human.
+function detectIrreversible(text) {
+  const s = String(text || '').toLowerCase();
+  const hits = [];
+  if (/\bgo[\s-]?live\b|make[\s-]?live/.test(s)) hits.push('Go Live (publishes the prototype)');
+  if (/\bgit push\b|\bpush\b/.test(s)) hits.push('git push');
+  if (/\bshare\b|external link/.test(s)) hits.push('External share link');
+  if (/\bdelete\b|\brm -/.test(s)) hits.push('Delete files');
+  return hits;
+}
+
 /* ── Uploaded prototypes (non-GitHub: dropped .html file or .zip project) ────
  * A user drags a single .html file or a .zip of a small static project onto the
  * workspace home; it becomes a live, openable prototype without any git flow.
@@ -2904,6 +3010,210 @@ async function handleApi(req, res, url) {
     const comments = readFeedback(prototypeId);
     const next = comments.filter((c) => c.id !== id);
     writeFeedback(prototypeId, next);
+    return sendJson(res, 200, { ok: true });
+  }
+
+
+
+  // ── External prototype shares ─────────────────────────────────────────────
+  // Local mirror of the deployed SWA shares API. Owner calls (create/list/lock)
+  // need no auth here — the bridge only runs on the owner's machine. Verify is
+  // public (used by the ShareGate for password-protected external links).
+
+  // POST /api/shares  { prototypeId, route, password, expiresInMinutes, label? }
+  if (req.method === 'POST' && pathname === '/api/shares') {
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const prototypeId = String(body.prototypeId || '').trim();
+    const route = String(body.route || '').trim();
+    const password = String(body.password || '');
+    let minutes = parseInt(body.expiresInMinutes, 10);
+    const MAX_MINUTES = 60 * 24 * 30; // 30 days
+    if (!prototypeId) return sendJson(res, 400, { error: 'prototypeId is required' });
+    if (password.length < 4) return sendJson(res, 400, { error: 'Password must be at least 4 characters' });
+    if (!Number.isFinite(minutes) || minutes <= 0) return sendJson(res, 400, { error: 'expiresInMinutes must be a positive number' });
+    if (minutes > MAX_MINUTES) minutes = MAX_MINUTES;
+    const token = crypto.randomBytes(16).toString('hex');
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + minutes * 60 * 1000).toISOString();
+    const record = {
+      prototypeId,
+      token,
+      passwordHash: hashSharePassword(password),
+      expiresAt,
+      locked: false,
+      label: String(body.label || '').slice(0, 120),
+      route,
+      createdBy: String(body.createdBy || 'owner'),
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    };
+    const rows = readShares(prototypeId);
+    rows.push(record);
+    writeShares(prototypeId, rows);
+    return sendJson(res, 201, { token, expiresAt, route, prototypeId, locked: false });
+  }
+
+  // GET /api/shares/list?prototypeId=  — sanitized (never returns password hash)
+  if (req.method === 'GET' && pathname === '/api/shares/list') {
+    const prototypeId = String(url.searchParams.get('prototypeId') || '').trim();
+    if (!prototypeId) return sendJson(res, 400, { error: 'prototypeId is required' });
+    const rows = readShares(prototypeId).map((e) => ({
+      prototypeId: e.prototypeId,
+      token: e.token,
+      route: e.route || '',
+      label: e.label || '',
+      expiresAt: e.expiresAt,
+      locked: !!e.locked,
+      createdBy: e.createdBy || '',
+      createdAt: e.createdAt,
+      status: shareStatus(e),
+    }));
+    rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    return sendJson(res, 200, { shares: rows });
+  }
+
+  // POST /api/shares/lock  { prototypeId, token, locked }
+  if (req.method === 'POST' && pathname === '/api/shares/lock') {
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const prototypeId = String(body.prototypeId || '').trim();
+    const token = String(body.token || '').trim();
+    const locked = !!body.locked;
+    if (!prototypeId || !token) return sendJson(res, 400, { error: 'prototypeId and token are required' });
+    const rows = readShares(prototypeId);
+    const rec = rows.find((e) => e.token === token);
+    if (!rec) return sendJson(res, 404, { error: 'Share not found' });
+    rec.locked = locked;
+    rec.updatedAt = new Date().toISOString();
+    writeShares(prototypeId, rows);
+    return sendJson(res, 200, { prototypeId, token, locked });
+  }
+
+  // POST /api/shares/verify  (PUBLIC)  { prototypeId, token, password }
+  if (req.method === 'POST' && pathname === '/api/shares/verify') {
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const prototypeId = String(body.prototypeId || '').trim();
+    const token = String(body.token || '').trim();
+    const password = String(body.password || '');
+    if (!prototypeId || !token) return sendJson(res, 400, { valid: false, reason: 'missing' });
+    const share = readShares(prototypeId).find((e) => e.token === token);
+    if (!share) return sendJson(res, 404, { valid: false, reason: 'not_found' });
+    if (share.locked) return sendJson(res, 403, { valid: false, reason: 'locked' });
+    if (share.expiresAt && new Date(share.expiresAt).getTime() < Date.now())
+      return sendJson(res, 403, { valid: false, reason: 'expired' });
+    if (!verifySharePassword(password, share.passwordHash))
+      return sendJson(res, 401, { valid: false, reason: 'password' });
+    return sendJson(res, 200, { valid: true, expiresAt: share.expiresAt, route: share.route || '' });
+  }
+
+  // ── Human-in-the-loop review queue ────────────────────────────────────────
+
+  // POST /api/run/plan — synthesize a pre-run plan for a supervised run and open
+  // a pending "plan" review gate. Body mirrors a run request plus optional
+  // { steps:[{mode,stageId?,toolId?,label}], mode }. Returns the plan; the client
+  // renders it and, on approve, resolves the gate then launches the real run.
+  if (req.method === 'POST' && pathname === '/api/run/plan') {
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const taskId = (body.taskId || '').toString().trim() || null;
+    const prompt = (body.prompt || '').toString().trim();
+    const rawSteps = Array.isArray(body.steps) ? body.steps : [];
+    const steps = rawSteps.length
+      ? rawSteps.map((s, i) => ({
+          n: i + 1,
+          mode: s.mode === 'stage' ? 'stage' : 'tool',
+          stageId: s.stageId || null,
+          toolId: s.toolId || null,
+          label: String(s.label || s.stageId || s.toolId || `Step ${i + 1}`).slice(0, 120),
+        }))
+      : [{
+          n: 1,
+          mode: body.stageId ? 'stage' : 'tool',
+          stageId: body.stageId || null,
+          toolId: body.toolId || null,
+          label: String(body.label || body.stageId || body.toolId || 'Run').slice(0, 120),
+        }];
+    const taskPath = taskId ? `tasks/${taskId}` : 'tasks/<new-task>';
+    const irreversible = detectIrreversible(`${prompt} ${steps.map((s) => s.label).join(' ')}`);
+    const summary = [
+      `${steps.length} step${steps.length === 1 ? '' : 's'} → ${taskPath}/`,
+      ...steps.map((s) => `  ${s.n}. ${s.label}${s.mode === 'stage' ? ' (stage)' : ''}`),
+      irreversible.length ? `Irreversible: ${irreversible.join(', ')}` : '',
+    ].filter(Boolean).join('\n');
+    const entry = createReviewEntry({
+      type: 'plan',
+      taskId,
+      title: `Plan approval — ${steps.length} step${steps.length === 1 ? '' : 's'}`,
+      summary,
+      payload: { kind: 'plan', request: body },
+    });
+    return sendJson(res, 200, {
+      planId: entry.id,
+      taskId,
+      taskPath,
+      steps,
+      irreversible,
+      summary,
+    });
+  }
+
+  // POST /api/review/create — open a stage-checkpoint or flag review gate.
+  if (req.method === 'POST' && pathname === '/api/review/create') {
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const type = ['stage', 'flag', 'plan'].includes(body.type) ? body.type : 'stage';
+    const entry = createReviewEntry({
+      type,
+      taskId: body.taskId || null,
+      jobId: body.jobId || null,
+      stageId: body.stageId || null,
+      title: body.title || (type === 'flag' ? 'Quality gate flagged' : 'Stage checkpoint'),
+      summary: body.summary || '',
+      payload: body.payload || null,
+    });
+    return sendJson(res, 201, { entry });
+  }
+
+  // GET /api/review/list?taskId=&status=  — pending gates (default) or filtered.
+  if (req.method === 'GET' && pathname === '/api/review/list') {
+    const taskId = String(url.searchParams.get('taskId') || '').trim();
+    const status = String(url.searchParams.get('status') || 'pending').trim();
+    let rows = readReview();
+    if (status !== 'all') rows = rows.filter((e) => e.status === status);
+    if (taskId) rows = rows.filter((e) => e.taskId === taskId);
+    rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    return sendJson(res, 200, { entries: rows, pending: readReview().filter((e) => e.status === 'pending').length });
+  }
+
+  // POST /api/review/resolve  { id, decision:'approve'|'reject'|'redo', note? }
+  // Marks the gate resolved and returns its stored resume payload so the caller
+  // can relaunch the next job.
+  if (req.method === 'POST' && pathname === '/api/review/resolve') {
+    let body;
+    try { body = await readBody(req); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+    const id = String(body.id || '').trim();
+    const decision = ['approve', 'reject', 'redo'].includes(body.decision) ? body.decision : '';
+    if (!id || !decision) return sendJson(res, 400, { error: 'id and a valid decision are required' });
+    const rows = readReview();
+    const entry = rows.find((e) => e.id === id);
+    if (!entry) return sendJson(res, 404, { error: 'Review entry not found' });
+    entry.status = decision === 'approve' ? 'approved' : (decision === 'redo' ? 'redo' : 'rejected');
+    entry.note = String(body.note || '').slice(0, 4000);
+    entry.resolvedAt = new Date().toISOString();
+    writeReview(rows);
+    return sendJson(res, 200, { entry, payload: entry.payload || null });
+  }
+
+  // DELETE /api/review/:id — dismiss a gate.
+  const reviewDel = pathname.match(/^\/api\/review\/([^/]+)$/);
+  if (req.method === 'DELETE' && reviewDel) {
+    const id = reviewDel[1];
+    const rows = readReview();
+    const next = rows.filter((e) => e.id !== id);
+    if (next.length === rows.length) return sendJson(res, 404, { error: 'Review entry not found' });
+    writeReview(next);
     return sendJson(res, 200, { ok: true });
   }
 

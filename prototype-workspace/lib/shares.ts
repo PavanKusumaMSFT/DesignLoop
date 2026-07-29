@@ -9,7 +9,27 @@
 import { msalInstance } from "@/components/auth/auth-providers";
 import { loginRequest } from "@/lib/msal-config";
 
-const API_BASE = process.env.NEXT_PUBLIC_SHARES_API_BASE || "/api";
+const SHARES_API_BASE_ENV = process.env.NEXT_PUBLIC_SHARES_API_BASE;
+
+// Resolve the shares API base so the same client works everywhere:
+//   • NEXT_PUBLIC_SHARES_API_BASE when explicitly set;
+//   • the local bridge (http://<host>:8099/api) when running the dev workspace
+//     on :3100 — the SWA Functions API does not run under `next dev`;
+//   • otherwise same-origin `/api` (the deployed SWA Functions).
+function sharesApiBase(): string {
+  if (SHARES_API_BASE_ENV) return SHARES_API_BASE_ENV.replace(/\/+$/, "");
+  if (typeof window !== "undefined") {
+    const { hostname, port, protocol } = window.location;
+    if (port === "3100") {
+      return `${protocol}//${hostname}:8099/api`;
+    }
+  }
+  return "/api";
+}
+
+function usingBridge(base: string): boolean {
+  return base.includes(":8099");
+}
 
 export interface ShareRecord {
   prototypeId: string;
@@ -86,15 +106,18 @@ async function getIdToken(): Promise<string> {
 }
 
 async function ownerFetch(path: string, init: RequestInit = {}) {
-  const token = await getIdToken();
-  const res = await fetch(`${API_BASE}${path}`, {
+  const base = sharesApiBase();
+  // The local bridge runs on the owner's machine and needs no MSAL token; only
+  // the deployed SWA Functions require the owner token header.
+  const token = usingBridge(base) ? null : await getIdToken();
+  const res = await fetch(`${base}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
       // Azure Static Web Apps reserves the `Authorization` header for its own
       // platform auth and does not forward it to managed Functions, so the
       // MSAL token is sent in a custom header the function reads instead.
-      "X-Owner-Token": token,
+      ...(token ? { "X-Owner-Token": token } : {}),
       ...(init.headers || {}),
     },
   });
@@ -155,7 +178,7 @@ export async function verifyShare(
   token: string,
   password: string,
 ): Promise<VerifyResult> {
-  const res = await fetch(`${API_BASE}/shares/verify`, {
+  const res = await fetch(`${sharesApiBase()}/shares/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prototypeId, token, password }),

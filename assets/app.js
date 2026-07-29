@@ -792,6 +792,7 @@ function loadTask(taskId) {
   `;
   wireTaskTimeline();
   wireComposer('lifecycle');
+  syncReviewToggle();
   loadReportCard(taskId);
   wireVersionPreviews();
 }
@@ -1940,6 +1941,11 @@ function composerMarkup(placeholder) {
           </div>
           <input type="file" id="artifactFileInput" multiple hidden onchange="onArtifactFiles(event)">
         </div>
+        <label class="review-toggle" title="Pause for your approval before running and between stages">
+          <input type="checkbox" id="reviewModeToggle" checked onchange="onReviewModeToggle(this)">
+          <span class="review-toggle-track" aria-hidden="true"><span class="review-toggle-thumb"></span></span>
+          <span class="review-toggle-text">Review mode</span>
+        </label>
         <div class="composer-right">
           <div class="run-split">
             <button class="cmd-primary" type="button" aria-haspopup="true" aria-expanded="false" onclick="toggleRunMenu(event)">
@@ -2545,6 +2551,8 @@ async function runStage(stageId) {
   const taskId = extractTaskId();
   const sourceArtifacts = runtimeComposerSourceArtifacts();
 
+  if (!(await reviewGate(out, { taskId, prompt, stageId, label: stage.label }))) return;
+
   out.innerHTML = processingPanelHtml(`Starting ${stage.label} stage…`);
   const statusEl   = out.querySelector('.run-status-text');
   const cancelBtn  = out.querySelector('.run-cancel');
@@ -2597,6 +2605,199 @@ async function runStage(stageId) {
   }
 }
 
+/* ---------- Human-in-the-loop (review gates) ---------- */
+let REVIEW_MODE = (localStorage.getItem('dl_review_mode') !== 'off');
+
+function onReviewModeToggle(el) {
+  REVIEW_MODE = !!(el && el.checked);
+  localStorage.setItem('dl_review_mode', REVIEW_MODE ? 'on' : 'off');
+}
+
+/* Reflect the persisted REVIEW_MODE onto the checkbox after a composer renders. */
+function syncReviewToggle() {
+  const el = document.getElementById('reviewModeToggle');
+  if (el) el.checked = REVIEW_MODE;
+}
+
+async function reviewApi(path, method, body) {
+  const res = await fetch(`/api/review${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+
+/* Pre-run plan gate (A). Resolves true to proceed, false to abort/edit.
+   Never blocks the run if the bridge/plan endpoint is unavailable. */
+async function reviewGate(out, planReq) {
+  if (!REVIEW_MODE || !out) return true;
+  let plan;
+  try {
+    const res = await fetch('/api/run/plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(planReq),
+    });
+    plan = await res.json();
+    if (!res.ok) throw new Error(plan && plan.error);
+  } catch {
+    return true; // fail open — don't trap the user if planning breaks
+  }
+  return new Promise((resolve) => {
+    out.innerHTML = renderPlanPanel(plan);
+    const done = (v) => { resolve(v); };
+    const approve = out.querySelector('.plan-approve');
+    const edit = out.querySelector('.plan-edit');
+    const cancel = out.querySelector('.plan-cancel');
+    if (approve) approve.onclick = async () => {
+      approve.disabled = true;
+      try { await reviewApi('/resolve', 'POST', { id: plan.planId, decision: 'approve' }); } catch {}
+      refreshReviewInbox();
+      done(true);
+    };
+    if (edit) edit.onclick = async () => {
+      try { await reviewApi('/resolve', 'POST', { id: plan.planId, decision: 'reject' }); } catch {}
+      refreshReviewInbox();
+      out.innerHTML = '';
+      const box = document.getElementById('commandInput');
+      if (box) box.focus();
+      done(false);
+    };
+    if (cancel) cancel.onclick = async () => {
+      try { await reviewApi('/resolve', 'POST', { id: plan.planId, decision: 'reject' }); } catch {}
+      refreshReviewInbox();
+      out.innerHTML = '';
+      done(false);
+    };
+  });
+}
+
+function renderPlanPanel(plan) {
+  const steps = (plan.steps || []).map((s) => `
+    <li class="plan-step">
+      <span class="plan-step-n">${s.n}</span>
+      <span class="plan-step-label">${escapeHtml(s.label)}</span>
+      ${s.mode === 'stage' ? '<span class="plan-step-kind">stage</span>' : ''}
+    </li>`).join('');
+  const warn = (plan.irreversible || []).length
+    ? `<div class="plan-warn">
+         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+         <span>Irreversible: ${plan.irreversible.map(escapeHtml).join(', ')}</span>
+       </div>`
+    : '';
+  return `
+    <div class="plan-panel" role="dialog" aria-label="Review plan before running">
+      <div class="plan-head">
+        <span class="plan-badge">Review</span>
+        <strong class="plan-title">Approve this run</strong>
+        <span class="plan-sub">${escapeHtml(plan.taskPath || '')}</span>
+      </div>
+      <ol class="plan-steps">${steps}</ol>
+      ${warn}
+      <div class="plan-actions">
+        <button type="button" class="plan-approve">Approve &amp; run</button>
+        <button type="button" class="plan-edit">Edit prompt</button>
+        <button type="button" class="plan-cancel">Cancel</button>
+      </div>
+    </div>`;
+}
+
+/* Between-stage checkpoint gate (B). Renders pause controls in the sequence
+   panel, opens a durable review entry, and resolves with the human's decision. */
+function seqCheckpoint(out, state, i) {
+  const controls = out.querySelector('.run-seq-controls');
+  const justDone = state.steps[i];
+  const next = state.steps[i + 1];
+  const summary = `Completed: ${justDone.label}. Next: ${next.label}.`;
+  let entryId = null;
+  reviewApi('/create', 'POST', {
+    type: 'stage',
+    taskId: state.taskId || null,
+    stageId: justDone.stageId || justDone.id || null,
+    title: `Checkpoint — ${justDone.label} done`,
+    summary,
+    payload: { kind: 'stage', resumeIndex: i + 1 },
+  }).then((d) => { entryId = d.entry && d.entry.id; refreshReviewInbox(); }).catch(() => {});
+
+  return new Promise((resolve) => {
+    if (!controls) { resolve({ action: 'continue' }); return; }
+    setHomeRunning(false);
+    controls.innerHTML = `
+      <div class="seq-checkpoint">
+        <div class="seq-checkpoint-msg">
+          <span class="seq-checkpoint-badge">Paused</span>
+          ${escapeHtml(justDone.label)} finished — review before continuing to <strong>${escapeHtml(next.label)}</strong>.
+        </div>
+        <textarea class="seq-checkpoint-note" rows="1" placeholder="Optional note to steer the next step…"></textarea>
+        <div class="seq-checkpoint-actions">
+          <button type="button" class="seq-continue">Continue</button>
+          <button type="button" class="seq-redo">Redo this step</button>
+          <button type="button" class="seq-stop">Stop</button>
+        </div>
+      </div>`;
+    const noteEl = controls.querySelector('.seq-checkpoint-note');
+    const finish = async (action, decision) => {
+      const note = noteEl ? noteEl.value.trim() : '';
+      if (entryId) { try { await reviewApi('/resolve', 'POST', { id: entryId, decision, note }); } catch {} }
+      refreshReviewInbox();
+      controls.innerHTML = '';
+      resolve({ action, note });
+    };
+    controls.querySelector('.seq-continue').onclick = () => finish('continue', 'approve');
+    controls.querySelector('.seq-redo').onclick = () => finish('redo', 'redo');
+    controls.querySelector('.seq-stop').onclick = () => finish('stop', 'reject');
+  });
+}
+
+/* ---------- Review inbox (F) ---------- */
+async function refreshReviewInbox() {
+  const btn = document.getElementById('reviewInboxBtn');
+  const countEl = document.getElementById('reviewInboxCount');
+  if (!btn || !countEl) return;
+  try {
+    const data = await reviewApi('/list', 'GET');
+    const n = data.pending || (data.entries || []).length || 0;
+    countEl.textContent = String(n);
+    btn.hidden = n === 0;
+  } catch {
+    btn.hidden = true;
+  }
+}
+
+async function openReviewInbox() {
+  const out = document.getElementById('commandOutput');
+  if (!out) return;
+  let data;
+  try { data = await reviewApi('/list', 'GET'); } catch { return; }
+  const entries = data.entries || [];
+  const rows = entries.map((e) => `
+    <li class="inbox-row" data-id="${e.id}">
+      <span class="inbox-type inbox-type-${e.type}">${e.type}</span>
+      <span class="inbox-body">
+        <strong>${escapeHtml(e.title || e.type)}</strong>
+        ${e.taskId ? `<span class="inbox-task">${escapeHtml(e.taskId)}</span>` : ''}
+        <span class="inbox-summary">${escapeHtml((e.summary || '').split('\n')[0])}</span>
+      </span>
+      <span class="inbox-actions">
+        <button type="button" class="inbox-dismiss" onclick="dismissReview('${e.id}')">Dismiss</button>
+      </span>
+    </li>`).join('');
+  out.innerHTML = `
+    <div class="inbox-panel">
+      <div class="inbox-head"><strong>Needs your review</strong><span class="inbox-count">${entries.length}</span></div>
+      ${entries.length ? `<ul class="inbox-list">${rows}</ul>` : '<div class="inbox-empty">Nothing waiting. Runs in Review mode will pause here.</div>'}
+    </div>`;
+}
+
+async function dismissReview(id) {
+  try { await reviewApi(`/${id}`, 'DELETE'); } catch {}
+  refreshReviewInbox();
+  openReviewInbox();
+}
+
 /* ---------- Sequential multi-step runner (stages / tools) ---------- */
 let SEQ_STATE = null;
 
@@ -2604,7 +2805,10 @@ function runSequence(mode, ids) {
   const out = document.getElementById('commandOutput');
   if (!out) return;
   if (!ensureComposerSourcesReady(out)) return;
+  runSequenceGated(mode, ids, out);
+}
 
+async function runSequenceGated(mode, ids, out) {
   const text = commandText();
   const sourcesBlock = composerSourcesBlock();
 
@@ -2625,16 +2829,25 @@ function runSequence(mode, ids) {
     return { id, mode, label: t.name, tool: t, stage: (t.stages && t.stages[0]) || 'discover' };
   });
 
+  const taskId = extractTaskId();
+  const approved = await reviewGate(out, {
+    taskId,
+    prompt: text,
+    steps: steps.map(s => ({ mode: s.mode, stageId: s.stageId || null, toolId: s.mode === 'tool' ? s.id : null, label: s.label })),
+  });
+  if (!approved) return;
+
   const state = {
     mode, steps, text, sourcesBlock,
     runtimeSources: runtimeComposerSourceArtifacts(),
     sourceSnapshot: captureComposerSourceArtifacts(),
-    taskId: extractTaskId(),
+    taskId,
     statuses: steps.map(() => 'pending'),
     allArtifacts: [],
     aborted: false,
     jobId: null,
     index: 0,
+    nextNote: '',
   };
   SEQ_STATE = state;
   out.innerHTML = renderSeqPanel(state);
@@ -2697,6 +2910,13 @@ async function runSeqFrom(out, state, startIndex) {
       if (result && result.taskId && !state.taskId) state.taskId = result.taskId;
       if (result && Array.isArray(result.artifacts)) state.allArtifacts.push(...result.artifacts);
       setSeqStatus(out, state, i, 'done');
+      if (REVIEW_MODE && !state.aborted && i < state.steps.length - 1) {
+        const decision = await seqCheckpoint(out, state, i);
+        if (state.aborted) return;
+        if (decision.action === 'stop') { finishSeqStopped(out, state, i); return; }
+        if (decision.note) state.nextNote = decision.note;
+        if (decision.action === 'redo') { setSeqStatus(out, state, i, 'pending'); i--; continue; }
+      }
     } catch (err) {
       if (state.aborted) return;
       setSeqStatus(out, state, i, 'error');
@@ -2709,22 +2929,26 @@ async function runSeqFrom(out, state, startIndex) {
 }
 
 function buildSeqStepRequest(step, state) {
+  const note = state.nextNote ? `\n\nReviewer note for this step: ${state.nextNote}` : '';
   if (step.mode === 'stage') {
-    return {
+    const req = {
       url: '/api/run-stage',
       body: {
         stageId: step.stageId,
-        prompt: (state.text || '') + state.sourcesBlock,
+        prompt: (state.text || '') + state.sourcesBlock + note,
         taskId: state.taskId,
         sourceArtifacts: state.runtimeSources || [],
+        reviewMode: REVIEW_MODE,
       },
     };
+    state.nextNote = '';
+    return req;
   }
   const t = step.tool;
-  const prompt = stripAgentPrefix(`@${t.agent} ${state.text || 'Use the attached source artifacts.'}${state.sourcesBlock}
+  const prompt = stripAgentPrefix(`@${t.agent} ${state.text || 'Use the attached source artifacts.'}${state.sourcesBlock}${note}
 
 Run the "${t.name}" tool. Save output to the paths defined in the tool spec.`);
-  return {
+  const req = {
     url: '/api/run',
     body: {
       prompt,
@@ -2733,8 +2957,11 @@ Run the "${t.name}" tool. Save output to the paths defined in the tool spec.`);
       kind: `tool:${step.id}`,
       toolId: step.id,
       sourceArtifacts: state.runtimeSources || [],
+      reviewMode: REVIEW_MODE,
     },
   };
+  state.nextNote = '';
+  return req;
 }
 
 function runSequenceStep(step, state, mountEl) {
@@ -2826,6 +3053,25 @@ function finishSeq(out, state) {
   }
 }
 
+function finishSeqStopped(out, state, i) {
+  setHomeRunning(false);
+  const title = out.querySelector('.run-seq-title');
+  const cancel = out.querySelector('.run-seq-cancel');
+  const done = i + 1;
+  if (title) title.textContent = `Stopped at your request — ${done} of ${state.steps.length} run`;
+  if (cancel) cancel.remove();
+  for (let j = i + 1; j < state.steps.length; j++) setSeqStatus(out, state, j, 'skipped');
+  const activeEl = out.querySelector('.run-seq-active');
+  if (activeEl) {
+    finishRun(activeEl, {
+      ok: true,
+      artifacts: state.allArtifacts,
+      taskId: state.taskId,
+      sourceArtifacts: state.sourceSnapshot || [],
+    });
+  }
+}
+
 function seqCancel(state) {
   if (!state) return;
   setHomeRunning(false);
@@ -2869,7 +3115,8 @@ function initHomePage() {
     });
   }
   wireComposer('lifecycle');
-  bridgeBoot({ type: 'home' }).then(updatePrototypesLink);
+  syncReviewToggle();
+  bridgeBoot({ type: 'home' }).then(() => { updatePrototypesLink(); refreshReviewInbox(); });
 }
 
 /* Show/hide and target the home "Prototypes" link based on the live workspace. */
@@ -3436,8 +3683,9 @@ let CURRENT_JOB = null;
 
 async function runAgent({ kind, prompt, agent, taskId, mountEl, label, sourceArtifacts, runtimeSourceArtifacts, toolId }) {
   if (!mountEl) return;
-  setHomeRunning(true);
   const cleanPrompt = stripAgentPrefix(prompt);
+  if (!(await reviewGate(mountEl, { taskId, prompt: cleanPrompt, toolId: toolId || null, label }))) return;
+  setHomeRunning(true);
   mountEl.innerHTML = processingPanelHtml(label || 'Starting…');
   const logEl = mountEl.querySelector('.run-log');
   const stepsEl = mountEl.querySelector('.run-steps');
@@ -3457,6 +3705,7 @@ async function runAgent({ kind, prompt, agent, taskId, mountEl, label, sourceArt
         kind,
         toolId: toolId || null,
         sourceArtifacts: runtimeSourceArtifacts || [],
+        reviewMode: REVIEW_MODE,
       }),
     });
     if (!res.ok) {
@@ -3516,7 +3765,7 @@ async function runAgent({ kind, prompt, agent, taskId, mountEl, label, sourceArt
       finishRun(mountEl, { ok: true, artifacts: d.artifacts || [], taskId, verifyResult: d.verifyResult || lastVerifyResult, sourceArtifacts });
     } else if (d.status === 'flagged') {
       es.close();
-      finishRun(mountEl, { flagged: true, artifacts: d.artifacts || [], taskId, verifyResult: d.verifyResult || lastVerifyResult, sourceArtifacts });
+      finishRun(mountEl, { flagged: true, artifacts: d.artifacts || [], taskId, verifyResult: d.verifyResult || lastVerifyResult, sourceArtifacts, prompt: cleanPrompt, agent, kind, label, toolId });
     } else if (d.status === 'error') {
       es.close();
       finishRun(mountEl, { ok: false, artifacts: d.artifacts || [], error: d.error, taskId, prompt, agent, kind, label, sourceArtifacts });
@@ -3534,7 +3783,7 @@ async function runAgent({ kind, prompt, agent, taskId, mountEl, label, sourceArt
   es.onerror = () => { /* browser auto-reconnects; server replays buffered log */ };
 }
 
-async function finishRun(mountEl, { ok, flagged, cancelled, artifacts = [], error, taskId, prompt, agent, kind, label, verifyResult, sourceArtifacts = [] }) {
+async function finishRun(mountEl, { ok, flagged, cancelled, artifacts = [], error, taskId, prompt, agent, kind, label, toolId, verifyResult, sourceArtifacts = [] }) {
   CURRENT_JOB = null;
   setHomeRunning(false);
   const panel = mountEl.querySelector('.processing-panel');
@@ -3554,9 +3803,65 @@ async function finishRun(mountEl, { ok, flagged, cancelled, artifacts = [], erro
   }
 
   if (flagged) {
+    if (statusEl) statusEl.textContent = 'Quality gate flagged this output — your call.';
+    if (resultEl) resultEl.innerHTML = renderVerifyPanel(verifyResult, artifacts, taskId);
+    if (REVIEW_MODE) {
+      // Open a durable flag gate and offer an interactive decision.
+      let entryId = null;
+      try {
+        const d = await reviewApi('/create', 'POST', {
+          type: 'flag', taskId, title: 'Quality gate flagged',
+          summary: (verifyResult && verifyResult.summary) || 'Output did not pass the quality gate after 2 rounds.',
+          payload: { kind: 'flag', prompt, agent, kind, label, toolId },
+        });
+        entryId = d.entry && d.entry.id;
+        refreshReviewInbox();
+      } catch {}
+      if (resultEl) {
+        const dec = document.createElement('div');
+        dec.className = 'flag-decision';
+        dec.innerHTML = `
+          <textarea class="flag-note" rows="1" placeholder="Feedback for a re-run (optional)…"></textarea>
+          <div class="flag-actions">
+            <button type="button" class="flag-approve">Approve anyway</button>
+            <button type="button" class="flag-rerun">Re-run with feedback</button>
+            <button type="button" class="flag-reject">Reject</button>
+          </div>`;
+        resultEl.appendChild(dec);
+        const noteEl = dec.querySelector('.flag-note');
+        const resolve = async (decision) => {
+          if (entryId) { try { await reviewApi('/resolve', 'POST', { id: entryId, decision, note: noteEl ? noteEl.value.trim() : '' }); } catch {} }
+          refreshReviewInbox();
+        };
+        dec.querySelector('.flag-approve').onclick = async () => {
+          await resolve('approve');
+          if (statusEl) statusEl.textContent = 'Approved despite the flag.';
+          if (cancelBtn) { cancelBtn.textContent = 'Done'; cancelBtn.onclick = () => { mountEl.innerHTML = ''; }; }
+          dec.remove();
+          await refreshTasks(); rebuildSidebar();
+        };
+        dec.querySelector('.flag-rerun').onclick = async () => {
+          const note = noteEl ? noteEl.value.trim() : '';
+          await resolve('redo');
+          runAgent({
+            kind, agent, taskId, mountEl, label, toolId,
+            prompt: `${prompt}${note ? `\n\nReviewer feedback to address on this re-run: ${note}` : ''}`,
+            sourceArtifacts,
+            runtimeSourceArtifacts: runtimeComposerSourceArtifacts(),
+          });
+        };
+        dec.querySelector('.flag-reject').onclick = async () => {
+          await resolve('reject');
+          if (statusEl) statusEl.textContent = 'Rejected. Output left in place for inspection.';
+          if (cancelBtn) { cancelBtn.textContent = 'Close'; cancelBtn.onclick = () => { mountEl.innerHTML = ''; }; }
+          dec.remove();
+        };
+      }
+      if (cancelBtn) { cancelBtn.textContent = 'Dismiss'; cancelBtn.onclick = () => { mountEl.innerHTML = ''; }; }
+      return;
+    }
     if (statusEl) statusEl.textContent = 'Quality gate failed after 2 rounds — review needed.';
     if (cancelBtn) { cancelBtn.textContent = 'Dismiss'; cancelBtn.onclick = () => { mountEl.innerHTML = ''; }; }
-    if (resultEl) resultEl.innerHTML = renderVerifyPanel(verifyResult, artifacts, taskId);
     return;
   }
 

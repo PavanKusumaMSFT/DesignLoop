@@ -84,6 +84,11 @@
   <main class="main">
     <button class="hamburger" id="hamburgerBtn" aria-label="Toggle sidebar" style="position:fixed;top:14px;left:14px;z-index:50">&#9776;</button>
     <div class="home-topbar">
+      <button class="review-inbox-pill" id="reviewInboxBtn" type="button" onclick="openReviewInbox()" title="Runs waiting for your review" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+        <span>Needs your review</span>
+        <span class="review-inbox-count" id="reviewInboxCount">0</span>
+      </button>
       <a class="prototypes-link" id="prototypesLink" href="#" target="_blank" rel="noopener" title="Open the prototype workspace" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>
         <span>Prototypes</span>
@@ -108,6 +113,11 @@
             </div>
             <input type="file" id="artifactFileInput" multiple hidden onchange="onArtifactFiles(event)">
           </div>
+          <label class="review-toggle" title="Pause for your approval before running and between stages">
+            <input type="checkbox" id="reviewModeToggle" checked onchange="onReviewModeToggle(this)">
+            <span class="review-toggle-track" aria-hidden="true"><span class="review-toggle-thumb"></span></span>
+            <span class="review-toggle-text">Review mode</span>
+          </label>
           <div class="composer-right">
             <div class="run-split">
               <button class="cmd-primary" type="button" aria-haspopup="true" aria-expanded="false" onclick="toggleRunMenu(event)">
