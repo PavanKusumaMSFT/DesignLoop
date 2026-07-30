@@ -2785,8 +2785,8 @@ async function openReviewInbox() {
   const entries = data.entries || [];
   const rows = entries.map((e) => {
     const p = e.payload || {};
-    const resumable = p.kind === 'sequence' && Array.isArray(p.stepIds)
-      && Number(p.resumeIndex) < p.stepIds.length;
+    const resumable = (p.kind === 'server-sequence' && p.sequenceId)
+      || (p.kind === 'sequence' && Array.isArray(p.stepIds) && Number(p.resumeIndex) < p.stepIds.length);
     return `
     <li class="inbox-row" data-id="${e.id}">
       <span class="inbox-type inbox-type-${e.type}">${e.type}</span>
@@ -2823,6 +2823,9 @@ async function resumeReview(id) {
   try { data = await reviewApi('/list', 'GET'); } catch { return; }
   const entry = (data.entries || []).find((e) => e.id === id);
   const p = entry && entry.payload;
+  if (p && p.kind === 'server-sequence' && p.sequenceId) {
+    return resumeServerSequence(p.sequenceId);
+  }
   if (!p || p.kind !== 'sequence' || !Array.isArray(p.stepIds)) {
     renderCopyFallback(out, 'This checkpoint can no longer be resumed.');
     return;
@@ -2918,7 +2921,176 @@ async function runSequenceGated(mode, ids, out) {
   out.innerHTML = renderSeqPanel(state);
   const cancelBtn = out.querySelector('.run-seq-cancel');
   if (cancelBtn) cancelBtn.onclick = () => seqCancel(state);
-  runSeqFrom(out, state, 0);
+  const startedOnServer = await startServerSequence(out, state);
+  if (!startedOnServer) runSeqFrom(out, state, 0); // fallback: client-driven loop
+}
+
+/* ---------- Server-orchestrated sequences (durable, resumable headless) ----------
+ * The bridge owns the loop and pauses server-side, so a run survives tab close,
+ * reload, or bridge restart and can be resumed from any tab (or curl). The client
+ * just reflects the sequence stream and drives the pause controls. */
+
+async function startServerSequence(out, state) {
+  const payload = {
+    mode: state.mode,
+    reviewMode: REVIEW_MODE,
+    taskId: state.taskId || null,
+    text: state.text || '',
+    sourceArtifacts: state.runtimeSources || [],
+    steps: state.steps.map((s) => (s.mode === 'stage'
+      ? { mode: 'stage', stageId: s.stageId || s.id, label: s.label }
+      : { mode: 'tool', toolId: s.id, agent: (s.tool && s.tool.agent) || null, name: (s.tool && s.tool.name) || s.label, label: s.label })),
+  };
+  let data;
+  try {
+    const res = await fetch('/api/sequence', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    if (res.status === 404) return false; // older bridge without orchestrator → fallback
+    data = await res.json();
+    if (!res.ok || !data.sequence) throw new Error((data && data.error) || `Bridge responded ${res.status}`);
+  } catch (err) {
+    return false; // network/endpoint issue → fall back to client loop
+  }
+  state.seqId = data.sequence.id;
+  attachSeqStream(out, state);
+  return true;
+}
+
+function attachSeqStream(out, state) {
+  const seqId = state.seqId;
+  if (!seqId) return;
+  if (state._es) { try { state._es.close(); } catch {} }
+  const es = new EventSource(`/api/sequence/${seqId}/stream`);
+  state._es = es;
+  state._activeJob = null;
+  es.addEventListener('seq-status', (e) => {
+    let d; try { d = JSON.parse(e.data); } catch { return; }
+    if (!d) return;
+    state.taskId = d.taskId || state.taskId;
+    state.allArtifacts = d.artifacts || [];
+    (d.steps || []).forEach((st, i) => setSeqStatus(out, state, i, st.status));
+
+    const controls = out.querySelector('.run-seq-controls');
+    if (d.status === 'running') {
+      setHomeRunning(true);
+      if (controls) controls.innerHTML = '';
+      if (d.currentJobId && d.currentJobId !== state._activeJob) {
+        state._activeJob = d.currentJobId;
+        attachActiveJobLog(out, state, d.currentJobId, (d.steps[d.index] || {}).label || 'Step');
+      }
+    } else if (d.status === 'paused') {
+      renderServerSeqPause(out, state, d);
+    } else if (d.status === 'done') {
+      es.close(); state._es = null; finishSeq(out, state);
+    } else if (d.status === 'error') {
+      es.close(); state._es = null; showSeqFailControls(out, state, d.index, { message: d.error || 'Step failed.' });
+    } else if (d.status === 'stopped') {
+      es.close(); state._es = null; finishSeqStopped(out, state, Math.max(0, d.index));
+    }
+  });
+  es.onerror = () => { /* browser auto-reconnects; server replays current state */ };
+}
+
+function attachActiveJobLog(out, state, jobId, label) {
+  const activeEl = out.querySelector('.run-seq-active');
+  if (!activeEl) return;
+  activeEl.innerHTML = processingPanelHtml(`${label} running…`);
+  const logEl = activeEl.querySelector('.run-log');
+  const stepsEl = activeEl.querySelector('.run-steps');
+  const cancelBtn = activeEl.querySelector('.run-cancel');
+  if (cancelBtn) cancelBtn.onclick = () => seqCancel(state);
+  const tracker = makeStepTracker(stepsEl);
+  const es = new EventSource(`/api/jobs/${jobId}/stream`);
+  es.addEventListener('log', (e) => {
+    let d; try { d = JSON.parse(e.data); } catch { return; }
+    appendLogLine(logEl, d.stream, d.line);
+    if (d.stream !== 'stderr' && isMeaningfulStep(d.line)) {
+      const s = humanizeLogLine(d.line);
+      if (s) tracker.add(s);
+    }
+  });
+  es.addEventListener('status', (e) => {
+    let d; try { d = JSON.parse(e.data); } catch { return; }
+    if (['done', 'flagged', 'error', 'cancelled'].includes(d.status)) es.close();
+  });
+  es.onerror = () => {};
+}
+
+function renderServerSeqPause(out, state, snap) {
+  setHomeRunning(false);
+  const controls = out.querySelector('.run-seq-controls');
+  if (!controls) return;
+  const i = snap.index;
+  const just = (snap.steps[i] || {}).label || 'This step';
+  const next = (snap.steps[i + 1] || {}).label || 'the next step';
+  controls.innerHTML = `
+    <div class="seq-checkpoint">
+      <div class="seq-checkpoint-msg">
+        <span class="seq-checkpoint-badge">Paused</span>
+        ${escapeHtml(just)} finished — review before continuing to <strong>${escapeHtml(next)}</strong>.
+      </div>
+      <textarea class="seq-checkpoint-note" rows="1" placeholder="Optional note to steer the next step…"></textarea>
+      <div class="seq-checkpoint-actions">
+        <button type="button" class="seq-continue">Continue</button>
+        <button type="button" class="seq-redo">Redo this step</button>
+        <button type="button" class="seq-stop">Stop</button>
+      </div>
+    </div>`;
+  const noteEl = controls.querySelector('.seq-checkpoint-note');
+  const post = async (action) => {
+    const note = noteEl ? noteEl.value.trim() : '';
+    controls.innerHTML = '';
+    try {
+      await fetch(`/api/sequence/${state.seqId}/${action}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ note }),
+      });
+    } catch {}
+    refreshReviewInbox();
+    // The sequence stream will push the resulting state.
+  };
+  controls.querySelector('.seq-continue').onclick = () => post('resume');
+  controls.querySelector('.seq-redo').onclick = () => post('redo');
+  controls.querySelector('.seq-stop').onclick = () => post('stop');
+}
+
+/* Resume a server-orchestrated sequence from the inbox: continues headless on
+ * the bridge, and re-attaches this tab to watch it. */
+async function resumeServerSequence(seqId) {
+  const out = document.getElementById('commandOutput');
+  if (!out) return;
+  let snap;
+  try {
+    const res = await fetch(`/api/sequence/${seqId}`);
+    if (!res.ok) throw new Error('gone');
+    snap = (await res.json()).sequence;
+  } catch {
+    renderCopyFallback(out, 'This sequence can no longer be resumed.');
+    return;
+  }
+  const steps = snap.steps.map((st) => {
+    if (st.mode === 'stage') return { id: st.stageId, mode: 'stage', label: st.label, stageId: st.stageId };
+    const t = TOOL_REGISTRY.find((x) => x.id === st.toolId) || { id: st.toolId, name: st.label, stages: ['discover'] };
+    return { id: st.toolId, mode: 'tool', label: st.label, tool: t, stage: (t.stages && t.stages[0]) || 'discover' };
+  });
+  const state = {
+    mode: snap.mode, steps, text: snap.text || '', sourcesBlock: '',
+    runtimeSources: [], sourceSnapshot: [], taskId: snap.taskId || null,
+    statuses: snap.steps.map((st) => st.status), allArtifacts: snap.artifacts || [],
+    aborted: false, jobId: null, index: snap.index, nextNote: '', seqId,
+  };
+  if (SEQ_STATE && SEQ_STATE._es) { try { SEQ_STATE._es.close(); } catch {} }
+  SEQ_STATE = state;
+  out.innerHTML = renderSeqPanel(state);
+  const cancelBtn = out.querySelector('.run-seq-cancel');
+  if (cancelBtn) cancelBtn.onclick = () => seqCancel(state);
+  attachSeqStream(out, state);
+  try {
+    await fetch(`/api/sequence/${seqId}/resume`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+    });
+  } catch {}
+  refreshReviewInbox();
 }
 
 function renderSeqPanel(state) {
@@ -3141,7 +3313,13 @@ function seqCancel(state) {
   if (!state) return;
   setHomeRunning(false);
   state.aborted = true;
-  if (state.jobId) cancelJob(state.jobId);
+  if (state.seqId) { // server-orchestrated: stop on the bridge
+    if (state._es) { try { state._es.close(); } catch {} state._es = null; }
+    fetch(`/api/sequence/${state.seqId}/stop`, { method: 'POST' }).catch(() => {});
+    refreshReviewInbox();
+  } else if (state.jobId) {
+    cancelJob(state.jobId);
+  }
   const out = document.getElementById('commandOutput');
   if (!out) return;
   const i = state.index;

@@ -416,6 +416,14 @@ class JobManager {
     if (typeof this._onFinalise === 'function') {
       try { this._onFinalise(job); } catch { /* recording is best-effort */ }
     }
+
+    // Per-job completion hook (set by the SequenceManager) — lets a server-side
+    // orchestrator advance to the next step when this step's job finishes.
+    if (typeof job._onDone === 'function') {
+      const cb = job._onDone;
+      job._onDone = null; // fire once
+      try { cb(job); } catch { /* orchestration is best-effort */ }
+    }
   }
 
   _finish(job, { status, exitCode = null, error = null, artifacts = job.artifacts }) {

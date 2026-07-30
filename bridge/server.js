@@ -23,6 +23,7 @@ const WordExtractor = require('word-extractor');
 const xlsx = require('xlsx');
 const { XMLParser } = require('fast-xml-parser');
 const { JobManager, COPILOT_BIN } = require('./jobs');
+const { SequenceManager } = require('./sequences');
 const { Verifier } = require('./verifier');
 const { attachWss } = require('./ws');
 const { serializePrototype } = require('./figma-serialize');
@@ -171,6 +172,78 @@ function toolRunner(toolId) {
     const j = JSON.parse(fs.readFileSync(p, 'utf8'));
     return j && j.runner === 'claude' ? 'claude' : 'copilot';
   } catch { return 'copilot'; }
+}
+
+const STAGE_AGENTS = {
+  discover: 'researcher', define: 'strategist', ideate: 'ideator',
+  design: 'designer', prototype: 'prototyper', test: 'tester', deliver: 'handoff',
+};
+
+/** Build the stage-coordinator prompt for a stage run. Shared by the
+ *  /api/run-stage route and the server-side SequenceManager so a stage runs
+ *  identically whether driven by the client or the orchestrator. */
+function buildStagePrompt({ stageId, userPrompt, promptBlock, taskId }) {
+  const stageLabel = stageId.charAt(0).toUpperCase() + stageId.slice(1);
+  const taskPath = taskId ? `tasks/${taskId}` : null;
+  return `You are running as the ${stageLabel} stage coordinator.
+
+${userPrompt ? `User instruction and source material:\n${userPrompt}\n` : ''}
+${promptBlock ? `${promptBlock}\n` : ''}
+Task directory: \`${taskPath}/\`
+IMPORTANT: Work ONLY in \`${taskPath}/\`. Do NOT read, reference, or write to any other task directory on disk.
+IMPORTANT: If source artifacts are missing/unreadable, STOP and output one clear blocker message. Do not guess intent from existing task folders.
+
+## Step 0 — Fetch source material (always first)
+
+If any URLs appear in the user instruction above, fetch them NOW before doing anything else.
+
+**HITS studies** (hits.microsoft.com/study/<id>):
+Use the direct HITS API — faster and more reliable than browser fetch:
+- curl -s "http://localhost:8099/api/hits/study/<id>"
+  Replace <id> with the numeric ID from the URL (e.g. hits.microsoft.com/study/6047768 → id is 6047768)
+- If that returns a 401, run: curl -s -X POST http://localhost:8099/api/hits/token
+  Then retry the study fetch.
+
+**Microsoft internal portals (non-HITS):**
+- curl -s "http://localhost:8099/api/browse?url=<encoded-url>&provider=microsoft"
+- If login is needed, do these three steps IN ORDER:
+  1. curl -X POST http://localhost:8099/api/sessions/login -H "Content-Type: application/json" -d '{"provider":"microsoft","targetUrl":"<the-url-you-are-fetching>"}'
+  2. Poll until session exists: until curl -sf http://localhost:8099/api/sessions/microsoft; do sleep 10; done
+  3. ONLY THEN retry the browse call. Do NOT retry before step 2 returns 200.
+
+**Public URLs:**
+- curl -s "http://localhost:8099/api/fetch?url=<encoded-url>"
+
+Save fetched content to \`${taskPath || 'tasks/<slug>'}/research/web/<slug>.md\`. This becomes the ground truth for the entire stage run. Do not proceed to stage work until the source material is retrieved and saved.
+
+## How to handle missing prerequisites
+
+This stage may be invoked directly without prior stages having run. Follow this order:
+
+1. **Fetch first.** Retrieve all URLs from the user instruction (Step 0 above).
+2. **Check for existing artifacts.** Look in the task directory for outputs from prior stages. Use anything already there.
+3. **Synthesise what is missing.** If prerequisite artifacts from a prior stage do not exist, derive them from the fetched source material and proceed. State assumptions clearly at the top of each synthesised document.
+4. **Ask for consent only as a last resort.** If there is no source material and no existing artifacts — nothing at all to work from — output a single clear question and stop.
+
+## Execution
+
+1. Read \`.github/skills/${stageId}/STAGE.md\` for the coordination playbook.
+2. ${taskPath
+  ? `Check \`${taskPath}/\` for what is already complete.`
+  : `Create the task directory. Treat this as a fresh run.`
+}
+3. Apply the selection logic from STAGE.md — skip tools whose outputs already exist.
+4. Execute remaining tools in the order defined in STAGE.md.
+5. For each tool: invoke its skill, confirm the artifact was written, then continue.
+6. Report stage complete with a summary when all required tools have passed.`;
+}
+
+/** Build a tool-run prompt for a tool step in a server-orchestrated sequence. */
+function buildToolPrompt({ toolName, userPrompt, promptBlock }) {
+  const base = userPrompt || 'Use the attached source artifacts.';
+  return `${base}${promptBlock || ''}
+
+Run the "${toolName}" tool. Save output to the paths defined in the tool spec.`;
 }
 
 function safeFileName(name, fallback = 'attachment') {
@@ -2102,6 +2175,30 @@ async function recordJobVersionEvents(job) {
 // Wire the completion hook so runs are versioned automatically.
 jobs._onFinalise = recordJobVersionEvents;
 
+// Server-side sequence orchestrator — owns multi-step runs so pause/resume
+// survives client disconnects and bridge restarts (state persisted to disk).
+const sequences = new SequenceManager({
+  jobs,
+  dataDir: path.join(__dirname, 'data', 'sequences'),
+  buildStagePrompt,
+  buildToolPrompt,
+  stageAgent: (id) => STAGE_AGENTS[id],
+  onPause: ({ sequenceId, taskId, justLabel, nextLabel }) => createReviewEntry({
+    type: 'stage',
+    taskId,
+    title: `Checkpoint — ${justLabel} done`,
+    summary: `Completed: ${justLabel}. Next: ${nextLabel}.`,
+    payload: { kind: 'server-sequence', sequenceId },
+  }),
+  onResolve: (entryId) => {
+    try {
+      const rows = readReview();
+      const e = rows.find((r) => r.id === entryId);
+      if (e) { e.status = 'approved'; e.resolvedAt = new Date().toISOString(); writeReview(rows); }
+    } catch { /* best-effort */ }
+  },
+});
+
 const NUL = '\u0000';
 const RS = '\u001f';
 
@@ -3764,11 +3861,7 @@ async function handleApi(req, res, url) {
     const stageId = (body.stageId || '').toString().trim();
     if (!stageId) return sendJson(res, 400, { error: 'Missing "stageId".' });
 
-    const stageAgents = {
-      discover: 'researcher', define: 'strategist', ideate: 'ideator',
-      design: 'designer', prototype: 'prototyper', test: 'tester', deliver: 'handoff',
-    };
-    const agentName = stageAgents[stageId];
+    const agentName = STAGE_AGENTS[stageId];
     if (!agentName) return sendJson(res, 400, { error: `Unknown stageId: ${stageId}` });
 
     const requestedTaskId = (body.taskId || '').toString().trim() || null;
@@ -3776,61 +3869,13 @@ async function handleApi(req, res, url) {
 
     const sourceCtx  = await materializeSourceArtifacts(body.sourceArtifacts);
     const taskId     = inferTaskId(requestedTaskId, userPrompt, sourceCtx);
-    const taskPath   = taskId ? `tasks/${taskId}` : null;
 
-    const stageLabel = stageId.charAt(0).toUpperCase() + stageId.slice(1);
-
-    const stagePrompt = `You are running as the ${stageLabel} stage coordinator.
-
-${userPrompt ? `User instruction and source material:\n${userPrompt}\n` : ''}
-${sourceCtx.promptBlock ? `${sourceCtx.promptBlock}\n` : ''}
-Task directory: \`${taskPath}/\`
-IMPORTANT: Work ONLY in \`${taskPath}/\`. Do NOT read, reference, or write to any other task directory on disk.
-IMPORTANT: If source artifacts are missing/unreadable, STOP and output one clear blocker message. Do not guess intent from existing task folders.
-
-## Step 0 — Fetch source material (always first)
-
-If any URLs appear in the user instruction above, fetch them NOW before doing anything else.
-
-**HITS studies** (hits.microsoft.com/study/<id>):
-Use the direct HITS API — faster and more reliable than browser fetch:
-- curl -s "http://localhost:8099/api/hits/study/<id>"
-  Replace <id> with the numeric ID from the URL (e.g. hits.microsoft.com/study/6047768 → id is 6047768)
-- If that returns a 401, run: curl -s -X POST http://localhost:8099/api/hits/token
-  Then retry the study fetch.
-
-**Microsoft internal portals (non-HITS):**
-- curl -s "http://localhost:8099/api/browse?url=<encoded-url>&provider=microsoft"
-- If login is needed, do these three steps IN ORDER:
-  1. curl -X POST http://localhost:8099/api/sessions/login -H "Content-Type: application/json" -d '{"provider":"microsoft","targetUrl":"<the-url-you-are-fetching>"}'
-  2. Poll until session exists: until curl -sf http://localhost:8099/api/sessions/microsoft; do sleep 10; done
-  3. ONLY THEN retry the browse call. Do NOT retry before step 2 returns 200.
-
-**Public URLs:**
-- curl -s "http://localhost:8099/api/fetch?url=<encoded-url>"
-
-Save fetched content to \`${taskPath || 'tasks/<slug>'}/research/web/<slug>.md\`. This becomes the ground truth for the entire stage run. Do not proceed to stage work until the source material is retrieved and saved.
-
-## How to handle missing prerequisites
-
-This stage may be invoked directly without prior stages having run. Follow this order:
-
-1. **Fetch first.** Retrieve all URLs from the user instruction (Step 0 above).
-2. **Check for existing artifacts.** Look in the task directory for outputs from prior stages. Use anything already there.
-3. **Synthesise what is missing.** If prerequisite artifacts from a prior stage do not exist, derive them from the fetched source material and proceed. State assumptions clearly at the top of each synthesised document.
-4. **Ask for consent only as a last resort.** If there is no source material and no existing artifacts — nothing at all to work from — output a single clear question and stop.
-
-## Execution
-
-1. Read \`.github/skills/${stageId}/STAGE.md\` for the coordination playbook.
-2. ${taskPath
-  ? `Check \`${taskPath}/\` for what is already complete.`
-  : `Create the task directory. Treat this as a fresh run.`
-}
-3. Apply the selection logic from STAGE.md — skip tools whose outputs already exist.
-4. Execute remaining tools in the order defined in STAGE.md.
-5. For each tool: invoke its skill, confirm the artifact was written, then continue.
-6. Report stage complete with a summary when all required tools have passed.`;
+    const stagePrompt = buildStagePrompt({
+      stageId,
+      userPrompt,
+      promptBlock: sourceCtx.promptBlock,
+      taskId,
+    });
 
     const job = jobs.createJob({
       prompt:      stagePrompt,
@@ -3879,6 +3924,85 @@ This stage may be invoked directly without prior stages having run. Follow this 
       taskId: job.taskId || null,
       sourceContext: sourceContextSummary(sourceCtx),
     });
+  }
+
+  // ── Server-orchestrated sequences (durable, resumable without a client) ──
+
+  // POST /api/sequence — start a multi-step run driven entirely by the bridge.
+  if (req.method === 'POST' && pathname === '/api/sequence') {
+    let body;
+    try { body = await readBody(req); }
+    catch (e) { return sendJson(res, 400, { error: `Invalid body: ${e.message}` }); }
+    const steps = Array.isArray(body.steps) ? body.steps : [];
+    if (!steps.length) return sendJson(res, 400, { error: 'Missing "steps".' });
+
+    const userPrompt = (body.text || '').toString().trim();
+    const sourceCtx = await materializeSourceArtifacts(body.sourceArtifacts);
+    const taskId = inferTaskId((body.taskId || '').toString().trim() || null, userPrompt, sourceCtx);
+
+    const seq = sequences.create({
+      mode: body.mode || 'stage',
+      steps,
+      text: userPrompt,
+      promptBlock: sourceCtx.promptBlock,
+      taskId,
+      reviewMode: body.reviewMode !== false,
+    });
+    return sendJson(res, 202, { sequence: sequences.snapshot(seq.id) });
+  }
+
+  // GET /api/sequence/list
+  if (req.method === 'GET' && pathname === '/api/sequence/list') {
+    return sendJson(res, 200, { sequences: sequences.list() });
+  }
+
+  // Routes under /api/sequence/:id (+ /stream|/resume|/redo|/stop)
+  const seqMatch = pathname.match(/^\/api\/sequence\/([^/]+)(\/stream|\/resume|\/redo|\/stop)?$/);
+  if (seqMatch) {
+    const id = seqMatch[1];
+    const action = seqMatch[2];
+
+    if (req.method === 'GET' && action === '/stream') {
+      const seq = sequences.get(id);
+      if (!seq) return sendJson(res, 404, { error: 'Unknown sequence' });
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+        ...CORS_HEADERS,
+      });
+      res.write('retry: 2000\n\n');
+      res.write(`event: seq-status\ndata: ${JSON.stringify(sequences.snapshot(id))}\n\n`);
+      sequences.subscribe(id, res);
+      const hb = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 15000);
+      res.on('close', () => clearInterval(hb));
+      return;
+    }
+
+    if (req.method === 'GET' && !action) {
+      const snap = sequences.snapshot(id);
+      if (!snap) return sendJson(res, 404, { error: 'Unknown sequence' });
+      return sendJson(res, 200, { sequence: snap });
+    }
+
+    if (req.method === 'POST' && (action === '/resume' || action === '/redo')) {
+      let body = {};
+      try { body = await readBody(req); } catch { body = {}; }
+      const note = (body && body.note) ? String(body.note) : '';
+      const r = action === '/resume' ? sequences.resume(id, note) : sequences.redo(id, note);
+      return sendJson(res, r.ok ? 200 : 409, r.ok ? { sequence: r.seq } : { error: r.error });
+    }
+
+    if (req.method === 'POST' && action === '/stop') {
+      const r = sequences.stop(id);
+      return sendJson(res, r.ok ? 200 : 409, r.ok ? { sequence: r.seq } : { error: r.error });
+    }
+
+    if (req.method === 'DELETE' && !action) {
+      const ok = sequences.remove(id);
+      return sendJson(res, ok ? 200 : 404, { removed: ok });
+    }
   }
 
   // Routes under /api/jobs/:id
