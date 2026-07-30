@@ -1931,13 +1931,20 @@ function composerMarkup(placeholder) {
       <div class="composer-sources" id="composerSources" hidden></div>
       <div class="composer-bar">
         <div class="composer-left">
-          <div class="composer-source-ctas">
-            <button class="composer-source-btn" type="button" onclick="pickDocumentArtifact()" title="Add document or file">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          <div class="composer-add">
+            <button class="composer-add-btn" type="button" aria-haspopup="true" aria-expanded="false" onclick="toggleAddMenu(event)" title="Add source">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
             </button>
-            <button class="composer-source-btn" type="button" onclick="pickLinkArtifact()" title="Add link or URL">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
-            </button>
+            <div class="composer-menu add-menu" id="addMenu" hidden role="menu">
+              <button class="add-opt" type="button" role="menuitem" onclick="closeComposerMenus(); pickDocumentArtifact()">
+                <span class="add-opt-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.5l-8.5 8.5a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5l-9 9a2 2 0 0 1-3-3l8.5-8.5"/></svg></span>
+                <span class="add-opt-label">Add files or photos</span>
+              </button>
+              <button class="add-opt" type="button" role="menuitem" onclick="closeComposerMenus(); pickLinkArtifact()">
+                <span class="add-opt-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></span>
+                <span class="add-opt-label">Add link or URL</span>
+              </button>
+            </div>
           </div>
           <input type="file" id="artifactFileInput" multiple hidden onchange="onArtifactFiles(event)">
         </div>
@@ -2001,6 +2008,10 @@ function closeComposerMenus() {
   if (modelMenu) modelMenu.hidden = true;
   const modelBtn = document.querySelector('.model-picker-btn[aria-haspopup]');
   if (modelBtn) modelBtn.setAttribute('aria-expanded', 'false');
+  const addMenu = document.getElementById('addMenu');
+  if (addMenu) addMenu.hidden = true;
+  const addBtn = document.querySelector('.composer-add-btn[aria-haspopup]');
+  if (addBtn) addBtn.setAttribute('aria-expanded', 'false');
 }
 
 function pickDocumentArtifact() {
@@ -2674,6 +2685,18 @@ function toggleModelMenu(e) {
     renderModelMenu();
     m.hidden = false;
     const btn = document.querySelector('.model-picker-btn');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+  }
+}
+
+function toggleAddMenu(e) {
+  if (e) e.stopPropagation();
+  const m = document.getElementById('addMenu');
+  const wasOpen = m && !m.hidden;
+  closeComposerMenus();
+  if (m && !wasOpen) {
+    m.hidden = false;
+    const btn = document.querySelector('.composer-add-btn');
     if (btn) btn.setAttribute('aria-expanded', 'true');
   }
 }
