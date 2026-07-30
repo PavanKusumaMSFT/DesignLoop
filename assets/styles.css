@@ -2272,9 +2272,9 @@ body:has(.sidebar.rail-collapsed) .main { margin-left: 64px; }
 .model-picker-ico { width: 15px; height: 15px; color: var(--color-neutral-500); flex: none; }
 .model-picker-label { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .model-picker-caret { width: 13px; height: 13px; color: var(--color-neutral-400); flex: none; transition: transform 0.2s var(--ease-out); }
-.model-picker-btn[aria-expanded="true"] .model-picker-caret { transform: rotate(180deg); }
+.model-picker-btn[aria-expanded="true"] .model-picker-caret { transform: rotate(0deg); }
 
-.model-menu { bottom: calc(100% + 8px); left: 0; top: auto; right: auto; min-width: 240px; }
+.model-menu { top: calc(100% + 8px); bottom: auto; left: 0; right: auto; min-width: 240px; }
 .model-menu .model-opt {
   display: flex;
   align-items: center;
