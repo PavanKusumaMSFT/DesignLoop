@@ -22,5 +22,13 @@
     "author": "pavankusuma",
     "route": "/generate-a-fluent-sign-up-page",
     "promotedAt": "2026-07-29T09:02:40.890Z"
+  },
+  {
+    "id": "azure-login-page",
+    "title": "Azure Login Page",
+    "status": "in-progress",
+    "author": "pavankusuma",
+    "route": "/azure-login-page",
+    "promotedAt": "2026-07-30T07:33:46.866Z"
   }
 ]
