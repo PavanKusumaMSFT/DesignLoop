@@ -79,18 +79,29 @@ class JobManager {
    * @returns {{ bin: string, args: string[], label: string }}
    */
   _runnerCommand(job) {
+    const model = this._sanitizeModel(job.model);
     if (job.runner === 'claude') {
       // Claude Code print-mode; skip permission prompts to match copilot's
       // --allow-all-tools posture so the headless run isn't blocked on approval.
+      const args = ['-p', job.promptText, '--dangerously-skip-permissions'];
+      if (model) args.push('--model', model);
       return {
         bin: CLAUDE_BIN,
-        args: ['-p', job.promptText, '--dangerously-skip-permissions'],
+        args,
         label: 'Claude Code',
       };
     }
     const args = ['-p', job.promptText, '--allow-all-tools'];
     if (job.agent) args.push(`--agent=${job.agent}`);
+    if (model) args.push('--model', model);
     return { bin: COPILOT_BIN, args, label: 'Copilot CLI' };
+  }
+
+  /** Allow only safe model-id characters; return null for Auto/empty. */
+  _sanitizeModel(model) {
+    if (!model || model === 'auto') return null;
+    const clean = String(model).replace(/[^a-zA-Z0-9.\-]/g, '');
+    return clean || null;
   }
 
   /** Snapshot of `git status --porcelain` as a Set of raw lines. */
@@ -187,7 +198,7 @@ class JobManager {
    * @param {string} [spec.parentJobId] - round-2 jobs reference their parent.
    * @param {boolean} [spec._skipVerify] - internal: skip verification (verify jobs, plain runs).
    */
-  createJob({ prompt, agent, taskId, kind, toolId, round, parentJobId, runner, _skipVerify }) {
+  createJob({ prompt, agent, taskId, kind, toolId, round, parentJobId, runner, model, _skipVerify }) {
     const id = randomUUID();
     const job = {
       id,
@@ -195,6 +206,7 @@ class JobManager {
       taskId: taskId || null,
       agent: agent || null,
       runner: runner === 'claude' ? 'claude' : 'copilot',
+      model: this._sanitizeModel(model),
       promptText: prompt || '',
       toolId: toolId || null,
       round: round || 1,

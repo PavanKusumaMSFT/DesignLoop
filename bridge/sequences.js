@@ -57,6 +57,7 @@ class SequenceManager {
       id: s.id, mode: s.mode, steps: s.steps, index: s.index, status: s.status,
       reviewMode: s.reviewMode, text: s.text, promptBlock: s.promptBlock,
       taskId: s.taskId, allArtifacts: s.allArtifacts, nextNote: s.nextNote,
+      model: s.model || null,
       reviewEntryId: s.reviewEntryId, currentJobId: s.currentJobId,
       error: s.error, createdAt: s.createdAt, updatedAt: s.updatedAt,
     };
@@ -116,7 +117,7 @@ class SequenceManager {
    * @param {string|null} spec.taskId
    * @param {boolean} spec.reviewMode
    */
-  create({ mode, steps, text, promptBlock, taskId, reviewMode }) {
+  create({ mode, steps, text, promptBlock, taskId, reviewMode, model }) {
     const id = randomUUID();
     const seq = {
       id,
@@ -135,6 +136,7 @@ class SequenceManager {
       index: -1,
       status: 'running',
       reviewMode: reviewMode !== false,
+      model: model || null,
       text: text || '',
       promptBlock: promptBlock || '',
       taskId: taskId || null,
@@ -195,7 +197,7 @@ class SequenceManager {
         promptBlock: seq.promptBlock,
         taskId: seq.taskId,
       });
-      jobSpec = { prompt, agent, taskId: seq.taskId, kind: 'stage', _skipVerify: true };
+      jobSpec = { prompt, agent, taskId: seq.taskId, kind: 'stage', model: seq.model || null, _skipVerify: true };
     } else {
       const prompt = this.buildToolPrompt({
         toolName: step.name || step.toolId,
@@ -206,6 +208,7 @@ class SequenceManager {
         prompt, agent: step.agent || null, taskId: seq.taskId,
         kind: `tool:${step.toolId}`, toolId: step.toolId,
         runner: step.runner || undefined,
+        model: seq.model || null,
         _skipVerify: !step.toolId || step.runner === 'claude',
       };
     }

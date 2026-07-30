@@ -1997,6 +1997,10 @@ function closeComposerMenus() {
   if (runMenu) runMenu.hidden = true;
   const caret = document.querySelector('.run-split .cmd-primary[aria-haspopup]');
   if (caret) caret.setAttribute('aria-expanded', 'false');
+  const modelMenu = document.getElementById('modelMenu');
+  if (modelMenu) modelMenu.hidden = true;
+  const modelBtn = document.querySelector('.model-picker-btn[aria-haspopup]');
+  if (modelBtn) modelBtn.setAttribute('aria-expanded', 'false');
 }
 
 function pickDocumentArtifact() {
@@ -2560,7 +2564,7 @@ async function runStage(stageId) {
     const res = await fetch('/api/run-stage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stageId, prompt, taskId, sourceArtifacts }),
+      body: JSON.stringify({ stageId, prompt, taskId, sourceArtifacts, model: runModelArg() }),
     });
 
     let data = null;
@@ -2617,6 +2621,69 @@ function onReviewModeToggle(el) {
 function syncReviewToggle() {
   const el = document.getElementById('reviewModeToggle');
   if (el) el.checked = REVIEW_MODE;
+  syncModelPicker();
+}
+
+/* ---------- Execution model picker (VS Code-style) ---------- */
+const RUN_MODELS = [
+  { id: 'auto', label: 'Auto', hint: 'Copilot picks the best model' },
+  { id: 'gpt-5.5', label: 'GPT-5.5', hint: 'OpenAI' },
+  { id: 'gpt-5.4', label: 'GPT-5.4', hint: 'OpenAI' },
+  { id: 'claude-opus-4.8', label: 'Claude Opus 4.8', hint: 'Anthropic' },
+  { id: 'claude-opus-4.6', label: 'Claude Opus 4.6', hint: 'Anthropic' },
+  { id: 'claude-haiku-4.5', label: 'Claude Haiku 4.5', hint: 'Anthropic' },
+];
+
+let SELECTED_MODEL = localStorage.getItem('dl_model') || 'auto';
+if (!RUN_MODELS.some(m => m.id === SELECTED_MODEL)) SELECTED_MODEL = 'auto';
+
+/* Model id to send with a run request; null (omit --model) for Auto. */
+function runModelArg() {
+  return (SELECTED_MODEL && SELECTED_MODEL !== 'auto') ? SELECTED_MODEL : null;
+}
+
+function currentModelLabel() {
+  const m = RUN_MODELS.find(x => x.id === SELECTED_MODEL);
+  return m ? m.label : 'Auto';
+}
+
+/* Reflect the persisted model onto the composer pill. */
+function syncModelPicker() {
+  const label = document.getElementById('modelPickerLabel');
+  if (label) label.textContent = currentModelLabel();
+}
+
+function renderModelMenu() {
+  const m = document.getElementById('modelMenu');
+  if (!m) return;
+  m.innerHTML = RUN_MODELS.map(opt => {
+    const on = opt.id === SELECTED_MODEL;
+    return `<button class="model-opt${on ? ' is-selected' : ''}" type="button" role="menuitemradio" aria-checked="${on}" onclick="selectRunModel('${opt.id}', event)">
+      <span class="model-opt-check" aria-hidden="true">${on ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>' : ''}</span>
+      <span class="model-opt-text"><span class="model-opt-label">${opt.label}</span><span class="model-opt-hint">${opt.hint}</span></span>
+    </button>`;
+  }).join('');
+}
+
+function toggleModelMenu(e) {
+  if (e) e.stopPropagation();
+  const m = document.getElementById('modelMenu');
+  const wasOpen = m && !m.hidden;
+  closeComposerMenus();
+  if (m && !wasOpen) {
+    renderModelMenu();
+    m.hidden = false;
+    const btn = document.querySelector('.model-picker-btn');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+  }
+}
+
+function selectRunModel(id, e) {
+  if (e) e.stopPropagation();
+  SELECTED_MODEL = (id && RUN_MODELS.some(x => x.id === id)) ? id : 'auto';
+  localStorage.setItem('dl_model', SELECTED_MODEL);
+  syncModelPicker();
+  closeComposerMenus();
 }
 
 async function reviewApi(path, method, body) {
@@ -2934,6 +3001,7 @@ async function startServerSequence(out, state) {
   const payload = {
     mode: state.mode,
     reviewMode: REVIEW_MODE,
+    model: runModelArg(),
     taskId: state.taskId || null,
     text: state.text || '',
     sourceArtifacts: state.runtimeSources || [],
@@ -3176,6 +3244,7 @@ function buildSeqStepRequest(step, state) {
         taskId: state.taskId,
         sourceArtifacts: state.runtimeSources || [],
         reviewMode: REVIEW_MODE,
+        model: runModelArg(),
       },
     };
     state.nextNote = '';
@@ -3195,6 +3264,7 @@ Run the "${t.name}" tool. Save output to the paths defined in the tool spec.`);
       toolId: step.id,
       sourceArtifacts: state.runtimeSources || [],
       reviewMode: REVIEW_MODE,
+      model: runModelArg(),
     },
   };
   state.nextNote = '';
@@ -3949,6 +4019,7 @@ async function runAgent({ kind, prompt, agent, taskId, mountEl, label, sourceArt
         toolId: toolId || null,
         sourceArtifacts: runtimeSourceArtifacts || [],
         reviewMode: REVIEW_MODE,
+        model: runModelArg(),
       }),
     });
     if (!res.ok) {

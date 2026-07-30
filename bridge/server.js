@@ -3882,6 +3882,7 @@ async function handleApi(req, res, url) {
       agent:       agentName,
       taskId,
       kind:        'stage',
+      model:       body.model || null,
       _skipVerify: true, // stage runs are coordinated by the agent; tools verify individually
     });
     return sendJson(res, 202, {
@@ -3914,6 +3915,7 @@ async function handleApi(req, res, url) {
       toolId:     body.toolId  || null,
       round:      body.round   || 1,
       runner,
+      model:      body.model   || null,
       // Only verify copilot tool runs; claude-runner tools (e.g. fluent-to-figma)
       // produce Figma-side output the copilot verify/rerun loop can't act on.
       _skipVerify: !body.toolId || runner === 'claude',
@@ -3947,6 +3949,7 @@ async function handleApi(req, res, url) {
       promptBlock: sourceCtx.promptBlock,
       taskId,
       reviewMode: body.reviewMode !== false,
+      model: body.model || null,
     });
     return sendJson(res, 202, { sequence: sequences.snapshot(seq.id) });
   }

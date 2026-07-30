@@ -216,6 +216,8 @@ Instructions:
         toolId,
         round:  2,
         parentJobId: job.id,
+        runner: job.runner,
+        model:  job.model,
         _skipVerify: false, // round 2 goes through verification
       });
 
