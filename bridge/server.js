@@ -907,19 +907,25 @@ async function publishTaskBranch(id, message) {
     if (addFiles.code !== 0) { await cleanup(); return { ok: false, error: `git add failed: ${addFiles.stderr || addFiles.stdout}` }; }
 
     const status = await runGit(['-C', wt, 'status', '--porcelain']);
-    if (status.code === 0 && !status.stdout.trim()) {
+    const hasChanges = status.code === 0 && !!status.stdout.trim();
+
+    if (hasChanges) {
+      const commitMsg = `${message}\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`;
+      const commit = await runGit(['-C', wt, 'commit', '-m', commitMsg]);
+      if (commit.code !== 0) { await cleanup(); return { ok: false, error: `git commit failed: ${commit.stderr || commit.stdout}` }; }
+    } else if (await remoteHasTaskBranch(id)) {
+      // No file changes AND the remote branch already exists — nothing to do.
       await cleanup();
       return { ok: true, pushed: true, branch, unchanged: true };
     }
-
-    const commitMsg = `${message}\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`;
-    const commit = await runGit(['-C', wt, 'commit', '-m', commitMsg]);
-    if (commit.code !== 0) { await cleanup(); return { ok: false, error: `git commit failed: ${commit.stderr || commit.stdout}` }; }
+    // else: no new commit needed, but the remote branch is missing (e.g. a
+    // baseline task already tracked on the base branch) — still push so the
+    // task/<id> ref is created on origin.
 
     const push = await runGit(['-C', wt, 'push', '-u', 'origin', branch]);
     const pushed = push.code === 0;
     await cleanup();
-    return { ok: true, pushed, branch, warning: pushed ? null : (push.stderr || push.stdout) };
+    return { ok: true, pushed, branch, unchanged: !hasChanges, warning: pushed ? null : (push.stderr || push.stdout) };
   } catch (e) {
     await cleanup();
     return { ok: false, error: e.message };
