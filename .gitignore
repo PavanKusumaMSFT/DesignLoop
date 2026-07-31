@@ -38,3 +38,11 @@ bridge/data/
 # page's "view a past version" selector (checked-out snapshots of past commits)
 prototype-workspace/app/vpr__*
 prototype-workspace/components/projects/vpr__*
+
+# Tasks are LOCAL by default — a newly created task stays on the user's machine
+# and is never swept into a commit by `git add .`. Sharing a task publishes it on
+# its own `task/<id>` branch via the bridge (force-add in an isolated worktree).
+# Baseline example tasks already tracked in the repo are unaffected (ignoring
+# untracked paths does not untrack committed files).
+/tasks/*
+!/tasks/.gitkeep

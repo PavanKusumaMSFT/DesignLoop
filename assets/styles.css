@@ -3288,3 +3288,161 @@ a.run-artifact:hover { background: var(--color-neutral-100); }
 }
 .inbox-actions button.inbox-resume:hover { background: var(--color-primary-700); border-color: var(--color-primary-700); }
 .inbox-empty { font-size: 0.85rem; color: var(--color-neutral-500); padding: 8px 2px; }
+
+/* =================================================================
+   TASK SHARING (per-task branch) — toggle, status pill, badges
+   ================================================================= */
+.task-overview-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.task-share-mount {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.share-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.share-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.share-toggle-track {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--color-neutral-300);
+  transition: background 0.2s var(--ease-out);
+  flex: none;
+}
+.share-toggle-thumb {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.22s var(--ease-spring);
+}
+.share-toggle input:checked + .share-toggle-track { background: var(--color-primary-500); }
+.share-toggle input:checked + .share-toggle-track .share-toggle-thumb { transform: translateX(14px); }
+.share-toggle input:focus-visible + .share-toggle-track { outline: 2px solid var(--color-primary-300); outline-offset: 2px; }
+.share-toggle input:disabled + .share-toggle-track { opacity: 0.5; cursor: default; }
+.share-toggle-text { font-size: 0.82rem; color: var(--color-neutral-600); font-weight: 500; }
+
+.share-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-neutral-200);
+  color: var(--color-neutral-600);
+  background: var(--color-neutral-50, #f6f7f9);
+}
+.share-status svg { width: 14px; height: 14px; }
+.share-status.is-shared {
+  color: var(--color-primary-700, #0a5cbe);
+  border-color: color-mix(in srgb, var(--color-primary-500) 35%, transparent);
+  background: color-mix(in srgb, var(--color-primary-500) 10%, #fff);
+}
+.share-status.is-local { color: var(--color-neutral-500); }
+.share-status.share-status-muted { color: var(--color-neutral-400); font-style: italic; }
+.share-branch { font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.74rem; }
+
+.share-actions { display: inline-flex; align-items: center; gap: 6px; }
+.share-action {
+  font-size: 0.76rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-neutral-200);
+  background: #fff;
+  color: var(--color-neutral-700);
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
+}
+.share-action:hover { background: var(--color-neutral-100); border-color: var(--color-neutral-300); }
+.share-action:disabled { opacity: 0.55; cursor: default; }
+
+/* Sidebar "Shared" badge on task nav items */
+.nav-share-badge {
+  margin-left: auto;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+}
+.nav-share-badge.is-shared {
+  color: var(--color-primary-700, #0a5cbe);
+  background: color-mix(in srgb, var(--color-primary-500) 14%, #fff);
+  border: 1px solid color-mix(in srgb, var(--color-primary-500) 30%, transparent);
+}
+
+/* Sidebar "Get shared tasks" action */
+.nav-get-shared {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 7px 10px;
+  border: 1px dashed var(--color-neutral-300);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-neutral-600);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out), color 0.15s var(--ease-out);
+}
+.nav-get-shared:hover {
+  background: var(--color-neutral-100);
+  border-color: var(--color-primary-500);
+  color: var(--color-primary-700, #0a5cbe);
+}
+.nav-get-shared svg { width: 15px; height: 15px; flex: none; }
+.rail-collapsed .nav-get-shared span { display: none; }
+
+/* =================================================================
+   TOAST notifications
+   ================================================================= */
+.toast-host {
+  position: fixed;
+  bottom: 22px;
+  right: 22px;
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+.toast {
+  min-width: 220px;
+  max-width: 380px;
+  padding: 11px 15px;
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-900, #1d1d1f);
+  color: #fff;
+  font-size: 0.84rem;
+  font-weight: 500;
+  box-shadow: var(--shadow-lg, 0 8px 28px rgba(0,0,0,0.22));
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+  transition: opacity 0.24s var(--ease-out), transform 0.24s var(--ease-spring);
+  pointer-events: auto;
+}
+.toast.toast-in { opacity: 1; transform: translateY(0) scale(1); }
+.toast-ok { background: var(--color-neutral-900, #1d1d1f); }
+.toast-warn { background: #8a5a00; }
+.toast-error { background: #a3232f; }

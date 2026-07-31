@@ -294,7 +294,31 @@ const ICONS = {
   send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>',
   sparkle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>',
   pencil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  branch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>',
 };
+
+/* Lightweight transient toast. kind: 'ok' | 'warn' | 'error' (default 'ok'). */
+function toast(message, kind) {
+  try {
+    let host = document.getElementById('toastHost');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'toastHost';
+      host.className = 'toast-host';
+      document.body.appendChild(host);
+    }
+    const el = document.createElement('div');
+    el.className = `toast toast-${kind || 'ok'}`;
+    el.setAttribute('role', 'status');
+    el.textContent = message;
+    host.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('toast-in'));
+    setTimeout(() => {
+      el.classList.remove('toast-in');
+      setTimeout(() => el.remove(), 260);
+    }, kind === 'error' ? 5200 : 3200);
+  } catch { /* non-fatal */ }
+}
 
 /* =================================================================
    TOOL REGISTRY
@@ -775,7 +799,10 @@ function loadTask(taskId) {
       <div class="task-overview-header">
         <h1 id="taskTitleHeading">${escapeHtml(task.title)}<button type="button" class="task-rename-btn" title="Rename task" aria-label="Rename task" onclick="startRenameTask('${task.id}')">${ICONS.pencil}</button></h1>
         <p>${task.description}</p>
-        ${sourceArtifactsForTask(task).length ? `<button type="button" class="task-overview-source" onclick="openArtifactsDialog('${task.id}')">${ICONS.folder} Artifacts</button>` : ''}
+        <div class="task-overview-actions">
+          ${sourceArtifactsForTask(task).length ? `<button type="button" class="task-overview-source" onclick="openArtifactsDialog('${task.id}')">${ICONS.folder} Artifacts</button>` : ''}
+          <div class="task-share-mount" id="taskShareMount" data-task="${task.id}"></div>
+        </div>
       </div>
       ${renderTaskRunner(task)}
       <div id="reportCardMount"></div>
@@ -795,6 +822,7 @@ function loadTask(taskId) {
   syncReviewToggle();
   loadReportCard(taskId);
   wireVersionPreviews();
+  loadTaskShare(taskId);
 }
 
 /* ── Prototype report card (Test-stage checks) ──────────────────────────
@@ -820,6 +848,208 @@ function reportCanComplete(status) {
   const s = String(status || '').toLowerCase();
   return s === 'in-review' || s === 'draft';
 }
+/* ── Task sharing (per-task git branch) ─────────────────────────────────────
+ * A task is LOCAL by default; the toggle publishes it on its own task/<id>
+ * branch so collaborators can pull it. All git work happens server-side in an
+ * isolated worktree. */
+async function loadTaskShare(taskId) {
+  const mount = document.getElementById('taskShareMount');
+  if (!mount || !BRIDGE.online) { if (mount) mount.hidden = true; return; }
+  renderTaskShare(taskId, { loading: true });
+  try {
+    const r = await fetch(`/api/task/${encodeURIComponent(taskId)}/share-status`, { cache: 'no-store' });
+    if (!r.ok) throw new Error('status');
+    const st = await r.json();
+    if (currentTaskId !== taskId) return;
+    renderTaskShare(taskId, st);
+  } catch {
+    renderTaskShare(taskId, { shared: false, error: true });
+  }
+}
+
+function renderTaskShare(taskId, st) {
+  const mount = document.getElementById('taskShareMount');
+  if (!mount) return;
+  mount.hidden = false;
+  if (st.loading) {
+    mount.innerHTML = `<span class="share-status share-status-muted">Checking share status…</span>`;
+    return;
+  }
+  const shared = !!st.shared;
+  const branch = st.branch || `task/${taskId}`;
+  mount.innerHTML = `
+    <label class="share-toggle" title="${shared ? 'This task is shared to the repo' : 'Publish this task to the repo so others can pull it'}">
+      <input type="checkbox" id="shareToggle" ${shared ? 'checked' : ''} onchange="onShareToggle(this, '${taskId}')">
+      <span class="share-toggle-track" aria-hidden="true"><span class="share-toggle-thumb"></span></span>
+      <span class="share-toggle-text">Share to repo</span>
+    </label>
+    <span class="share-status ${shared ? 'is-shared' : 'is-local'}" id="shareStatus">
+      ${shared
+        ? `${ICONS.branch || '⎇'} <code class="share-branch">${branch}</code>`
+        : `Local only`}
+    </span>
+    ${shared ? `
+      <span class="share-actions">
+        <button type="button" class="share-action" onclick="pushTaskUpdates('${taskId}')" title="Commit and push your latest changes to the task branch">Push updates</button>
+        <button type="button" class="share-action" onclick="copyTaskBranch('${branch}')" title="Copy branch name">Copy branch</button>
+      </span>` : ''}
+  `;
+}
+
+async function onShareToggle(el, taskId) {
+  const wantShared = !!(el && el.checked);
+  if (el) el.disabled = true;
+  const setStatus = (html, cls) => {
+    const s = document.getElementById('shareStatus');
+    if (s) { s.className = `share-status ${cls || ''}`; s.innerHTML = html; }
+  };
+  try {
+    if (wantShared) {
+      setStatus('Publishing…', 'share-status-muted');
+      const r = await fetch(`/api/task/${encodeURIComponent(taskId)}/share`, { method: 'POST' });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.ok) throw new Error((data && data.error) || `Bridge responded ${r.status}`);
+      if (data.warning) toast(`Shared, but push warning: ${data.warning}`, 'warn');
+      else toast('Task shared to repo.', 'ok');
+    } else {
+      if (!confirm('Stop sharing this task? The task/' + taskId + ' branch will be deleted from the repo. Your local copy stays.')) {
+        el.checked = true; el.disabled = false; return;
+      }
+      setStatus('Unsharing…', 'share-status-muted');
+      const r = await fetch(`/api/task/${encodeURIComponent(taskId)}/unshare`, { method: 'POST' });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.ok) throw new Error((data && data.error) || `Bridge responded ${r.status}`);
+      toast('Task is now local only.', 'ok');
+    }
+    await loadTaskShare(taskId);
+    refreshHomeTasksBadges();
+  } catch (err) {
+    toast(`Share failed: ${err.message}`, 'error');
+    if (el) el.checked = !wantShared;
+    await loadTaskShare(taskId);
+  } finally {
+    if (el) el.disabled = false;
+  }
+}
+
+async function pushTaskUpdates(taskId) {
+  try {
+    const s = document.getElementById('shareStatus');
+    if (s) { s.className = 'share-status share-status-muted'; s.textContent = 'Pushing updates…'; }
+    const r = await fetch(`/api/task/${encodeURIComponent(taskId)}/push-updates`, { method: 'POST' });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok) throw new Error((data && data.error) || `Bridge responded ${r.status}`);
+    if (data.unchanged) toast('No changes to push.', 'ok');
+    else if (data.warning) toast(`Committed, but push warning: ${data.warning}`, 'warn');
+    else toast('Updates pushed to the task branch.', 'ok');
+  } catch (err) {
+    toast(`Push failed: ${err.message}`, 'error');
+  } finally {
+    await loadTaskShare(taskId);
+  }
+}
+
+function copyTaskBranch(branch) {
+  try {
+    navigator.clipboard.writeText(branch);
+    toast(`Copied "${branch}"`, 'ok');
+  } catch { toast('Could not copy branch name.', 'error'); }
+}
+
+/* Best-effort: refresh home task cards' shared badges if the home list is mounted. */
+/* Best-effort: refresh sidebar task list shared badges. */
+function refreshHomeTasksBadges() {
+  try {
+    if (typeof refreshTasks === 'function') {
+      refreshTasks().then(() => { try { rebuildSidebar(); } catch {} });
+    }
+  } catch {}
+}
+
+/* ── Get shared tasks (pull collaborator task branches) ─────────────────────── */
+function closeSharedTasksDialog() {
+  const el = document.getElementById('sharedTasksDialog');
+  if (el) el.remove();
+  document.removeEventListener('keydown', sharedTasksEscHandler);
+}
+function sharedTasksEscHandler(e) { if (e.key === 'Escape') closeSharedTasksDialog(); }
+
+async function openSharedTasksDialog() {
+  if (!BRIDGE.online) { toast('Bridge is offline — start it to browse shared tasks.', 'warn'); return; }
+  closeSharedTasksDialog();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'sharedTasksDialog';
+  overlay.innerHTML = `
+    <div class="modal artifacts-modal" role="dialog" aria-modal="true" aria-label="Shared tasks">
+      <div class="artifacts-modal-head">
+        <div>
+          <h2>Shared tasks</h2>
+          <p class="modal-sub">Tasks other users published to the repo. Pull one to work on it locally.</p>
+        </div>
+        <button type="button" class="artifacts-close" aria-label="Close" onclick="closeSharedTasksDialog()">&times;</button>
+      </div>
+      <div class="artifacts-list" id="sharedTasksList">
+        <p class="modal-sub">Loading shared tasks…</p>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeSharedTasksDialog(); });
+  document.body.appendChild(overlay);
+  document.addEventListener('keydown', sharedTasksEscHandler);
+  await renderSharedTasksList();
+}
+
+async function renderSharedTasksList() {
+  const list = document.getElementById('sharedTasksList');
+  if (!list) return;
+  let data;
+  try {
+    const r = await fetch('/api/shared-tasks', { cache: 'no-store' });
+    if (!r.ok) throw new Error(`Bridge responded ${r.status}`);
+    data = await r.json();
+  } catch (err) {
+    list.innerHTML = `<p class="modal-sub">Could not load shared tasks: ${escapeHtml(err.message)}</p>`;
+    return;
+  }
+  const tasks = (data && data.tasks) || [];
+  if (!tasks.length) {
+    list.innerHTML = `<p class="modal-sub">No shared tasks found in the repo yet.</p>`;
+    return;
+  }
+  const localIds = new Set(TASKS.map(t => t.id));
+  list.innerHTML = tasks.map(t => {
+    const id = escapeHtml(t.id);
+    const branch = escapeHtml(t.branch || `task/${t.id}`);
+    const here = localIds.has(t.id);
+    const author = t.author ? `<small class="artifacts-row-value">by ${escapeHtml(t.author)}</small>` : '';
+    return `
+      <div class="artifacts-row" data-shared-id="${id}">
+        <span class="artifacts-row-ico">${ICONS.branch}</span>
+        <span class="artifacts-row-main">
+          <span class="artifacts-row-name">${escapeHtml(t.title || t.id)}</span>
+          <small class="artifacts-row-value"><code class="share-branch">${branch}</code></small>
+          ${author}
+        </span>
+        <button type="button" class="share-action" onclick="pullSharedTask('${id}', this)">${here ? 'Update' : 'Pull'}</button>
+      </div>`;
+  }).join('');
+}
+
+async function pullSharedTask(taskId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Pulling…'; }
+  try {
+    const r = await fetch(`/api/task/${encodeURIComponent(taskId)}/pull`, { method: 'POST' });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok) throw new Error((data && data.error) || `Bridge responded ${r.status}`);
+    toast(`Pulled "${taskId}" into your workspace.`, 'ok');
+    if (btn) { btn.textContent = 'Pulled'; }
+    refreshHomeTasksBadges();
+  } catch (err) {
+    toast(`Pull failed: ${err.message}`, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Pull'; }
+  }
+}
+
 async function loadReportCard(taskId) {
   const mount = document.getElementById('reportCardMount');
   if (!mount || !BRIDGE.online) return;
@@ -1730,11 +1960,15 @@ function buildGlobalSidebar(active) {
 
   const taskItems = TASKS.map(task => {
     const isActive = active && active.type === 'task' && active.id === task.id;
+    const sharedBadge = task.shared
+      ? `<span class="nav-share-badge is-shared" title="Shared to repo${task.branch ? ' · ' + escapeHtml(task.branch) : ''}">Shared</span>`
+      : '';
     return `
       <div class="nav-item-wrap" data-task="${task.id}">
         <a class="nav-item ${isActive ? 'active' : ''}"
            onclick="openTaskPage('${task.id}')" title="${escapeHtml(task.title)}">
           <span class="nav-item-label">${escapeHtml(task.title)}</span>
+          ${sharedBadge}
         </a>
         <button type="button" class="nav-rename-btn" title="Rename task" aria-label="Rename task"
                 onclick="event.stopPropagation(); startRenameTaskRail('${task.id}')">${ICONS.pencil}</button>
@@ -1745,6 +1979,9 @@ function buildGlobalSidebar(active) {
     <div class="nav-section">
       <div class="nav-section-label">Tasks</div>
       ${taskItems || '<div class="nav-empty">No tasks yet</div>'}
+      <button type="button" class="nav-get-shared" onclick="openSharedTasksDialog()" title="Browse and pull tasks other users have shared to the repo">
+        ${ICONS.branch} <span>Get shared tasks</span>
+      </button>
     </div>`;
 }
 

@@ -13,6 +13,7 @@
 
 const http = require('http');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const { spawn, execSync } = require('child_process');
@@ -823,6 +824,155 @@ function readTaskConfig(id) {
     const obj = JSON.parse(raw);
     return obj && typeof obj === 'object' ? obj : {};
   } catch { return {}; }
+}
+
+/* Merge a patch into tasks/<id>/.task.json (create it if missing). Returns the
+   merged config, or null if the task dir doesn't exist. Defensive: never throws. */
+function writeTaskConfig(id, patch) {
+  try {
+    const taskDir = path.join(ROOT, 'tasks', id);
+    if (!fs.existsSync(taskDir) || !fs.statSync(taskDir).isDirectory()) return null;
+    const cfg = { ...readTaskConfig(id), ...(patch || {}) };
+    fs.writeFileSync(path.join(taskDir, '.task.json'), JSON.stringify(cfg, null, 2) + '\n', 'utf8');
+    return cfg;
+  } catch { return null; }
+}
+
+/* ─────────────────────── Task sharing (per-task git branch) ───────────────────────
+ * Tasks are LOCAL by default (gitignored). Sharing a task publishes tasks/<id>/
+ * on its own branch `task/<id>` so it never touches main and never collides with
+ * unrelated work. Every branch operation runs in a THROWAWAY git worktree in a
+ * temp dir, so the user's live working tree / current branch / in-flight job
+ * writes are never disturbed. */
+
+function taskBranch(id) { return `task/${id}`; }
+
+/* Recursively copy a directory tree (skip the .task.json runtime marker is not
+   needed — it travels with the task so shared state is visible to collaborators). */
+function copyDirInto(srcDir, destDir) {
+  fs.mkdirSync(destDir, { recursive: true });
+  for (const e of fs.readdirSync(srcDir, { withFileTypes: true })) {
+    const s = path.join(srcDir, e.name);
+    const d = path.join(destDir, e.name);
+    if (e.isDirectory()) copyDirInto(s, d);
+    else if (e.isFile()) fs.copyFileSync(s, d);
+  }
+}
+
+/* True when origin already has the task/<id> branch. Best-effort. */
+async function remoteHasTaskBranch(id) {
+  const r = await runGit(['ls-remote', '--heads', 'origin', taskBranch(id)]);
+  return r.code === 0 && !!r.stdout.trim();
+}
+
+/* Publish (create or update) tasks/<id>/ on branch task/<id> via an isolated
+   worktree. Returns { ok, pushed, branch, unchanged?, warning?, error? }. */
+async function publishTaskBranch(id, message) {
+  const branch = taskBranch(id);
+  const taskSrc = path.join(ROOT, 'tasks', id);
+  if (!fs.existsSync(taskSrc)) return { ok: false, error: `Task not found: ${id}` };
+
+  const head = await runGit(['rev-parse', '--abbrev-ref', 'HEAD']);
+  const base = (head.code === 0 && head.stdout.trim()) ? head.stdout.trim() : 'HEAD';
+
+  await runGit(['worktree', 'prune']);
+  const wt = fs.mkdtempSync(path.join(os.tmpdir(), 'dl-task-wt-'));
+  const cleanup = async () => {
+    await runGit(['worktree', 'remove', '--force', wt]);
+    try { fs.rmSync(wt, { recursive: true, force: true }); } catch {}
+  };
+
+  try {
+    // Update the existing branch when present (locally or on origin); else fork
+    // fresh from the current HEAD so the task branch = base + this task folder.
+    let startPoint = base;
+    const localRef = await runGit(['rev-parse', '--verify', '--quiet', branch]);
+    if (localRef.code === 0) {
+      startPoint = branch;
+    } else if (await remoteHasTaskBranch(id)) {
+      await runGit(['fetch', 'origin', `${branch}:${branch}`]);
+      startPoint = branch;
+    }
+
+    const add = await runGit(['worktree', 'add', '--force', '-B', branch, wt, startPoint]);
+    if (add.code !== 0) { await cleanup(); return { ok: false, error: `worktree add failed: ${add.stderr || add.stdout}` }; }
+
+    // Mirror the live task folder into the worktree (replace any prior copy so
+    // deletions propagate), then force-add (task paths are gitignored) + commit.
+    const wtTaskDir = path.join(wt, 'tasks', id);
+    try { fs.rmSync(wtTaskDir, { recursive: true, force: true }); } catch {}
+    copyDirInto(taskSrc, wtTaskDir);
+
+    const addFiles = await runGit(['-C', wt, 'add', '-A', '-f', '--', `tasks/${id}`]);
+    if (addFiles.code !== 0) { await cleanup(); return { ok: false, error: `git add failed: ${addFiles.stderr || addFiles.stdout}` }; }
+
+    const status = await runGit(['-C', wt, 'status', '--porcelain']);
+    if (status.code === 0 && !status.stdout.trim()) {
+      await cleanup();
+      return { ok: true, pushed: true, branch, unchanged: true };
+    }
+
+    const commitMsg = `${message}\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`;
+    const commit = await runGit(['-C', wt, 'commit', '-m', commitMsg]);
+    if (commit.code !== 0) { await cleanup(); return { ok: false, error: `git commit failed: ${commit.stderr || commit.stdout}` }; }
+
+    const push = await runGit(['-C', wt, 'push', '-u', 'origin', branch]);
+    const pushed = push.code === 0;
+    await cleanup();
+    return { ok: true, pushed, branch, warning: pushed ? null : (push.stderr || push.stdout) };
+  } catch (e) {
+    await cleanup();
+    return { ok: false, error: e.message };
+  }
+}
+
+/* Delete the remote task/<id> branch and any local ref. */
+async function unshareTaskBranch(id) {
+  const branch = taskBranch(id);
+  const del = await runGit(['push', 'origin', '--delete', branch]);
+  await runGit(['branch', '-D', branch]); // best-effort local cleanup
+  return { ok: del.code === 0, error: del.code === 0 ? null : (del.stderr || del.stdout) };
+}
+
+/* Current share state for a task, combining the .task.json marker with the
+   authoritative remote check. */
+async function taskShareStatus(id) {
+  const cfg = readTaskConfig(id);
+  const branch = taskBranch(id);
+  const remoteExists = await remoteHasTaskBranch(id);
+  return {
+    id,
+    shared: remoteExists,
+    branch: remoteExists ? branch : null,
+    author: cfg.sharedBy || gitUserName() || null,
+    lastPush: cfg.sharedAt || null,
+    remoteExists,
+  };
+}
+
+/* List all shared task branches on origin as [{ id, branch }]. */
+async function listSharedTaskBranches() {
+  const r = await runGit(['ls-remote', '--heads', 'origin', 'task/*']);
+  if (r.code !== 0) return [];
+  return r.stdout.split('\n').filter(Boolean).map((line) => {
+    const ref = (line.split('\t')[1] || '').trim();
+    const id = ref.replace('refs/heads/task/', '');
+    return /^[a-z0-9][a-z0-9-_]*$/i.test(id) ? { id, branch: `task/${id}` } : null;
+  }).filter(Boolean);
+}
+
+/* Pull a shared task's files from origin into the working tree WITHOUT switching
+   the user's branch. Files land untracked/ignored (local) on their side. */
+async function pullSharedTask(id) {
+  const branch = taskBranch(id);
+  const fetch = await runGit(['fetch', 'origin', branch]);
+  if (fetch.code !== 0) return { ok: false, error: `fetch failed: ${fetch.stderr || fetch.stdout}` };
+  const co = await runGit(['checkout', 'FETCH_HEAD', '--', `tasks/${id}`]);
+  if (co.code !== 0) return { ok: false, error: `checkout failed: ${co.stderr || co.stdout}` };
+  // `checkout <tree> -- path` stages the files; unstage so they stay local/ignored.
+  await runGit(['reset', '-q', '--', `tasks/${id}`]);
+  writeTaskConfig(id, { shared: true, branch, sharedBy: gitUserName() || null });
+  return { ok: true, id, branch };
 }
 
 /* ─── Figma "Send to Figma" per-task target registry ───
@@ -1692,7 +1842,8 @@ function discoverTasks() {
 
   return ids.map((id) => {
     const taskAbs = path.join(tasksDir, id);
-    const customTitle = String(readTaskConfig(id).title || '').trim();
+    const cfg = readTaskConfig(id);
+    const customTitle = String(cfg.title || '').trim();
     const phases = [];
     for (const ph of PHASES) {
       const files = [];
@@ -1816,6 +1967,8 @@ function discoverTasks() {
       customTitle: customTitle || null,
       description: `Design lifecycle artifacts for ${customTitle || titleCase(id)}.`,
       source,
+      shared: !!cfg.shared,
+      branch: cfg.shared ? (cfg.branch || `task/${id}`) : null,
       phases,
     };
   });
@@ -3663,6 +3816,75 @@ async function handleApi(req, res, url) {
     } catch (e) {
       return sendJson(res, 500, { error: e.message });
     }
+  }
+
+  // GET /api/shared-tasks — task/* branches published on origin (for "Get shared
+  // tasks"). Annotates whether each already exists locally.
+  if (req.method === 'GET' && pathname === '/api/shared-tasks') {
+    try {
+      const branches = await listSharedTaskBranches();
+      const rows = branches.map((b) => ({
+        ...b,
+        localTitle: (readTaskConfig(b.id).title || null),
+        existsLocally: fs.existsSync(path.join(ROOT, 'tasks', b.id)),
+      }));
+      return sendJson(res, 200, { tasks: rows });
+    } catch (e) {
+      return sendJson(res, 500, { error: e.message });
+    }
+  }
+
+  // Routes under /api/task/:id/(share-status|share|push-updates|unshare|pull)
+  const taskShareMatch = pathname.match(/^\/api\/task\/([a-z0-9][a-z0-9-_]*)\/(share-status|share|push-updates|unshare|pull)$/i);
+  if (taskShareMatch) {
+    const id = taskShareMatch[1];
+    const action = taskShareMatch[2];
+    const taskDir = path.join(ROOT, 'tasks', id);
+
+    // pull targets a remote task that may not exist locally yet; all others need
+    // the task folder present.
+    if (action !== 'pull' && (!fs.existsSync(taskDir) || !fs.statSync(taskDir).isDirectory())) {
+      return sendJson(res, 404, { error: `Task not found: ${id}` });
+    }
+
+    if (req.method === 'GET' && action === 'share-status') {
+      try { return sendJson(res, 200, await taskShareStatus(id)); }
+      catch (e) { return sendJson(res, 500, { error: e.message }); }
+    }
+
+    if (req.method === 'POST' && (action === 'share' || action === 'push-updates')) {
+      const title = (readTaskConfig(id).title || titleCase(id));
+      const verb = action === 'share' ? 'Share' : 'Update';
+      const msg = `${verb} task "${title}"\n\nPublishes tasks/${id}/ on branch ${taskBranch(id)} so collaborators can pull it.`;
+      try {
+        const result = await publishTaskBranch(id, msg);
+        if (!result.ok) return sendJson(res, 500, { error: result.error });
+        writeTaskConfig(id, { shared: true, branch: taskBranch(id), sharedBy: gitUserName() || null, sharedAt: new Date().toISOString() });
+        return sendJson(res, 200, {
+          ok: true, id, branch: result.branch, pushed: result.pushed,
+          unchanged: !!result.unchanged, warning: result.warning || null,
+        });
+      } catch (e) { return sendJson(res, 500, { error: e.message }); }
+    }
+
+    if (req.method === 'POST' && action === 'unshare') {
+      try {
+        const result = await unshareTaskBranch(id);
+        writeTaskConfig(id, { shared: false, branch: null });
+        if (!result.ok) return sendJson(res, 200, { ok: true, id, warning: result.error || 'Remote branch may not have existed.' });
+        return sendJson(res, 200, { ok: true, id });
+      } catch (e) { return sendJson(res, 500, { error: e.message }); }
+    }
+
+    if (req.method === 'POST' && action === 'pull') {
+      try {
+        const result = await pullSharedTask(id);
+        if (!result.ok) return sendJson(res, 500, { error: result.error });
+        return sendJson(res, 200, { ok: true, id, branch: result.branch });
+      } catch (e) { return sendJson(res, 500, { error: e.message }); }
+    }
+
+    return sendJson(res, 405, { error: 'Method not allowed for this task action.' });
   }
 
   // GET /api/report?id=<id>&kind=task|prototype — the prototype "report card":
