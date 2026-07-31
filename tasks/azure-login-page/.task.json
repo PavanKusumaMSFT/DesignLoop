@@ -3,9 +3,21 @@
   "title": "Azure Login Page",
   "description": "Full design lifecycle for an Azure sign-in / login page prototype.",
   "created": "2026-07-29",
-  "phases": ["research", "strategy", "ideation", "designs", "prototypes", "tests", "handoff"],
+  "phases": [
+    "research",
+    "strategy",
+    "ideation",
+    "designs",
+    "prototypes",
+    "tests",
+    "handoff"
+  ],
   "prototype": {
     "workspaceRoute": "/azure-login-page",
     "source": "prototype-workspace/app/azure-login-page/page.tsx"
-  }
+  },
+  "shared": true,
+  "branch": "task/azure-login-page",
+  "sharedBy": "pavankusuma",
+  "sharedAt": "2026-07-31T09:41:34.141Z"
 }
